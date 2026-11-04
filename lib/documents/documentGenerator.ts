@@ -96,7 +96,7 @@ ${data.programGoals}
 
 ## 3. Core Learning Domains & Threefold Learning
 1. **Academic Main Lesson**: Language arts, arithmetic, geography, history, and natural sciences taught in focused 3–4 week immersive blocks.
-2. **Arts & Expression**: Wet-on-Wet watercolor, beeswax modeling, block crayon drawing, pastel chalkboard art, flute, and choral singing.
+2. **Arts & Expression**: Wet-on-Wet watercolor, beeswax modeling, crayon drawing, pastel chalkboard art, flute, and choral singing.
 3. **Movement & Practical Craft**: Handwork (knitting, sewing, weaving), gardening, traditional carpentry, and folk games.
 
 ## 4. Pedagogical Methods & Rhythms
@@ -125,7 +125,7 @@ At age 8 to 9 (the "nine-year change"), children experience a subtle awakening o
 - **Language Arts**: Traditional Vietnamese folklore, spoken storytelling, vowel/consonant grammar, cursive writing.
 - **Mathematics & Practical Measurement**: Origin of weights, measures, time, and currency through honest exchange.
 - **Local Geography & Crafts**: The river estuary life of Thu Bồn, Thanh Hà pottery, Kim Bồng woodworking.
-- **Artistic Work**: Wet-on-Wet watercolor exploring color polarities; Beeswax block crayon technique; Chalkboard drawing.
+- **Artistic Work**: Wet-on-Wet watercolor exploring color polarities; Crayon drawing technique (vẽ màu sáp); Chalkboard drawing.
 
 ## 3. Learning Outcomes & Observational Standards
 - Retell cultural stories with vocal warmth, natural rhythm, and steady breath pauses.

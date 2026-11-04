@@ -68,7 +68,7 @@ When the plant grew tall and fragrant blossoms bloomed, Cloud brought the sweete
       "Master carpenter from Kim Bồng crafts a bench but cannot easily trade for salt.",
       ["carpenter", "wood", "salt", "bench"],
       "crayon",
-      "Waldorf beeswax block crayon illustration on cream paper, warm golden amber and rich earth tones, a wooden bench under a tropical banyan tree, broad textured strokes"
+      "Waldorf crayon drawing on cream paper, warm golden amber and rich earth tones, a wooden bench under a tropical banyan tree, broad textured strokes"
     ),
     createScene(
       3,

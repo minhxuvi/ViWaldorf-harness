@@ -8,7 +8,7 @@
 |---|---|---|---|
 | **Orchestrator** | `muse-wonder-1.0` | Socratic dialogue, pedagogical reflection, story narrative segmentation, lesson rhythm coordination. | Cloud Meta AI API (`META_API_KEY`) / local fallback |
 | **Worker** | `muse-spark-1.3` | Content generation, markdown documentation, code contributor workflows. | Cloud Meta AI API (`META_API_KEY`) |
-| **Visual Art** | `muse-image-1.0` | Goethean wet-on-wet watercolor, beeswax block crayons, and dark slate chalkboard artwork. | Cloud Meta AI API (`META_API_KEY`) / local procedural SVG |
+| **Visual Art** | `muse-image-1.0` | Goethean wet-on-wet watercolor, crayon drawing with beeswax crayons, and dark slate chalkboard artwork. | Cloud Meta AI API (`META_API_KEY`) / local procedural SVG |
 | **Acoustics** | `muse-voice-transcribe-1.0` | Vietnamese speech recognition preserving regional accents and dialects with timestamps. | Cloud Meta AI API (`META_API_KEY`) / Web Speech API |
 
 ## 2. Inviolable Governance & Offline Fallback Seams

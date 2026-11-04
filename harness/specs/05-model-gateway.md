@@ -9,7 +9,7 @@ The system follows a model gateway architecture centered exclusively on Meta AI 
 ### Meta AI / Muse Architecture (`META_API_KEY`)
 - `muse-wonder-1.0`: High-level orchestrator, lesson planning, and Waldorf pedagogical companion.
 - `muse-spark-1.3`: Autonomous worker for code and markdown editing.
-- `muse-image-1.0`: Visual artwork generation for Waldorf scenes (Goethean wet-on-wet watercolor, beeswax block crayons, and chalkboard pastel).
+- `muse-image-1.0`: Visual artwork generation for Waldorf scenes (Goethean wet-on-wet watercolor, crayon drawing with beeswax crayons, and chalkboard pastel).
 - `muse-voice-transcribe-1.0`: Regional dialect-aware Vietnamese speech-to-text with timestamps.
 
 ## 2. In-Browser Live Dictation & Local Fallback Seams

@@ -33,7 +33,7 @@ export default function ChatPage() {
 Principles:
 - Nurture the child's living flame (head, heart, hands) and breathing rhythm (in-breath focus, out-breath creative movement).
 - Deep reverence for Vietnamese culture, seasonal festivals, folklore, and regional dialects (Northern, Central, Southern). Never penalize regional accents.
-- Guide educators in Goethean arts (Wet-on-Wet watercolor with lemon yellow, Prussian blue, vermilion; beeswax block crayons; chalkboard pastel art).
+- Guide educators in Goethean arts (Wet-on-Wet watercolor with lemon yellow, Prussian blue, vermilion; crayon drawing with natural beeswax crayons; chalkboard pastel art).
 - Provide warm, non-punitive, non-judgmental guidance. Never use cold numeric grading or rankings.
 - Respond warmly and poetically in the user's language (Vietnamese or English). Keep answers practical and inspiring.`,
     model: "ViWaldorf Persona Initializer (DAO.md Compass)",
@@ -221,11 +221,11 @@ Principles:
           lang === "vi"
             ? `Về nghệ thuật cho truyện "${selectedStory?.title || "Vườn học"}":
 1. **Màu nước ướt-trên-ướt (Wet-on-Wet)**: Cho cảnh bến sông Thu Bồn, hãy bắt đầu bằng vạt vàng chanh ấm ở trung tâm, sau đó đưa xanh lam phổ tràn vào từ rìa giấy ẩm. Hai màu gặp nhau sẽ sinh ra sắc xanh non tự nhiên của bờ bãi mà không cần viền sắc cạnh.
-2. **Sáp ong khối (Beeswax Crayon)**: Dùng cạnh phẳng của thỏi sáp màu đất son (terracotta) và nâu đất để vẽ chiếc ghế gỗ Kim Bồng. Chồng nhẹ lớp vàng ấm lên trên để tạo vân gỗ óng ả.
+2. **Màu sáp (Crayon Drawing)**: Kỹ thuật vẽ màu sáp dùng cạnh phẳng của thỏi sáp màu đất son (terracotta) và nâu đất để vẽ chiếc ghế gỗ Kim Bồng, chồng nhẹ lớp vàng ấm lên trên để tạo vân gỗ óng ả mà không viền nét cứng.
 3. **Phấn bảng đen (Chalkboard)**: Vẽ những chuỗi đồng xu và đèn lồng Hội An tỏa ánh sáng vàng rực rỡ từ nền tối mờ của bảng đá đen.`
             : `Artistic guidance for "${selectedStory?.title || "Class Story"}":
 1. **Wet-on-Wet Watercolor**: For the river estuary scene, begin with a gentle luminous wash of lemon yellow in the center, allowing Prussian blue to sweep in from the damp paper edges. Their soft meeting naturally births fresh leaf green shores without harsh outlines.
-2. **Beeswax Block Crayon**: Use the flat broad edge of terracotta and ochre wax blocks for the carpenter's wooden bench, layering golden warmth over earth tones.
+2. **Crayon Drawing (Beeswax Crayon)**: Use broad flat strokes and warm terracotta and ochre tones with natural beeswax crayons for the carpenter's wooden bench, layering golden warmth over earth tones without sharp outlines.
 3. **Chalkboard Pastel**: Render the Hội An lantern reflections and ancient coins with glowing golden chalks against the deep matte slate blackboard.`;
       } else if (
         lower.includes("breath") ||
@@ -262,7 +262,7 @@ Children absorb the living picture in the silent space between words. When trans
 Principles:
 - Nurture the child's living flame (head, heart, hands) and breathing rhythm.
 - Deep reverence for Vietnamese culture, seasonal festivals, folklore, and regional dialects.
-- Guide educators in Goethean arts (Wet-on-Wet watercolor, beeswax block crayons, chalkboard pastel art).
+- Guide educators in Goethean arts (Wet-on-Wet watercolor, crayon drawing with beeswax crayons, chalkboard pastel art).
 - Provide warm, non-punitive, non-judgmental guidance.`,
         model: "Local Pedagogical Synthesizer (DAO.md Heuristics)",
         provider: "local",

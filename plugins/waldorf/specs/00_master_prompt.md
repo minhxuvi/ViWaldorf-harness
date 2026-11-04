@@ -5,7 +5,7 @@
   1. Upload or paste a story, automatically divide it into memorable scenes.
   2. Generate age-appropriate illustrations using three authentic Waldorf artistic techniques:
      - **Wet-on-Wet Watercolor** (Goethean color theory, soft diffused washes)
-     - **Beeswax Block Crayon** (broad textured strokes on warm paper)
+     - **Crayon Drawing** (broad textured strokes with natural beeswax crayons on warm paper)
      - **Chalkboard Drawing** (luminous pastel chalks on dark slate)
   3. Record oral retellings, measure acoustic delivery directly in the browser (duration, RMS dB loudness, dynamic range, pause ratio %, speaking pace WPM).
   4. Edit transcriptions, preserve regional Vietnamese dialects without flattening accents, and receive encouraging, holistic feedback.

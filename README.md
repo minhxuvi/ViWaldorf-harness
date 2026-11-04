@@ -59,7 +59,7 @@ The application provides exact visual and workflow parity with the native macOS 
    - Overview of active stories, practice metrics, dialect rules, and seasonal curriculum rhythms.
 2. **Story Retelling Practice**:
    - Story selection and upload (.txt / .md / manual input) with automated scene decomposition.
-   - **Step 1 — Scene Map & 3 Waldorf Art Techniques**: Wet-on-Wet watercolor (Goethean color theory washes), Beeswax block crayon, and Chalkboard pastel drawing. Includes procedural canvas rendering and AI generation prompts.
+   - **Step 1 — Scene Map & 3 Waldorf Art Techniques**: Wet-on-Wet watercolor (Goethean color theory washes), Crayon drawing (beeswax crayons), and Chalkboard pastel drawing. Includes procedural canvas rendering and AI generation prompts.
    - **Step 2 — Voice Recording & Acoustic Analysis**: Direct in-browser 24kHz WAV audio recording with immediate acoustic delivery metrics (duration, RMS loudness dB, dynamic range, pause ratio %, and pace in WPM).
    - **Step 3 — Transcription & Dialect Adaptation**: Privacy-first transcription with explicit consent toggles. Local dialect rule engine preserving regional pronunciations (Quảng Nam, Central, Northern, Southern).
    - **Constructive Heuristic Feedback**: Warm, encouragement-oriented feedback without punitive numerical scores.

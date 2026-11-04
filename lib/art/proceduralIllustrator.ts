@@ -135,7 +135,7 @@ export class ProceduralIllustrator {
       <rect width="${w}" height="${h}" fill="#FFF8EE" />
       <rect width="${w}" height="${h}" fill="url(#crayon-hatch-${ord})" />
       
-      <!-- Tactile Beeswax Block Crayon Layers -->
+      <!-- Tactile Beeswax Crayon Layers -->
       ${
         isPillar
           ? `<rect x="${w * 0.42}" y="60" width="${w * 0.16}" height="300" fill="#B85C38" fill-opacity="0.7" rx="8" />

@@ -43,10 +43,10 @@ export class ModelGateway {
         );
       case "crayon":
         return (
-          `An authentic Waldorf beeswax block crayon illustration on textured heavy cream drawing paper depicting: "${cleanSummary}". ` +
-          `Medium: Pure natural Stockmar beeswax block crayons, visible pebbled paper tooth with speckled wax adherence and warm matte wax sheen. ` +
+          `An authentic Waldorf crayon drawing on textured heavy cream drawing paper depicting: "${cleanSummary}". ` +
+          `Medium: Pure natural Waldorf beeswax crayons (Stockmar style, blocks and sticks), visible pebbled paper tooth with speckled wax adherence and warm matte wax sheen. ` +
           `Color & Lighting: Concentric radiating aura of warm light; pure golden lemon yellow core radiating outwards through warm honey orange, peach, and vermilion, into soft turquoise and cobalt blue in the outer corners. ` +
-          `Technique: Broad flat-edge wax block strokes layered with fine directional textured hatching following living organic contours; soft translucent layering where undertones shine through; shadows created with complementary deep blue and violet rather than black. ` +
+          `Technique: Authentic Waldorf crayon drawing technique; broad flat strokes laying down luminous fields of color layered with gentle directional textured hatching following organic contours; soft translucent wax glazes where undertones shine through; shadows created with complementary deep blue and violet rather than black. ` +
           `Subject: tender and living archetypal forms, warm nurturing atmosphere, reverent storytelling quality.`
         );
       case "chalkboard":

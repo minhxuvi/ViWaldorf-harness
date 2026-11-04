@@ -5,7 +5,7 @@ const SYSTEM_INSTRUCTION = `You are ViWaldorf, a gentle, wise Waldorf pedagogica
 Principles:
 - Nurture the child's living flame (head, heart, hands) and breathing rhythm (in-breath focus, out-breath creative movement).
 - Deep reverence for Vietnamese culture, seasonal festivals, folklore, and regional dialects (Northern, Central, Southern). Never penalize regional accents.
-- Guide educators in Goethean arts (Wet-on-Wet watercolor with lemon yellow, Prussian blue, vermilion; beeswax block crayons; chalkboard pastel art).
+- Guide educators in Goethean arts (Wet-on-Wet watercolor with lemon yellow, Prussian blue, vermilion; crayon drawing with natural beeswax crayons; chalkboard pastel art).
 - Provide warm, non-punitive, non-judgmental guidance. Never use cold numeric grading or rankings.
 - Respond warmly and poetically in the user's language (Vietnamese or English). Keep answers practical and inspiring.`;
 
@@ -107,11 +107,11 @@ export async function POST(request: NextRequest) {
           lang === "vi"
             ? `Về nghệ thuật và sắc màu Waldorf (muse-wonder-1.0):
 1. **Màu nước ướt-trên-ướt (Wet-on-Wet)**: Tạo nền giấy ẩm với 3 màu cơ bản Goethe (vàng chanh, xanh lam Phổ, đỏ son). Để màu tự lan tỏa và hòa quyện hữu cơ, tuyệt đối không viền nét đen.
-2. **Sáp ong khối (Beeswax Block Crayon)**: Dùng mặt phẳng của thỏi sáp miết dải màu rộng, tạo cảm giác ấm áp và kết cấu tự nhiên của giấy vẽ.
+2. **Màu sáp (Crayon Drawing)**: Kỹ thuật vẽ màu sáp với sáp ong tự nhiên (Beeswax Crayons). Dùng mặt phẳng hoặc cạnh thỏi sáp miết dải màu rộng tạo cảm giác ấm áp và kết cấu tự nhiên của giấy vẽ, kết hợp đan nét nhẹ theo hình thể hữu cơ mà không dùng nét viền đen.
 3. **Phấn bảng đen (Chalkboard Drawing)**: Kéo ánh sáng tinh khôi từ bóng tối sâu thẳm của phiến đá đen, tạo chiều sâu thị giác tôn kính cho bài học.`
             : `Regarding Waldorf Artistic Guidance (muse-wonder-1.0):
 1. **Wet-on-Wet Watercolor**: Prepare damp cotton paper and apply luminous Goethean primaries (lemon yellow, Prussian blue, vermilion). Allow colors to breathe and meet organically without black contour lines.
-2. **Beeswax Block Crayon**: Utilize broad flat-edge strokes to bring forth living warmth and organic paper tooth.
+2. **Crayon Drawing (Beeswax Crayon)**: Utilize broad flat strokes and layered organic contours with natural beeswax crayons to bring forth living warmth and organic paper tooth without harsh black lines.
 3. **Chalkboard Pastel**: Draw radiant golden light out of the cosmic dark slate, nurturing the child's imaginative feeling life.`;
       } else if (lower.includes("breath") || lower.includes("thở") || lower.includes("nhịp") || lower.includes("rhythm")) {
         replyText =

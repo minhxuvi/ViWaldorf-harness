@@ -19,13 +19,13 @@ Waldorf education honors the threefold nature of the growing child:
 - **Figures**: Gentle archetypal silhouettes in loose natural attire, soft-focus poetic impression without cartoonish or hyper-detailed facial features.
 - **Strict Negative Constraints**: Zero black ink lines, no harsh cartoon borders, no 3D CGI gloss, no anime/manga eyes, no text or typography.
 
-### 2. Beeswax Block Crayon (`crayon`)
+### 2. Crayon Drawing / Kỹ thuật vẽ Màu sáp (`crayon`)
 - **Recommended Age**: Grades 1–5 (ages 6–11).
-- **Core Principle**: Layered translucent beeswax glaze over textured cream drawing paper.
+- **Core Principle**: Kỹ thuật vẽ màu sáp (Crayon Drawing) tạo hình từ mảng màu và cảm nhận bề mặt giấy; sử dụng chất liệu sáp ong tự nhiên (beeswax crayons, bao gồm cả sáp khối *block crayons* và sáp que/thỏi *stick crayons*). Lớp sáp ong bán trong suốt (*translucent beeswax glaze*) phủ nhẹ trên giấy vẽ màu kem có thớ nổi tự nhiên.
 - **Surface & Texture**: Heavy pebbled vellum drawing paper tooth where natural Stockmar beeswax catches on raised bumps, producing a distinctive speckled wax grain (scumbling/frottage) and warm matte sheen.
 - **Lighting & Color**: Concentric radiating halos of warm light (golden lemon yellow core radiating outwards through warm honey orange, peach, and vermilion, into soft turquoise/cobalt in the corners).
 - **Steiner Complementary Shadow Law**: Shadows are **never flat dead black**; shadows are built by layering complementary blues, deep purples, and indigo over warm undertones.
-- **Stroke Dynamics**: Broad flat-edge diagonal block strokes layered with expressive directional hatching following the living contours of animals, trees, and figures.
+- **Stroke Dynamics**: Broad flat-edge strokes (dùng cạnh phẳng hoặc mặt thỏi sáp) tạo mảng màu lớn, kết hợp đan nét hữu cơ (*directional organic hatching*) bám theo hình thể của cảnh vật mà không dùng đường viền đen.
 - **Strict Negative Constraints**: No cheap waxy oil-pastel smudges, no black outlines, no felt-tip markers, no flat digital fills, no sharp vector clip art.
 
 ### 3. Chalkboard Drawing (`chalkboard`)
@@ -60,12 +60,12 @@ Color Palette: Vibrant natural chalk pastels: warm butter yellow, golden ochre, 
 Composition: [SUBJECT_DETAILS], dignified and archetypal living narrative, timeless reverent classroom pedagogical illustration, decorative hand-drawn chalk vine border.
 ```
 
-### C. Beeswax Block Crayon
+### C. Crayon Drawing (Beeswax Crayon)
 ```text
-An authentic Waldorf beeswax block crayon illustration on textured heavy cream drawing paper depicting [SCENE_TITLE] - [SCENE_SUMMARY].
-Medium: Pure natural Stockmar beeswax block crayons, visible pebbled paper tooth with speckled wax adherence and warm matte wax sheen.
+An authentic Waldorf crayon drawing on textured heavy cream drawing paper depicting [SCENE_TITLE] - [SCENE_SUMMARY].
+Medium: Pure natural Waldorf beeswax crayons (Stockmar style, blocks and sticks), visible pebbled paper tooth with speckled wax adherence and warm matte wax sheen.
 Color & Lighting: Concentric radiating aura of warm light; pure golden lemon yellow core radiating outwards through warm honey orange, peach, and vermilion, into soft turquoise and cobalt blue in the outer corners.
-Technique: Broad flat-edge wax block strokes layered with fine directional textured hatching following living organic contours; soft translucent layering where undertones shine through; shadows created with complementary deep blue and violet rather than black.
+Technique: Authentic Waldorf crayon drawing technique; broad flat strokes laying down luminous fields of color layered with gentle directional textured hatching following organic contours; soft translucent wax glazes where undertones shine through; shadows created with complementary deep blue and violet rather than black.
 Subject: [SUBJECT_DETAILS], tender and living archetypal forms, warm nurturing atmosphere, reverent storytelling quality.
 ```
 

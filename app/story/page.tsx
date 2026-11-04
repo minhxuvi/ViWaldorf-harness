@@ -1742,10 +1742,10 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
                             </span>
                             <span className="font-serif">
                               {selectedStory.defaultArtStyle === "wet-on-wet"
-                                ? "Wet-on-Wet Watercolor"
+                                ? t.story.styleWetOnWet
                                 : selectedStory.defaultArtStyle === "crayon"
-                                ? "Beeswax Block Crayon"
-                                : "Chalkboard Pastel"}
+                                ? t.story.styleCrayon
+                                : t.story.styleChalkboard}
                             </span>
                           </div>
                         </div>
