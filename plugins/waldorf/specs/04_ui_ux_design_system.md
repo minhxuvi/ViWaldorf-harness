@@ -27,7 +27,11 @@ The interface reproduces the warmth, texture, and organic serenity of hand-craft
 - **Cards**: Rounded 14px–16px corners with subtle warm shadows (`rgba(60, 50, 20, 0.05)`).
 - **Navigation**: Persistent left sidebar (250px) on desktop; fluid top-bar drawer on mobile screens.
 
-## 3. Story Retelling Studio & Accessible Voice Bar
+## 3. Story Retelling Studio, Storybook Reader & Accessible Voice Bar
 
-- **Single-Scene Theater Stage**: Displays exactly one scene artwork at a time to prevent cognitive overload. Navigable via Prev/Next buttons, keyboard arrow keys, progress stepper dots, and touch-swipe gestures.
-- **Persistent Floating Voice Bar**: Docked at `bottom-4` / `bottom-6` with backdrop blur, terracotta/forest buttons, live recording timer, scene index stepper (`< Scene X / Y >`), and audio playback—guaranteeing zero loss of recording controls during page scrolling.
+- **Dual Experience Mode Switcher**: Seamlessly toggles between **Retelling Studio** (`studio`) for active oral rehearsal and **Storybook Reader** (`reader`) for quiet, immersive whole-story contemplation.
+- **Single-Scene Theater Stage**: Displays exactly one scene artwork at a time to prevent cognitive overload. Navigable via Prev/Next buttons, keyboard arrow keys (`←`/`→`), progress stepper dots, and touch-swipe gestures.
+- **Illustrated Storybook Reader**: Provides authentic picture-book presentation (large Goethean artwork + illuminated story text with drop cap and page turner) and continuous prose reading with embedded illustrations and oral audio playback.
+- **Full Story Reference Slide-over Drawer**: Instantly accessible from the Studio without losing active recording state, gently highlighting the current scene within the complete narrative arc.
+- **Focused Oral Workspace**: Replaces redundant prompt boxes with a cohesive dictation, dialect learning, and acoustic analysis report center.
+- **Persistent Floating Voice Bar**: Docked at `bottom-4` / `bottom-6` with backdrop blur, terracotta/forest buttons, live recording timer, scene index stepper (`< Scene X / Y >`), audio playback, and quick full-story trigger—guaranteeing zero loss of recording controls during page scrolling without overlapping content (`pb-28`).

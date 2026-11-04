@@ -3,13 +3,21 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useApp } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
-import { WaldorfArtStyle, StoryScene, AudioDeliveryMetrics, PracticeAttempt } from "@/lib/types";
+import {
+  WaldorfArtStyle,
+  StoryScene,
+  AudioDeliveryMetrics,
+  PracticeAttempt,
+  StoryViewMode,
+  ReaderViewMode,
+} from "@/lib/types";
 import { ProceduralIllustrator } from "@/lib/art/proceduralIllustrator";
 import { WavAnalyzer } from "@/lib/audio/wavAnalyzer";
 import { DialectAdaptationEngine } from "@/lib/dialect/dialectEngine";
 import { ModelGateway } from "@/lib/ai/modelGateway";
 import {
   BookOpen,
+  Book,
   Mic,
   Square,
   Upload,
@@ -25,10 +33,34 @@ import {
   Wind,
   Layers,
   RotateCcw,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
+  X,
+  FileText,
+  Clock,
+  Bookmark,
 } from "lucide-react";
+
+const cleanKeyword = (kw: string) =>
+  kw.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'“”’—–]/g, "").trim();
+
+const stopWordSet = new Set([
+  "the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "with", "by", "from",
+  "is", "it", "this", "that", "there", "then", "their", "they", "was", "were", "be",
+  "as", "of", "into", "within", "over", "under", "all", "so", "no", "not", "when",
+  "his", "her", "him", "who", "whose", "had", "have", "has", "could", "would",
+  "và", "hoặc", "trong", "trên", "tại", "cho", "với", "từ", "của", "những", "các", "một",
+  "đã", "đang", "sẽ", "là", "thì", "mà", "nhưng", "được", "bị", "bởi",
+  "khi", "này", "đó", "ra", "vào", "lại", "rồi", "lúc", "người", "như", "rất", "cũng"
+]);
+
+const sanitizeKeywords = (keywords?: string[]): string[] => {
+  if (!keywords || !Array.isArray(keywords)) return [];
+  return keywords
+    .map(cleanKeyword)
+    .filter((w) => w.length > 2 && !stopWordSet.has(w.toLowerCase()))
+    .slice(0, 5);
+};
 
 export default function StoryPage() {
   const {
@@ -43,7 +75,12 @@ export default function StoryPage() {
     lang,
   } = useApp();
 
-  // Mode and form states
+  // View Mode: Retelling Studio vs Storybook Reader
+  const [viewMode, setViewMode] = useState<StoryViewMode>("studio");
+  const [readerStyle, setReaderStyle] = useState<ReaderViewMode>("picture-book");
+  const [isFullStoryOpen, setIsFullStoryOpen] = useState(false);
+
+  // Practice & Form states
   const [practiceMode, setPracticeMode] = useState<"prompt" | "fading" | "free">("prompt");
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadTitle, setUploadTitle] = useState("");
@@ -77,6 +114,9 @@ export default function StoryPage() {
   const [dialectNotice, setDialectNotice] = useState("");
   const [speechSupported, setSpeechSupported] = useState(false);
 
+  // Free practice reveal state
+  const [isFreePracticeRevealed, setIsFreePracticeRevealed] = useState(false);
+
   // Refs for audio recording & speech recognition
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -100,7 +140,7 @@ export default function StoryPage() {
     }
   }, []);
 
-  // When active story changes, reset retelling state cleanly (DO NOT dump story source text into retelling transcript!)
+  // When active story changes, reset retelling state cleanly
   useEffect(() => {
     if (selectedStory) {
       setTranscript("");
@@ -109,6 +149,7 @@ export default function StoryPage() {
       setRecordedAudioUrl(null);
       setAudioMetrics(null);
       setActiveSceneIndex(0);
+      setIsFreePracticeRevealed(false);
     }
   }, [selectedStory?.id]);
 
@@ -119,13 +160,33 @@ export default function StoryPage() {
     };
   }, []);
 
+  // Keyboard navigation for scenes / book pages
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        handlePrevScene();
+      } else if (e.key === "ArrowRight") {
+        handleNextScene();
+      } else if (e.key === "Escape" && isFullStoryOpen) {
+        setIsFullStoryOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedStory?.scenes?.length, activeSceneIndex, isFullStoryOpen]);
+
   // Generate AI artwork for a single scene
   const handleGenerateSceneArt = async (sceneId: string) => {
     if (!selectedStory) return;
     const targetScene = selectedStory.scenes.find((s) => s.id === sceneId);
     if (!targetScene) return;
 
-    // Set generating status
     updateData((prev) => ({
       ...prev,
       stories: prev.stories.map((s) => {
@@ -182,21 +243,81 @@ export default function StoryPage() {
     }
   };
 
-  // Generate artwork for all scenes in active story
+  // Generate AI art for ALL scenes in the active story
   const handleGenerateAllScenesArt = async () => {
     if (!selectedStory || isGeneratingAllScenes) return;
     setIsGeneratingAllScenes(true);
 
-    for (const scene of selectedStory.scenes) {
-      await handleGenerateSceneArt(scene.id);
-    }
+    try {
+      for (const sc of selectedStory.scenes) {
+        updateData((prev) => ({
+          ...prev,
+          stories: prev.stories.map((s) => {
+            if (s.id !== selectedStory.id) return s;
+            return {
+              ...s,
+              scenes: s.scenes.map((curr) =>
+                curr.id === sc.id ? { ...curr, isGenerating: true } : curr
+              ),
+            };
+          }),
+        }));
 
-    setIsGeneratingAllScenes(false);
+        try {
+          const res = await ModelGateway.generateSceneArtwork({
+            scene: sc,
+            style: sc.artStyle,
+            provider: aiProvider,
+            googleApiKey,
+            metaApiKey,
+          });
+
+          updateData((prev) => ({
+            ...prev,
+            stories: prev.stories.map((s) => {
+              if (s.id !== selectedStory.id) return s;
+              return {
+                ...s,
+                scenes: s.scenes.map((curr) =>
+                  curr.id === sc.id
+                    ? {
+                        ...curr,
+                        imagePath: res.imageUrl,
+                        imageSourceLabel: res.sourceLabel,
+                        isGenerating: false,
+                        generationError: null,
+                      }
+                    : curr
+                ),
+              };
+            }),
+          }));
+        } catch (sceneErr: any) {
+          console.warn("Error generating art for scene", sc.ord, sceneErr);
+          updateData((prev) => ({
+            ...prev,
+            stories: prev.stories.map((s) => {
+              if (s.id !== selectedStory.id) return s;
+              return {
+                ...s,
+                scenes: s.scenes.map((curr) =>
+                  curr.id === sc.id
+                    ? { ...curr, isGenerating: false, generationError: sceneErr.message }
+                    : curr
+                ),
+              };
+            }),
+          }));
+        }
+      }
+    } finally {
+      setIsGeneratingAllScenes(false);
+    }
   };
 
-  // Handle Manual Story Submission & Context-Aware Semantic Scene Splitting
+  // Upload/Manual story submission
   const handleSaveUploadedStory = async () => {
-    if (!uploadText.trim() || isSegmenting) return;
+    if (!uploadText.trim()) return;
     setIsSegmenting(true);
 
     const title = uploadTitle.trim() || uploadText.trim().split("\n")[0].substring(0, 40) + "...";
@@ -242,7 +363,6 @@ export default function StoryPage() {
     setUploadText("");
     setIsSegmenting(false);
 
-    // If auto-generation is enabled and an API key is available, generate artwork asynchronously
     if (autoGenerateArtOnUpload && (googleApiKey || metaApiKey)) {
       setTimeout(async () => {
         for (const sc of generatedScenes) {
@@ -276,7 +396,7 @@ export default function StoryPage() {
     }
   };
 
-  // Re-segment currently selected story using narrative context analysis
+  // Re-segment currently selected story
   const handleResegmentActiveStory = async () => {
     if (!selectedStory || isSegmenting) return;
     setIsSegmenting(true);
@@ -348,25 +468,6 @@ export default function StoryPage() {
     setTouchEndX(null);
   };
 
-  // Keyboard left/right arrow navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        document.activeElement?.tagName === "INPUT" ||
-        document.activeElement?.tagName === "TEXTAREA"
-      ) {
-        return;
-      }
-      if (e.key === "ArrowLeft") {
-        handlePrevScene();
-      } else if (e.key === "ArrowRight") {
-        handleNextScene();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [totalScenes, activeSceneIndex]);
-
   // Handle File Upload (.txt / .md)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -394,7 +495,11 @@ export default function StoryPage() {
         return {
           ...s,
           defaultArtStyle: newStyle,
-          scenes: s.scenes.map((sc) => ({ ...sc, artStyle: newStyle })),
+          scenes: s.scenes.map((sc) => ({
+            ...sc,
+            artStyle: newStyle,
+            imageSourceLabel: sc.imagePath ? sc.imageSourceLabel : `Procedural Art (${newStyle})`,
+          })),
         };
       }),
     }));
@@ -615,6 +720,21 @@ export default function StoryPage() {
     setTimeout(() => setDialectNotice(""), 4000);
   };
 
+  const activeStoryText = selectedStory
+    ? lang === "vi" && selectedStory.sourceTextVi
+      ? selectedStory.sourceTextVi
+      : selectedStory.sourceText
+    : "";
+
+  const activeStoryTitle = selectedStory
+    ? lang === "vi" && selectedStory.titleVi
+      ? selectedStory.titleVi
+      : selectedStory.title
+    : "";
+
+  const storyWordCount = activeStoryText.trim().split(/\s+/).filter(Boolean).length;
+  const estimatedReadMinutes = Math.max(1, Math.round(storyWordCount / 130));
+
   return (
     <div className="space-y-6 pb-28">
       <PageHeader title={t.story.title} subtitle={t.story.subtitle} />
@@ -665,8 +785,18 @@ export default function StoryPage() {
           </div>
         </div>
 
-        <div className="mt-3 text-xs text-inkSoft">
-          {data.attempts.length} {t.story.statsInfo} · {data.dialectRules.length} rules
+        <div className="mt-3 text-xs text-inkSoft flex items-center justify-between">
+          <span>
+            {data.attempts.length} {t.story.statsInfo} · {data.dialectRules.length} rules
+          </span>
+          {selectedStory && (
+            <span className="flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-forest" />
+              <span>
+                ~{estimatedReadMinutes} {t.story.minRead || "min read"} ({storyWordCount} words)
+              </span>
+            </span>
+          )}
         </div>
       </div>
 
@@ -765,526 +895,932 @@ export default function StoryPage() {
 
       {selectedStory && (
         <div className="space-y-6">
-          {/* Practice Mode Switcher */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-[#F7ECD8]/60 border border-line">
+          {/* PRIMARY VIEW MODE SWITCHER: RETELLING STUDIO vs STORYBOOK READER */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-[#F7ECD8]/80 rounded-2xl border border-line shadow-sm">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-forestDark">Practice Mode:</span>
-              <div className="flex rounded-lg bg-white p-1 border border-line">
-                <button
-                  onClick={() => setPracticeMode("prompt")}
-                  className={`px-3 py-1 rounded text-xs font-semibold transition ${
-                    practiceMode === "prompt" ? "bg-forest text-white" : "text-inkSoft"
-                  }`}
-                >
-                  {t.story.modePrompt}
-                </button>
-                <button
-                  onClick={() => setPracticeMode("fading")}
-                  className={`px-3 py-1 rounded text-xs font-semibold transition ${
-                    practiceMode === "fading" ? "bg-forest text-white" : "text-inkSoft"
-                  }`}
-                >
-                  {t.story.modeFading}
-                </button>
-                <button
-                  onClick={() => setPracticeMode("free")}
-                  className={`px-3 py-1 rounded text-xs font-semibold transition ${
-                    practiceMode === "free" ? "bg-forest text-white" : "text-inkSoft"
-                  }`}
-                >
-                  {t.story.modeFree}
-                </button>
-              </div>
+              <button
+                onClick={() => setViewMode("studio")}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 ${
+                  viewMode === "studio"
+                    ? "bg-forest text-white shadow"
+                    : "bg-white/80 text-forestDark hover:bg-white border border-line"
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                <span>{t.story.studioTab || "Retelling Studio"}</span>
+              </button>
+
+              <button
+                onClick={() => setViewMode("reader")}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 ${
+                  viewMode === "reader"
+                    ? "bg-forest text-white shadow"
+                    : "bg-white/80 text-forestDark hover:bg-white border border-line"
+                }`}
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>{t.story.readerTab || "Storybook Reader"}</span>
+              </button>
             </div>
 
-            {/* Art Style Selector for whole story */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-forestDark">Art Technique:</span>
-              <select
-                value={selectedStory.defaultArtStyle}
-                onChange={(e) => handleChangeStoryStyle(e.target.value as WaldorfArtStyle)}
-                className="px-2.5 py-1 rounded-lg border border-line bg-white text-xs font-medium"
+            {/* Quick action button based on current view mode */}
+            {viewMode === "studio" ? (
+              <button
+                onClick={() => setIsFullStoryOpen(true)}
+                className="btn-ghost text-xs py-1.5 px-3 flex items-center gap-1.5 font-medium shadow-sm"
+                title={t.story.readFullStoryBtn || "Read Full Story"}
               >
-                <option value="wet-on-wet">{t.story.styleWetOnWet}</option>
-                <option value="crayon">{t.story.styleCrayon}</option>
-                <option value="chalkboard">{t.story.styleChalkboard}</option>
-              </select>
-            </div>
+                <Book className="w-3.5 h-3.5 text-forest" />
+                <span>{t.story.readFullStoryBtn || "Read Full Story"}</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-forestDark hidden sm:inline">
+                  Style:
+                </span>
+                <div className="flex rounded-lg bg-white p-0.5 border border-line">
+                  <button
+                    onClick={() => setReaderStyle("picture-book")}
+                    className={`px-2.5 py-1 rounded text-xs font-semibold transition ${
+                      readerStyle === "picture-book"
+                        ? "bg-forest text-white"
+                        : "text-inkSoft hover:text-ink"
+                    }`}
+                  >
+                    {t.story.viewModeBook || "Picture Book"}
+                  </button>
+                  <button
+                    onClick={() => setReaderStyle("continuous")}
+                    className={`px-2.5 py-1 rounded text-xs font-semibold transition ${
+                      readerStyle === "continuous"
+                        ? "bg-forest text-white"
+                        : "text-inkSoft hover:text-ink"
+                    }`}
+                  >
+                    {t.story.viewModeContinuous || "Continuous"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* MERGED STEP 1 & 2: INTERACTIVE STORY RETELLING STUDIO */}
-          <div className="garden-card space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-              <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-forest" />
-                <h2 className="font-serif text-lg font-bold text-forestDark">
-                  {t.story.mergedStudioTitle || "Interactive Retelling Studio: Scene Journey & Voice Recording"}
-                </h2>
-                <span className="badge-leaf text-xs">
-                  {t.story.sceneCounter} {activeSceneIndex + 1} {t.story.ofWord || "of"} {totalScenes}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handleResegmentActiveStory}
-                  disabled={isSegmenting}
-                  className="btn-ghost text-xs py-1 text-forestDark hover:text-forest"
-                  title={t.story.resegmentByContextBtn}
-                >
-                  {isSegmenting ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5 text-terra" />
-                  )}
-                  <span>
-                    {isSegmenting ? t.story.segmentingStatus : t.story.resegmentByContextBtn}
-                  </span>
-                </button>
-
-                <button
-                  onClick={handleGenerateAllScenesArt}
-                  disabled={isGeneratingAllScenes}
-                  className="btn-primary text-xs py-1"
-                  title={t.story.generateAllArtBtn}
-                >
-                  {isGeneratingAllScenes ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3.5 h-3.5" />
-                  )}
-                  <span>
-                    {isGeneratingAllScenes ? "Painting all scenes..." : t.story.generateAllArtBtn}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            {/* SINGLE SCENE THEATER CAROUSEL (Touch Swipable & Button Controllable) */}
-            {currentScene && (
-              <div
-                className="relative rounded-2xl bg-[#FFFDF9] border border-line p-4 sm:p-5 space-y-4 shadow-sm"
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                {/* Scene Navigation Bar */}
-                <div className="flex items-center justify-between gap-2 border-b border-line pb-2.5">
-                  <div className="flex items-center gap-2">
+          {/* VIEW 1: INTERACTIVE RETELLING STUDIO */}
+          {viewMode === "studio" && (
+            <div className="space-y-6">
+              {/* Practice Mode & Technique Selector Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-[#F7ECD8]/50 border border-line">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-forestDark">Practice Mode:</span>
+                  <div className="flex rounded-lg bg-white p-1 border border-line">
                     <button
-                      onClick={handlePrevScene}
-                      disabled={activeSceneIndex <= 0}
-                      className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none"
+                      onClick={() => setPracticeMode("prompt")}
+                      className={`px-3 py-1 rounded text-xs font-semibold transition ${
+                        practiceMode === "prompt" ? "bg-forest text-white" : "text-inkSoft"
+                      }`}
                     >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                      <span>{t.story.prevSceneBtn}</span>
+                      {t.story.modePrompt}
                     </button>
                     <button
-                      onClick={handleNextScene}
-                      disabled={activeSceneIndex >= totalScenes - 1}
-                      className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none"
+                      onClick={() => setPracticeMode("fading")}
+                      className={`px-3 py-1 rounded text-xs font-semibold transition ${
+                        practiceMode === "fading" ? "bg-forest text-white" : "text-inkSoft"
+                      }`}
                     >
-                      <span>{t.story.nextSceneBtn}</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      {t.story.modeFading}
                     </button>
-                  </div>
-
-                  <span className="text-[11px] text-inkSoft italic hidden sm:inline">
-                    {t.story.swipeHint}
-                  </span>
-
-                  {/* Scene Stepper Indicator Dots */}
-                  <div className="flex items-center gap-1.5">
-                    {selectedStory.scenes.map((sc, idx) => (
-                      <button
-                        key={sc.id}
-                        onClick={() => setActiveSceneIndex(idx)}
-                        className={`transition-all rounded-full ${
-                          idx === activeSceneIndex
-                            ? "w-7 h-2 bg-forest shadow-sm"
-                            : "w-2 h-2 bg-[#D5C7B0] hover:bg-forest/60"
-                        }`}
-                        title={`Scene ${idx + 1}: ${sc.title}`}
-                      />
-                    ))}
+                    <button
+                      onClick={() => setPracticeMode("free")}
+                      className={`px-3 py-1 rounded text-xs font-semibold transition ${
+                        practiceMode === "free" ? "bg-forest text-white" : "text-inkSoft"
+                      }`}
+                    >
+                      {t.story.modeFree}
+                    </button>
                   </div>
                 </div>
 
-                {/* Single Artwork Card with Overlay Navigation Chevrons */}
-                {(() => {
-                  const proceduralSvgUrl = ProceduralIllustrator.generateArtSVG(
-                    currentScene,
-                    currentScene.artStyle
-                  );
-                  const displayArtUrl = currentScene.imagePath || proceduralSvgUrl;
-                  const isEditing = editingSceneId === currentScene.id;
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-forestDark">Art Technique:</span>
+                  <select
+                    value={selectedStory.defaultArtStyle}
+                    onChange={(e) => handleChangeStoryStyle(e.target.value as WaldorfArtStyle)}
+                    className="px-2.5 py-1 rounded-lg border border-line bg-white text-xs font-medium"
+                  >
+                    <option value="wet-on-wet">{t.story.styleWetOnWet}</option>
+                    <option value="crayon">{t.story.styleCrayon}</option>
+                    <option value="chalkboard">{t.story.styleChalkboard}</option>
+                  </select>
+                </div>
+              </div>
 
-                  return (
-                    <div className="space-y-4">
-                      <div className="relative w-full max-w-2xl mx-auto aspect-[16/10] rounded-xl overflow-hidden border border-line bg-[#FDF8EE] shadow-md group">
-                        <img
-                          src={displayArtUrl}
-                          alt={currentScene.title}
-                          className="w-full h-full object-cover transition duration-300"
-                        />
+              {/* SINGLE SCENE THEATER & PRACTICE STAGE */}
+              <div className="garden-card space-y-5">
+                {/* Unified Studio Stage Header */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-forest" />
+                    <h2 className="font-serif text-lg font-bold text-forestDark">
+                      {t.story.mergedStudioTitle || "Interactive Retelling Studio"}
+                    </h2>
+                    <span className="badge-leaf text-xs">
+                      {t.story.sceneCounter} {activeSceneIndex + 1} {t.story.ofWord || "of"} {totalScenes}
+                    </span>
+                  </div>
 
-                        {/* Side Overlay Chevrons on Artwork */}
-                        {activeSceneIndex > 0 && (
-                          <button
-                            onClick={handlePrevScene}
-                            className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-80 group-hover:opacity-100"
-                            title={t.story.prevSceneBtn}
-                          >
-                            <ChevronLeft className="w-5 h-5" />
-                          </button>
-                        )}
-                        {activeSceneIndex < totalScenes - 1 && (
-                          <button
-                            onClick={handleNextScene}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-80 group-hover:opacity-100"
-                            title={t.story.nextSceneBtn}
-                          >
-                            <ChevronRight className="w-5 h-5" />
-                          </button>
-                        )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleResegmentActiveStory}
+                      disabled={isSegmenting}
+                      className="btn-ghost text-xs py-1 text-forestDark hover:text-forest"
+                      title={t.story.resegmentByContextBtn}
+                    >
+                      {isSegmenting ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 text-terra" />
+                      )}
+                      <span>
+                        {isSegmenting ? t.story.segmentingStatus : t.story.resegmentByContextBtn}
+                      </span>
+                    </button>
 
-                        {/* Generating shimmer overlay */}
-                        {currentScene.isGenerating && (
-                          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center gap-2 text-white p-4 text-center">
-                            <RefreshCw className="w-7 h-7 animate-spin text-amber-300" />
-                            <span className="text-sm font-serif italic text-amber-100">
-                              {t.story.generatingArtStatus}
-                            </span>
-                          </div>
-                        )}
+                    <button
+                      onClick={handleGenerateAllScenesArt}
+                      disabled={isGeneratingAllScenes}
+                      className="btn-primary text-xs py-1"
+                      title={t.story.generateAllArtBtn}
+                    >
+                      {isGeneratingAllScenes ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5" />
+                      )}
+                      <span>
+                        {isGeneratingAllScenes ? "Painting all scenes..." : t.story.generateAllArtBtn}
+                      </span>
+                    </button>
+                  </div>
+                </div>
 
-                        {/* Top Action Buttons */}
-                        <div className="absolute top-2.5 right-2.5 flex gap-1.5">
-                          <button
-                            onClick={() => handleGenerateSceneArt(currentScene.id)}
-                            disabled={currentScene.isGenerating}
-                            className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1.5 font-semibold"
-                            title={t.story.generateAiArtBtn}
-                          >
-                            <Sparkles className="w-3.5 h-3.5 text-terra" />
-                            <span className="hidden sm:inline text-xs">{t.story.generateAiArtBtn}</span>
-                          </button>
-                          <button
-                            onClick={() => handleRegenerateScene(currentScene.id)}
-                            disabled={currentScene.isGenerating}
-                            className="p-1.5 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1"
-                            title={t.story.regenerateArtBtn}
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {/* Attribution Badge */}
-                        <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur text-white text-[11px] font-sans flex items-center gap-1.5">
-                          <span className="font-bold">{currentScene.artStyle.toUpperCase()}</span>
-                          <span>·</span>
-                          <span className="opacity-90">
-                            {currentScene.imageSourceLabel || "Procedural Art"}
-                          </span>
-                        </div>
+                {/* SCENE THEATER CAROUSEL (Touch Swipable & Clean Controls) */}
+                {currentScene && (
+                  <div
+                    className="relative rounded-2xl bg-[#FFFDF9] border border-line p-4 sm:p-5 space-y-4 shadow-sm"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    {/* Scene Navigation Bar */}
+                    <div className="flex items-center justify-between gap-2 border-b border-line pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handlePrevScene}
+                          disabled={activeSceneIndex <= 0}
+                          className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                          <span>{t.story.prevSceneBtn}</span>
+                        </button>
+                        <button
+                          onClick={handleNextScene}
+                          disabled={activeSceneIndex >= totalScenes - 1}
+                          className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none"
+                        >
+                          <span>{t.story.nextSceneBtn}</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
                       </div>
 
-                      {/* Scene Title, Context Summary & Inline Editing */}
-                      {isEditing ? (
-                        <div className="max-w-2xl mx-auto space-y-2.5 p-3.5 rounded-xl bg-white border border-line">
-                          <input
-                            type="text"
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            className="w-full px-3 py-1.5 rounded-lg border border-line text-sm font-semibold"
-                          />
-                          <textarea
-                            rows={3}
-                            value={editSummary}
-                            onChange={(e) => setEditSummary(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border border-line text-xs font-sans"
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleSaveSceneEdit(currentScene.id)}
-                              className="btn-primary text-xs py-1"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Save</span>
-                            </button>
-                            <button
-                              onClick={() => setEditingSceneId(null)}
-                              className="btn-ghost text-xs py-1"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="max-w-2xl mx-auto space-y-2 p-3.5 rounded-xl bg-white/70 border border-line">
-                          <div className="flex items-start justify-between gap-3">
-                            <h4 className="font-serif font-bold text-base text-forestDark leading-snug">
-                              {currentScene.title}
-                            </h4>
-                            <button
-                              onClick={() => {
-                                setEditingSceneId(currentScene.id);
-                                setEditTitle(currentScene.title);
-                                setEditSummary(currentScene.summary);
-                              }}
-                              className="text-inkSoft hover:text-forest p-1 rounded hover:bg-[#F7ECD8]/50"
-                              title="Edit scene summary"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          <p
-                            className={`text-xs text-ink leading-relaxed ${
-                              practiceMode === "fading" ? "fading" : ""
+                      <span className="text-[11px] text-inkSoft italic hidden sm:inline">
+                        {t.story.swipeHint}
+                      </span>
+
+                      {/* Scene Stepper Indicator Dots */}
+                      <div className="flex items-center gap-1.5">
+                        {selectedStory.scenes.map((sc, idx) => (
+                          <button
+                            key={sc.id}
+                            onClick={() => setActiveSceneIndex(idx)}
+                            className={`transition-all rounded-full ${
+                              idx === activeSceneIndex
+                                ? "w-7 h-2 bg-forest shadow-sm"
+                                : "w-2 h-2 bg-[#D5C7B0] hover:bg-forest/60"
                             }`}
-                          >
-                            {currentScene.summary}
-                          </p>
-                          {currentScene.keywords?.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 pt-1">
-                              {currentScene.keywords.map((kw, i) => (
-                                <span
-                                  key={i}
-                                  className="px-2 py-0.5 rounded bg-[#F7ECD8]/70 text-[10px] font-medium text-forestDark"
-                                >
-                                  {kw}
+                            title={`Scene ${idx + 1}: ${sc.title}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Single Artwork Card with Overlay Navigation Chevrons */}
+                    {(() => {
+                      const proceduralSvgUrl = ProceduralIllustrator.generateArtSVG(
+                        currentScene,
+                        currentScene.artStyle
+                      );
+                      const displayArtUrl = currentScene.imagePath || proceduralSvgUrl;
+                      const isEditing = editingSceneId === currentScene.id;
+                      const sanitizedKw = sanitizeKeywords(currentScene.keywords);
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="relative w-full max-w-2xl mx-auto aspect-[16/10] rounded-xl overflow-hidden border border-line bg-[#FDF8EE] shadow-md group">
+                            <img
+                              src={displayArtUrl}
+                              alt={currentScene.title}
+                              className="w-full h-full object-cover transition duration-300"
+                            />
+
+                            {/* Side Overlay Chevrons on Artwork */}
+                            {activeSceneIndex > 0 && (
+                              <button
+                                onClick={handlePrevScene}
+                                className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-80 group-hover:opacity-100"
+                                title={t.story.prevSceneBtn}
+                              >
+                                <ChevronLeft className="w-5 h-5" />
+                              </button>
+                            )}
+                            {activeSceneIndex < totalScenes - 1 && (
+                              <button
+                                onClick={handleNextScene}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-80 group-hover:opacity-100"
+                                title={t.story.nextSceneBtn}
+                              >
+                                <ChevronRight className="w-5 h-5" />
+                              </button>
+                            )}
+
+                            {/* Generating shimmer overlay */}
+                            {currentScene.isGenerating && (
+                              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center gap-2 text-white p-4 text-center">
+                                <RefreshCw className="w-7 h-7 animate-spin text-amber-300" />
+                                <span className="text-sm font-serif italic text-amber-100">
+                                  {t.story.generatingArtStatus}
                                 </span>
-                              ))}
+                              </div>
+                            )}
+
+                            {/* Top Action Buttons */}
+                            <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+                              <button
+                                onClick={() => handleGenerateSceneArt(currentScene.id)}
+                                disabled={currentScene.isGenerating}
+                                className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1.5 font-semibold"
+                                title={t.story.generateAiArtBtn}
+                              >
+                                <Sparkles className="w-3.5 h-3.5 text-terra" />
+                                <span className="hidden sm:inline text-xs">
+                                  {t.story.generateAiArtBtn}
+                                </span>
+                              </button>
+                              <button
+                                onClick={() => handleRegenerateScene(currentScene.id)}
+                                disabled={currentScene.isGenerating}
+                                className="p-1.5 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1"
+                                title={t.story.regenerateArtBtn}
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {/* Accurate Attribution Badge */}
+                            <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur text-white text-[11px] font-sans flex items-center gap-1.5 shadow">
+                              <span className="font-bold tracking-wider">
+                                {currentScene.artStyle.toUpperCase()}
+                              </span>
+                              <span>·</span>
+                              <span className="opacity-90">
+                                {currentScene.imagePath
+                                  ? currentScene.imageSourceLabel || "AI Generated Art"
+                                  : `Procedural Waldorf Art (${currentScene.artStyle})`}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Scene Title, Context Summary & Inline Editing */}
+                          {isEditing ? (
+                            <div className="max-w-2xl mx-auto space-y-2.5 p-3.5 rounded-xl bg-white border border-line">
+                              <input
+                                type="text"
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                className="w-full px-3 py-1.5 rounded-lg border border-line text-sm font-semibold"
+                              />
+                              <textarea
+                                rows={3}
+                                value={editSummary}
+                                onChange={(e) => setEditSummary(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg border border-line text-xs font-sans"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleSaveSceneEdit(currentScene.id)}
+                                  className="btn-primary text-xs py-1"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Save</span>
+                                </button>
+                                <button
+                                  onClick={() => setEditingSceneId(null)}
+                                  className="btn-ghost text-xs py-1"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="max-w-2xl mx-auto space-y-2.5 p-4 rounded-xl bg-white/80 border border-line shadow-sm">
+                              <div className="flex items-start justify-between gap-3">
+                                <h4 className="font-serif font-bold text-base text-forestDark leading-snug">
+                                  {currentScene.title}
+                                </h4>
+                                <button
+                                  onClick={() => {
+                                    setEditingSceneId(currentScene.id);
+                                    setEditTitle(currentScene.title);
+                                    setEditSummary(currentScene.summary);
+                                  }}
+                                  className="text-inkSoft hover:text-forest p-1 rounded hover:bg-[#F7ECD8]/50 transition"
+                                  title="Edit scene summary"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {/* Practice Mode text presentation */}
+                              {practiceMode === "free" ? (
+                                <div className="space-y-2 p-3 rounded-lg bg-[#F7ECD8]/40 border border-line/60">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs italic text-forestDark font-medium">
+                                      ✨ Free practice mode: form living pictures in your imagination!
+                                    </span>
+                                    <button
+                                      onClick={() => setIsFreePracticeRevealed(!isFreePracticeRevealed)}
+                                      className="text-[11px] text-forest underline font-medium hover:text-terra"
+                                    >
+                                      {isFreePracticeRevealed ? "Hide prompt" : "Peek prompt"}
+                                    </button>
+                                  </div>
+                                  {isFreePracticeRevealed && (
+                                    <p className="text-xs text-ink leading-relaxed pt-1 border-t border-line/50 font-serif">
+                                      {currentScene.summary}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p
+                                  className={`text-xs text-ink leading-relaxed ${
+                                    practiceMode === "fading" ? "fading select-none" : ""
+                                  }`}
+                                >
+                                  {currentScene.summary}
+                                </p>
+                              )}
+
+                              {/* Clean, Sanitized Keyword Tags */}
+                              {sanitizedKw.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-line/40">
+                                  <span className="text-[10px] uppercase font-semibold text-inkSoft tracking-wider mr-1">
+                                    Sensory Cues:
+                                  </span>
+                                  {sanitizedKw.map((kw, i) => (
+                                    <span
+                                      key={i}
+                                      className="px-2 py-0.5 rounded-full bg-[#F7ECD8] text-[10px] font-medium text-forestDark border border-line/60"
+                                    >
+                                      {kw}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
+                      );
+                    })()}
+                  </div>
+                )}
 
-            {/* DIRECT ACOUSTIC ANALYSIS METRICS (if recorded) */}
-            {audioMetrics && (
-              <div className="p-4 rounded-xl bg-[#E3EFE0]/70 border border-[#BEDEBA] space-y-3">
-                <h4 className="font-serif font-bold text-sm text-forestDark flex items-center gap-1.5">
-                  <Volume2 className="w-4 h-4 text-forest" />
-                  {t.story.audioAnalysisTitle}
-                </h4>
-
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                  <div className="p-2.5 rounded-lg bg-white/80 border border-line">
-                    <div className="text-[11px] text-inkSoft">{t.story.metricDuration}</div>
-                    <div className="text-base font-serif font-bold text-forestDark mt-0.5">
-                      {audioMetrics.durationSeconds}s
-                    </div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-white/80 border border-line">
-                    <div className="text-[11px] text-inkSoft">{t.story.metricLoudness}</div>
-                    <div className="text-base font-serif font-bold text-forestDark mt-0.5">
-                      {audioMetrics.rmsDecibels} dB
-                    </div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-white/80 border border-line">
-                    <div className="text-[11px] text-inkSoft">{t.story.metricDynamicRange}</div>
-                    <div className="text-base font-serif font-bold text-forestDark mt-0.5">
-                      {audioMetrics.dynamicRangeDb} dB
-                    </div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-white/80 border border-line">
-                    <div className="text-[11px] text-inkSoft">{t.story.metricPauseRatio}</div>
-                    <div className="text-base font-serif font-bold text-forestDark mt-0.5">
-                      {Math.round(audioMetrics.pauseRatio * 100)}%
-                    </div>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-white/80 border border-line">
-                    <div className="text-[11px] text-inkSoft">{t.story.metricPace}</div>
-                    <div className="text-base font-serif font-bold text-forestDark mt-0.5">
-                      {audioMetrics.estimatedPaceWPM} WPM
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-xs text-forestDark font-medium leading-relaxed italic">
-                  {audioMetrics.deliverySummary}
-                </p>
-              </div>
-            )}
-
-            {/* DECOUPLED PANELS: LEFT = SOURCE STORY REFERENCE PROMPT; RIGHT = LIVE ORAL RETELLING TRANSCRIPT */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-1">
-              {/* SOURCE REFERENCE PROMPT */}
-              <div className="p-4 rounded-xl bg-[#FFFDF9] border border-line space-y-2 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between border-b border-line pb-2">
-                    <span className="text-xs font-semibold text-forestDark flex items-center gap-1.5">
-                      <BookOpen className="w-4 h-4 text-forest" />
-                      {t.story.sourceStoryReference}
-                    </span>
-                    <span className="badge-leaf text-[10px]">
-                      {practiceMode.toUpperCase()}
-                    </span>
-                  </div>
-
-                  <div className="max-h-[220px] overflow-y-auto pr-1 text-xs text-ink leading-relaxed">
-                    {practiceMode === "free" ? (
-                      <div className="space-y-2 italic text-inkSoft">
-                        <p>✨ Free practice mode: rely on your inner imagination!</p>
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {selectedStory.scenes.flatMap((s) => s.keywords).map((kw, i) => (
-                            <span
-                              key={i}
-                              className="px-2 py-0.5 rounded bg-[#F7ECD8] text-[11px] font-medium text-forestDark"
-                            >
-                              {kw}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <p
-                        className={`font-serif whitespace-pre-line text-ink leading-relaxed ${
-                          practiceMode === "fading" ? "fading" : ""
+                {/* REIMAGINED FOCUSED RETELLING WORKSPACE */}
+                <div className="rounded-2xl bg-white border border-line p-5 space-y-4 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+                    <div className="flex items-center gap-2">
+                      <Mic className="w-4 h-4 text-terra" />
+                      <h3 className="font-serif font-bold text-sm text-forestDark">
+                        {t.story.transcriptTitle || "Story Retelling & Oral Practice Workspace"}
+                      </h3>
+                      <span
+                        className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${
+                          isRecording
+                            ? "bg-red-100 text-red-700 animate-pulse border border-red-200"
+                            : speechSupported
+                            ? "bg-[#E3EFE0] text-forest border border-[#BEDEBA]"
+                            : "bg-[#F7ECD8] text-inkSoft"
                         }`}
                       >
-                        {lang === "vi" && selectedStory.sourceTextVi
-                          ? selectedStory.sourceTextVi
-                          : selectedStory.sourceText}
-                      </p>
+                        {isRecording
+                          ? "● Recording voice & listening..."
+                          : speechSupported
+                          ? "Live Dictation Ready"
+                          : "Manual text mode"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setIsFullStoryOpen(true)}
+                        className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1.5 text-forestDark hover:text-forest"
+                        title={t.story.readFullStoryBtn || "Read Full Story"}
+                      >
+                        <Book className="w-3.5 h-3.5 text-forest" />
+                        <span>{t.story.readFullStoryBtn || "Full Story Reference"}</span>
+                      </button>
+
+                      {transcript && (
+                        <button
+                          onClick={() => {
+                            setTranscript("");
+                            setRawTranscript("");
+                            setInterimSpoken("");
+                          }}
+                          className="btn-ghost text-xs py-1 px-2 text-inkSoft hover:text-terra"
+                          title={t.story.clearTranscriptBtn}
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Clear</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Transcript textarea with real-time speech feedback */}
+                  <div className="space-y-2">
+                    <textarea
+                      rows={5}
+                      value={transcript}
+                      onChange={(e) => setTranscript(e.target.value)}
+                      placeholder={t.story.spokenTranscriptPlaceholder}
+                      className="w-full p-3.5 rounded-xl border border-line bg-[#FDFBF7] text-sm font-sans focus:outline-none focus:ring-2 focus:ring-forest/40 leading-relaxed resize-y"
+                    />
+
+                    {interimSpoken && (
+                      <div className="p-2 rounded-lg bg-[#F7ECD8]/50 border border-line/60 flex items-center gap-2 text-xs text-terra animate-pulse">
+                        <span className="w-2 h-2 rounded-full bg-terra" />
+                        <span className="italic font-medium">"{interimSpoken}"</span>
+                      </div>
                     )}
                   </div>
-                </div>
 
-                <div className="pt-2 border-t border-line text-[11px] text-inkSoft italic">
-                  {practiceMode === "prompt" && "Read aloud or use as a prompt while telling the story."}
-                  {practiceMode === "fading" && "Text is gently faded to encourage mental picture recall."}
-                  {practiceMode === "free" && "Tell the story freely in your own living words."}
-                </div>
-              </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleSaveCorrectionAndDialect}
+                        disabled={!transcript.trim()}
+                        className="btn-primary text-xs py-1.5 px-3.5 shadow-sm"
+                      >
+                        <Brain className="w-3.5 h-3.5" />
+                        <span>{t.story.saveCorrectionBtn}</span>
+                      </button>
 
-              {/* LIVE ORAL RETELLING TRANSCRIPT */}
-              <div className="p-4 rounded-xl bg-white border border-line space-y-2 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between border-b border-line pb-2">
-                    <span className="text-xs font-semibold text-forestDark flex items-center gap-1.5">
-                      <Mic className="w-4 h-4 text-terra" />
-                      {t.story.transcriptTitle}
-                    </span>
-                    <span
-                      className={`text-[10px] font-medium px-2 py-0.5 rounded ${
-                        speechSupported ? "bg-[#E3EFE0] text-forest" : "bg-[#F7ECD8] text-inkSoft"
-                      }`}
-                    >
-                      {speechSupported
-                        ? isRecording
-                          ? "● Listening live..."
-                          : "Live Dictation Ready"
-                        : "Manual edit mode"}
+                      {dialectNotice && (
+                        <span className="text-xs font-semibold text-forest animate-fade-in">
+                          ✓ {dialectNotice}
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="text-[11px] text-inkSoft italic">
+                      Save your retelling to preserve local dialect nuances and acoustic reflections.
                     </span>
                   </div>
 
-                  <textarea
-                    rows={6}
-                    value={transcript}
-                    onChange={(e) => setTranscript(e.target.value)}
-                    placeholder={t.story.spokenTranscriptPlaceholder}
-                    className="w-full p-2.5 rounded-lg border border-line bg-[#FDFBF7] text-xs font-sans focus:outline-none focus:ring-1 focus:ring-forest leading-relaxed resize-none"
-                  />
+                  {/* INTEGRATED DIRECT ACOUSTIC ANALYSIS (Reported right inside Retelling Workspace) */}
+                  {audioMetrics && (
+                    <div className="mt-4 pt-4 border-t border-line space-y-3 bg-[#E3EFE0]/40 -mx-5 -mb-5 p-5 rounded-b-2xl">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-serif font-bold text-xs sm:text-sm text-forestDark flex items-center gap-1.5">
+                          <Volume2 className="w-4 h-4 text-forest" />
+                          {t.story.audioAnalysisTitle}
+                        </h4>
+                        {recordedAudioUrl && (
+                          <audio controls src={recordedAudioUrl} className="h-7 w-36 sm:w-48" />
+                        )}
+                      </div>
 
-                  {interimSpoken && (
-                    <p className="text-[11px] text-terra italic animate-pulse">
-                      "{interimSpoken}"
-                    </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                        <div className="p-2.5 rounded-lg bg-white/90 border border-line">
+                          <div className="text-[11px] text-inkSoft">{t.story.metricDuration}</div>
+                          <div className="text-sm sm:text-base font-serif font-bold text-forestDark mt-0.5">
+                            {audioMetrics.durationSeconds}s
+                          </div>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-white/90 border border-line">
+                          <div className="text-[11px] text-inkSoft">{t.story.metricLoudness}</div>
+                          <div className="text-sm sm:text-base font-serif font-bold text-forestDark mt-0.5">
+                            {audioMetrics.rmsDecibels} dB
+                          </div>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-white/90 border border-line">
+                          <div className="text-[11px] text-inkSoft">{t.story.metricDynamicRange}</div>
+                          <div className="text-sm sm:text-base font-serif font-bold text-forestDark mt-0.5">
+                            {audioMetrics.dynamicRangeDb} dB
+                          </div>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-white/90 border border-line">
+                          <div className="text-[11px] text-inkSoft">{t.story.metricPauseRatio}</div>
+                          <div className="text-sm sm:text-base font-serif font-bold text-forestDark mt-0.5">
+                            {Math.round(audioMetrics.pauseRatio * 100)}%
+                          </div>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-white/90 border border-line">
+                          <div className="text-[11px] text-inkSoft">{t.story.metricPace}</div>
+                          <div className="text-sm sm:text-base font-serif font-bold text-forestDark mt-0.5">
+                            {audioMetrics.estimatedPaceWPM} WPM
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-forestDark font-medium leading-relaxed italic">
+                        {audioMetrics.deliverySummary}
+                      </p>
+                    </div>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-line">
+                {/* Privacy Consent Toggle */}
+                <div className="p-3 rounded-xl bg-[#FFFDF7] border border-line flex items-start gap-3 text-xs">
+                  <input
+                    type="checkbox"
+                    id="consent-toggle"
+                    checked={consentGranted}
+                    onChange={(e) => setConsentGranted(e.target.checked)}
+                    className="mt-0.5 rounded text-forest focus:ring-forest"
+                  />
+                  <label htmlFor="consent-toggle" className="text-inkSoft cursor-pointer">
+                    <strong className="text-forestDark">{t.story.consentLabel}</strong>
+                    <p className="mt-0.5">{t.story.consentNotice}</p>
+                  </label>
+                </div>
+              </div>
+
+              {/* STEP 3: CONSTRUCTIVE STORYTELLING FEEDBACK */}
+              <div className="garden-card space-y-3">
+                <div className="flex items-center justify-between border-b border-line pb-2.5">
+                  <h2 className="font-serif text-lg font-bold text-forestDark flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-terra" />
+                    {t.story.feedbackTitle}
+                  </h2>
+                  <span className="text-xs text-inkSoft italic">
+                    {t.story.noNumericGradingNotice}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-[#FDFBF5] border border-line space-y-1">
+                    <div className="font-semibold text-forestDark flex items-center gap-1.5">
+                      <Wind className="w-3.5 h-3.5 text-forest" />
+                      Rhythm & Breath Balance
+                    </div>
+                    <p className="text-inkSoft leading-relaxed">
+                      Your spoken pace gives young listeners space to form living pictures in their mind's eye. Remember to breathe between key scene transitions.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#FDFBF5] border border-line space-y-1">
+                    <div className="font-semibold text-forestDark flex items-center gap-1.5">
+                      <Eye className="w-3.5 h-3.5 text-terra" />
+                      Imagery & Sensory Warmth
+                    </div>
+                    <p className="text-inkSoft leading-relaxed">
+                      The sensory language of earth, water, and handmade craft grounds the story deeply in living imagination.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* VIEW 2: AUTHENTIC WALDORF STORYBOOK READER */}
+          {viewMode === "reader" && (
+            <div className="space-y-6">
+              {/* Storybook Reader Header Card */}
+              <div className="garden-card space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-3">
+                  <div>
+                    <span className="badge-leaf text-xs mb-1">
+                      {selectedStory.ageRange} · {selectedStory.defaultArtStyle.toUpperCase()}
+                    </span>
+                    <h2 className="font-serif text-2xl font-bold text-forestDark">
+                      {activeStoryTitle}
+                    </h2>
+                    <p className="text-xs text-inkSoft mt-0.5">
+                      {selectedStory.goal || "Imaginative storytelling & picture-making"}
+                    </p>
+                  </div>
+
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={handleSaveCorrectionAndDialect}
-                      disabled={!transcript.trim()}
-                      className="btn-primary text-xs py-1"
+                      onClick={() => setViewMode("studio")}
+                      className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5"
                     >
-                      <Brain className="w-3.5 h-3.5" />
-                      <span>{t.story.saveCorrectionBtn}</span>
+                      <Mic className="w-3.5 h-3.5" />
+                      <span>{t.story.jumpToStudioWithScene || "Practice in Studio"}</span>
                     </button>
+                  </div>
+                </div>
 
-                    {transcript && (
-                      <button
-                        onClick={() => {
-                          setTranscript("");
-                          setRawTranscript("");
-                          setInterimSpoken("");
-                        }}
-                        className="btn-ghost text-xs py-1 text-inkSoft hover:text-terra"
-                        title={t.story.clearTranscriptBtn}
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>{t.story.clearTranscriptBtn}</span>
-                      </button>
+                {/* Sub-view: 1. Picture Book Spread (Sách Tranh Lật Trang) */}
+                {readerStyle === "picture-book" && currentScene && (
+                  <div className="space-y-5 pt-2">
+                    {/* Open Book Spread Container */}
+                    <div className="bg-[#FFFDF7] rounded-2xl border-2 border-[#E7DCC4] p-5 sm:p-8 shadow-md">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                        {/* Left Page: Large Waldorf Artwork */}
+                        <div className="space-y-3">
+                          <div className="relative aspect-[16/10] sm:aspect-[4/3] rounded-xl overflow-hidden border border-line bg-[#FDF8EE] shadow-sm group">
+                            {(() => {
+                              const proceduralSvgUrl = ProceduralIllustrator.generateArtSVG(
+                                currentScene,
+                                currentScene.artStyle
+                              );
+                              const displayArtUrl = currentScene.imagePath || proceduralSvgUrl;
+
+                              return (
+                                <img
+                                  src={displayArtUrl}
+                                  alt={currentScene.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              );
+                            })()}
+
+                            <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur text-white text-[11px] font-sans">
+                              {currentScene.artStyle.toUpperCase()} ·{" "}
+                              {currentScene.imagePath
+                                ? currentScene.imageSourceLabel || "AI Art"
+                                : "Goethean Procedural Art"}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-xs text-inkSoft px-1">
+                            <span className="italic">
+                              Illustration {activeSceneIndex + 1} of {totalScenes}
+                            </span>
+                            <span className="font-serif">
+                              {selectedStory.defaultArtStyle === "wet-on-wet"
+                                ? "Wet-on-Wet Watercolor"
+                                : selectedStory.defaultArtStyle === "crayon"
+                                ? "Beeswax Block Crayon"
+                                : "Chalkboard Pastel"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Right Page: Story Text & Narrative */}
+                        <div className="space-y-4 flex flex-col justify-between h-full">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between border-b border-line pb-2">
+                              <span className="text-xs uppercase tracking-wider font-semibold text-forest">
+                                {t.story.pageCounter || "Page"} {activeSceneIndex + 1} / {totalScenes}
+                              </span>
+                              <span className="badge-sand text-[10px]">
+                                Scene {currentScene.ord}
+                              </span>
+                            </div>
+
+                            <h3 className="font-serif text-xl sm:text-2xl font-bold text-forestDark leading-snug">
+                              {currentScene.title}
+                            </h3>
+
+                            <div className="font-serif text-base sm:text-lg leading-relaxed text-ink space-y-3 pt-1">
+                              <p className="first-letter:text-4xl first-letter:font-bold first-letter:text-terra first-letter:mr-1.5 first-letter:float-left first-letter:leading-none">
+                                {currentScene.summary}
+                              </p>
+                            </div>
+
+                            {/* Sensory Cues Tags */}
+                            {sanitizeKeywords(currentScene.keywords).length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pt-3">
+                                {sanitizeKeywords(currentScene.keywords).map((kw, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="px-2.5 py-0.5 rounded-full bg-[#F7ECD8] text-[11px] font-medium text-forestDark border border-line/60"
+                                  >
+                                    {kw}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Quick Jump to Studio Action */}
+                          <div className="pt-4 border-t border-line flex flex-wrap items-center justify-between gap-3">
+                            <button
+                              onClick={() => {
+                                setViewMode("studio");
+                              }}
+                              className="btn-ghost text-xs py-1.5 px-3 flex items-center gap-1.5 text-forest"
+                            >
+                              <Mic className="w-3.5 h-3.5" />
+                              <span>{t.story.jumpToStudioWithScene || "Practice this scene in Studio"}</span>
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={handlePrevScene}
+                                disabled={activeSceneIndex <= 0}
+                                className="btn-ghost text-xs py-1 px-3 flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none"
+                              >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                                <span>Previous</span>
+                              </button>
+                              <button
+                                onClick={handleNextScene}
+                                disabled={activeSceneIndex >= totalScenes - 1}
+                                className="btn-ghost text-xs py-1 px-3 flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none"
+                              >
+                                <span>Next</span>
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Book Page Turner Thumbnails */}
+                    <div className="flex items-center justify-center gap-2 overflow-x-auto py-2">
+                      {selectedStory.scenes.map((sc, idx) => (
+                        <button
+                          key={sc.id}
+                          onClick={() => setActiveSceneIndex(idx)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-serif transition flex items-center gap-1.5 border ${
+                            idx === activeSceneIndex
+                              ? "bg-forest text-white border-forest shadow-sm font-bold"
+                              : "bg-white/80 text-forestDark border-line hover:bg-white"
+                          }`}
+                        >
+                          <span>{idx + 1}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-view: 2. Continuous Prose (Đọc Liền Mạch Toàn Bộ Truyện) */}
+                {readerStyle === "continuous" && (
+                  <div className="max-w-3xl mx-auto space-y-6 pt-3 pb-8">
+                    {/* Audio Player if available */}
+                    {recordedAudioUrl && (
+                      <div className="p-3.5 rounded-xl bg-[#E3EFE0]/60 border border-[#BEDEBA] flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-forestDark">
+                          <Volume2 className="w-4 h-4 text-forest" />
+                          <span>Listen to your recorded oral retelling while reading:</span>
+                        </div>
+                        <audio controls src={recordedAudioUrl} className="h-8 w-48" />
+                      </div>
                     )}
+
+                    {/* Complete Story Text formatted as an illustrated book */}
+                    <div className="bg-[#FFFDF7] p-6 sm:p-10 rounded-2xl border border-line shadow-sm space-y-6">
+                      <div className="text-center space-y-1.5 border-b border-line pb-4">
+                        <h3 className="font-serif text-2xl sm:text-3xl font-bold text-forestDark">
+                          {activeStoryTitle}
+                        </h3>
+                        <p className="text-xs text-inkSoft italic">
+                          {selectedStory.sourceInfo || "Waldorf Storytelling Collection"}
+                        </p>
+                      </div>
+
+                      {/* Continuous scenes with illustration vignettes */}
+                      <div className="space-y-6 font-serif text-base sm:text-lg leading-relaxed text-ink">
+                        {selectedStory.scenes.map((sc, idx) => {
+                          const svgUrl = ProceduralIllustrator.generateArtSVG(sc, sc.artStyle);
+                          const artUrl = sc.imagePath || svgUrl;
+
+                          return (
+                            <div key={sc.id} className="space-y-3 pt-3 border-t border-line/40 first:border-t-0">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-serif font-bold text-base text-forestDark">
+                                  {sc.title}
+                                </h4>
+                                <button
+                                  onClick={() => {
+                                    setActiveSceneIndex(idx);
+                                    setViewMode("studio");
+                                  }}
+                                  className="text-xs text-forest hover:text-terra font-sans font-medium"
+                                >
+                                  Practice in Studio →
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                                <div className="sm:col-span-2">
+                                  <p className="leading-relaxed whitespace-pre-line text-ink">
+                                    {sc.summary}
+                                  </p>
+                                </div>
+                                <div className="rounded-xl overflow-hidden border border-line shadow-sm aspect-[16/10] group">
+                                  <img
+                                    src={artUrl}
+                                    alt={sc.title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Full Original Source Story Text Section */}
+                      <div className="pt-6 border-t border-line space-y-3">
+                        <h4 className="font-serif font-bold text-base text-forestDark flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-forest" />
+                          Complete Narrative Text (Full Source)
+                        </h4>
+                        <div className="p-4 rounded-xl bg-[#FDFBF5] border border-line font-serif text-sm sm:text-base leading-relaxed text-ink whitespace-pre-line">
+                          {activeStoryText}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* SLIDE-OVER DRAWER: COMPLETE SOURCE STORY REFERENCE */}
+          {isFullStoryOpen && (
+            <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm animate-fade-in">
+              <div
+                className="w-full max-w-lg bg-[#FFFDF7] h-full shadow-2xl border-l border-line p-6 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right"
+                role="dialog"
+                aria-modal="true"
+              >
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-line pb-3">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-forest" />
+                      <h3 className="font-serif font-bold text-base text-forestDark">
+                        {t.story.fullStoryDrawerTitle || "Full Story Reference"}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setIsFullStoryOpen(false)}
+                      className="p-1.5 rounded-lg text-inkSoft hover:text-ink hover:bg-[#F7ECD8]/60 transition"
+                      title={t.story.closeFullStoryBtn || "Close"}
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
 
-                  {dialectNotice && (
-                    <span className="text-xs font-semibold text-forest animate-fade-in">
-                      ✓ {dialectNotice}
-                    </span>
+                  <div className="space-y-1">
+                    <h4 className="font-serif text-xl font-bold text-forestDark">
+                      {activeStoryTitle}
+                    </h4>
+                    <p className="text-xs text-inkSoft">
+                      {selectedStory.ageRange} · {selectedStory.goal}
+                    </p>
+                  </div>
+
+                  {/* Active Scene Highlight Notice */}
+                  {currentScene && (
+                    <div className="p-3 rounded-lg bg-[#E3EFE0]/60 border border-[#BEDEBA] text-xs text-forestDark">
+                      <strong>Current Active Scene {activeSceneIndex + 1}:</strong> {currentScene.title}
+                    </div>
                   )}
+
+                  {/* Complete story text */}
+                  <div className="p-4 rounded-xl bg-white border border-line text-sm font-serif leading-relaxed text-ink whitespace-pre-line shadow-inner max-h-[60vh] overflow-y-auto">
+                    {activeStoryText}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-line flex items-center justify-between gap-3">
+                  <button
+                    onClick={() => {
+                      setIsFullStoryOpen(false);
+                      setViewMode("reader");
+                    }}
+                    className="btn-primary text-xs py-2 px-3 flex items-center gap-1.5"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Open in Storybook Reader</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsFullStoryOpen(false)}
+                    className="btn-ghost text-xs py-2 px-3"
+                  >
+                    Close
+                  </button>
                 </div>
               </div>
             </div>
-
-            {/* Privacy Consent Toggle */}
-            <div className="p-3 rounded-xl bg-[#FFFDF7] border border-line flex items-start gap-3 text-xs">
-              <input
-                type="checkbox"
-                id="consent-toggle"
-                checked={consentGranted}
-                onChange={(e) => setConsentGranted(e.target.checked)}
-                className="mt-0.5 rounded text-forest focus:ring-forest"
-              />
-              <label htmlFor="consent-toggle" className="text-inkSoft cursor-pointer">
-                <strong className="text-forestDark">{t.story.consentLabel}</strong>
-                <p className="mt-0.5">{t.story.consentNotice}</p>
-              </label>
-            </div>
-          </div>
-
-          {/* STEP 3: CONSTRUCTIVE STORYTELLING FEEDBACK */}
-          <div className="garden-card space-y-3">
-            <div className="flex items-center justify-between border-b border-line pb-2.5">
-              <h2 className="font-serif text-lg font-bold text-forestDark flex items-center gap-2">
-                <Heart className="w-5 h-5 text-terra" />
-                {t.story.feedbackTitle}
-              </h2>
-              <span className="text-xs text-inkSoft italic">
-                {t.story.noNumericGradingNotice}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-[#FDFBF5] border border-line space-y-1">
-                <div className="font-semibold text-forestDark flex items-center gap-1.5">
-                  <Wind className="w-3.5 h-3.5 text-forest" />
-                  Rhythm & Breath Balance
-                </div>
-                <p className="text-inkSoft leading-relaxed">
-                  Your spoken pace gives young listeners space to form living pictures in their mind's eye. Remember to breathe between key scene transitions.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-[#FDFBF5] border border-line space-y-1">
-                <div className="font-semibold text-forestDark flex items-center gap-1.5">
-                  <Eye className="w-3.5 h-3.5 text-terra" />
-                  Imagery & Sensory Warmth
-                </div>
-                <p className="text-inkSoft leading-relaxed">
-                  The sensory language of river water, pottery clay, and wooden benches grounds the story deeply in Vietnamese cultural life.
-                </p>
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* PERSISTENT FLOATING VOICE RECORDING DOCK */}
           <aside
@@ -1316,6 +1852,16 @@ export default function StoryPage() {
               </button>
             </div>
 
+            {/* Quick Read Full Story button in dock */}
+            <button
+              onClick={() => setIsFullStoryOpen(true)}
+              className="p-2 rounded-lg bg-white/90 border border-line text-forestDark hover:bg-[#F7ECD8] transition shadow-sm hidden sm:flex items-center gap-1 text-xs"
+              title={t.story.readFullStoryBtn || "Read Full Story"}
+            >
+              <Book className="w-3.5 h-3.5 text-forest" />
+              <span>Full Story</span>
+            </button>
+
             {/* Main Voice Recording Action Button */}
             <div className="flex items-center gap-2 sm:gap-3">
               {!isRecording ? (
@@ -1342,7 +1888,7 @@ export default function StoryPage() {
 
               {/* Compact Audio Playback if audio exists */}
               {recordedAudioUrl && !isRecording && (
-                <audio controls src={recordedAudioUrl} className="h-8 w-28 sm:w-36" />
+                <audio controls src={recordedAudioUrl} className="h-8 w-24 sm:w-32" />
               )}
             </div>
           </aside>
