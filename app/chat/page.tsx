@@ -20,7 +20,7 @@ interface ChatMessage {
 }
 
 export default function ChatPage() {
-  const { t, lang, selectedStory } = useApp();
+  const { t, lang, selectedStory, googleApiKey, aiProvider } = useApp();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "m-0",
@@ -50,7 +50,7 @@ export default function ChatPage() {
       : "How to preserve regional dialects without imposing standardization pressure",
   ];
 
-  const handleSend = (textToSend?: string) => {
+  const handleSend = async (textToSend?: string) => {
     const prompt = (textToSend || input).trim();
     if (!prompt || isRunning) return;
 
@@ -64,7 +64,43 @@ export default function ChatPage() {
     setInput("");
     setIsRunning(true);
 
-    // Pedagogical response synthesis
+    // Attempt real Google Gemini call if configured or on production
+    if (aiProvider === "google" || googleApiKey) {
+      try {
+        const res = await fetch("/api/ai/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(googleApiKey ? { "x-goog-api-key": googleApiKey } : {}),
+          },
+          body: JSON.stringify({
+            prompt,
+            history: messages,
+            lang,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.text) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `b-${Date.now()}`,
+                sender: "viwaldorf",
+                text: data.text,
+              },
+            ]);
+            setIsRunning(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Gemini chat fetch error, falling back to local heuristics:", err);
+      }
+    }
+
+    // Pedagogical response synthesis fallback
     setTimeout(() => {
       let reply = "";
       const lower = prompt.toLowerCase();
@@ -103,7 +139,7 @@ Children absorb the living picture in the silent space between words. When trans
         },
       ]);
       setIsRunning(false);
-    }, 900);
+    }, 800);
   };
 
   return (

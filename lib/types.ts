@@ -1,4 +1,5 @@
 export type WaldorfArtStyle = "wet-on-wet" | "crayon" | "chalkboard";
+export type AIProvider = "google" | "meta" | "local";
 
 export interface StoryScene {
   id: string;
@@ -10,6 +11,8 @@ export interface StoryScene {
   imagePrompt: string;
   imagePath?: string | null;
   imageSourceLabel: string;
+  isGenerating?: boolean;
+  generationError?: string | null;
 }
 
 export interface WaldorfStory {
