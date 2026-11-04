@@ -13,7 +13,6 @@ import {
   ReaderViewMode,
   AIContextTelemetry,
 } from "@/lib/types";
-import { ProceduralIllustrator } from "@/lib/art/proceduralIllustrator";
 import { WavAnalyzer } from "@/lib/audio/wavAnalyzer";
 import { DialectAdaptationEngine } from "@/lib/dialect/dialectEngine";
 import { ModelGateway } from "@/lib/ai/modelGateway";
@@ -42,6 +41,7 @@ import {
   Clock,
   Bookmark,
   Terminal,
+  AlertCircle,
 } from "lucide-react";
 
 const cleanKeyword = (kw: string) =>
@@ -130,10 +130,8 @@ export default function StoryPage() {
       title: `Artwork: ${scene.title} (${scene.artStyle})`,
       prompt: scene.imagePrompt || ModelGateway.buildWaldorfPrompt(scene.summary || scene.title, scene.artStyle),
       styleInstruction: `Goethean Waldorf Art Medium: ${scene.artStyle}`,
-      model: scene.imageSourceLabel || `ProceduralIllustrator (${scene.artStyle})`,
-      provider: scene.imageSourceLabel?.includes("Meta")
-        ? "meta"
-        : "local",
+      model: scene.imageSourceLabel || "muse-image-1.0",
+      provider: "meta",
       injectedContext: {
         sceneTitle: scene.title,
         sceneSummary: scene.summary,
@@ -588,33 +586,16 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
           scenes: s.scenes.map((sc) => ({
             ...sc,
             artStyle: newStyle,
-            imageSourceLabel: sc.imagePath ? sc.imageSourceLabel : `Procedural Art (${newStyle})`,
+            imageSourceLabel: sc.imagePath ? sc.imageSourceLabel : "",
           })),
         };
       }),
     }));
   };
 
-  // Regenerate individual scene artwork with procedural fallback
+  // Regenerate individual scene artwork via AI
   const handleRegenerateScene = (sceneId: string) => {
-    if (!selectedStory) return;
-    updateData((prev) => ({
-      ...prev,
-      stories: prev.stories.map((s) => {
-        if (s.id !== selectedStory.id) return s;
-        return {
-          ...s,
-          scenes: s.scenes.map((sc) => {
-            if (sc.id !== sceneId) return sc;
-            return {
-              ...sc,
-              imagePath: null,
-              imageSourceLabel: `Procedural Art (${sc.artStyle})`,
-            };
-          }),
-        };
-      }),
-    }));
+    handleGenerateSceneArt(sceneId);
   };
 
   // Inline Scene Edit Save
@@ -1254,101 +1235,141 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
                       </div>
                     </div>
 
-                    {/* Single Artwork Card with Overlay Navigation Chevrons */}
+                    {/* Artwork Display or Compact Notification */}
                     {(() => {
-                      const proceduralSvgUrl = ProceduralIllustrator.generateArtSVG(
-                        currentScene,
-                        currentScene.artStyle
-                      );
-                      const displayArtUrl = currentScene.imagePath || proceduralSvgUrl;
                       const isEditing = editingSceneId === currentScene.id;
                       const sanitizedKw = sanitizeKeywords(currentScene.keywords);
 
                       return (
                         <div className="space-y-4">
-                          <div className="relative w-full max-w-2xl mx-auto aspect-[16/10] rounded-xl overflow-hidden border border-line bg-[#FDF8EE] shadow-md group">
-                            <img
-                              src={displayArtUrl}
-                              alt={currentScene.title}
-                              className="w-full h-full object-cover transition duration-300"
-                            />
+                          {currentScene.imagePath ? (
+                            <div className="relative w-full max-w-2xl mx-auto aspect-[16/10] rounded-xl overflow-hidden border border-line bg-[#FDF8EE] shadow-md group">
+                              <img
+                                src={currentScene.imagePath}
+                                alt={currentScene.title}
+                                className="w-full h-full object-cover transition duration-300"
+                              />
 
-                            {/* Side Overlay Chevrons on Artwork */}
-                            {activeSceneIndex > 0 && (
-                              <button
-                                onClick={handlePrevScene}
-                                className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-80 group-hover:opacity-100"
-                                title={t.story.prevSceneBtn}
-                              >
-                                <ChevronLeft className="w-5 h-5" />
-                              </button>
-                            )}
-                            {activeSceneIndex < totalScenes - 1 && (
-                              <button
-                                onClick={handleNextScene}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-80 group-hover:opacity-100"
-                                title={t.story.nextSceneBtn}
-                              >
-                                <ChevronRight className="w-5 h-5" />
-                              </button>
-                            )}
+                              {/* Side Overlay Chevrons on Artwork */}
+                              {activeSceneIndex > 0 && (
+                                <button
+                                  onClick={handlePrevScene}
+                                  className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-80 group-hover:opacity-100"
+                                  title={t.story.prevSceneBtn}
+                                >
+                                  <ChevronLeft className="w-5 h-5" />
+                                </button>
+                              )}
+                              {activeSceneIndex < totalScenes - 1 && (
+                                <button
+                                  onClick={handleNextScene}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-80 group-hover:opacity-100"
+                                  title={t.story.nextSceneBtn}
+                                >
+                                  <ChevronRight className="w-5 h-5" />
+                                </button>
+                              )}
 
-                            {/* Generating shimmer overlay */}
-                            {currentScene.isGenerating && (
-                              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center gap-2 text-white p-4 text-center">
-                                <RefreshCw className="w-7 h-7 animate-spin text-amber-300" />
-                                <span className="text-sm font-serif italic text-amber-100">
-                                  {t.story.generatingArtStatus}
+                              {/* Generating shimmer overlay */}
+                              {currentScene.isGenerating && (
+                                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center gap-2 text-white p-4 text-center">
+                                  <RefreshCw className="w-7 h-7 animate-spin text-amber-300" />
+                                  <span className="text-sm font-serif italic text-amber-100">
+                                    {t.story.generatingArtStatus}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Top Action Buttons */}
+                              <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+                                <button
+                                  onClick={() => handleOpenArtworkInspector(currentScene)}
+                                  className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forestDark hover:bg-[#F7ECD8] transition text-xs flex items-center gap-1.5 font-semibold group"
+                                  title={t.aiInspector.inspectArtBtn}
+                                >
+                                  <Terminal className="w-3.5 h-3.5 text-forest group-hover:text-terra transition-colors" />
+                                  <span className="hidden sm:inline text-xs">
+                                    {t.aiInspector.inspectArtBtn}
+                                  </span>
+                                </button>
+                                <button
+                                  onClick={() => handleRegenerateScene(currentScene.id)}
+                                  disabled={currentScene.isGenerating}
+                                  className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1.5 font-semibold"
+                                  title={t.story.regenerateArtBtn}
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5 text-terra" />
+                                  <span className="hidden sm:inline text-xs">
+                                    {t.story.regenerateArtBtn}
+                                  </span>
+                                </button>
+                              </div>
+
+                              {/* Accurate Attribution Badge */}
+                              <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur text-white text-[11px] font-sans flex items-center gap-1.5 shadow">
+                                <span className="font-bold tracking-wider">
+                                  {currentScene.artStyle.toUpperCase()}
+                                </span>
+                                <span>·</span>
+                                <span className="opacity-90">
+                                  {currentScene.imageSourceLabel || "Tranh AI (muse-image-1.0)"}
                                 </span>
                               </div>
-                            )}
-
-                            {/* Top Action Buttons */}
-                            <div className="absolute top-2.5 right-2.5 flex gap-1.5">
-                              <button
-                                onClick={() => handleOpenArtworkInspector(currentScene)}
-                                className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forestDark hover:bg-[#F7ECD8] transition text-xs flex items-center gap-1.5 font-semibold group"
-                                title={t.aiInspector.inspectArtBtn}
-                              >
-                                <Terminal className="w-3.5 h-3.5 text-forest group-hover:text-terra transition-colors" />
-                                <span className="hidden sm:inline text-xs">
-                                  {t.aiInspector.inspectArtBtn}
-                                </span>
-                              </button>
-                              <button
-                                onClick={() => handleGenerateSceneArt(currentScene.id)}
-                                disabled={currentScene.isGenerating}
-                                className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1.5 font-semibold"
-                                title={t.story.generateAiArtBtn}
-                              >
-                                <Sparkles className="w-3.5 h-3.5 text-terra" />
-                                <span className="hidden sm:inline text-xs">
-                                  {t.story.generateAiArtBtn}
-                                </span>
-                              </button>
-                              <button
-                                onClick={() => handleRegenerateScene(currentScene.id)}
-                                disabled={currentScene.isGenerating}
-                                className="p-1.5 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1"
-                                title={t.story.regenerateArtBtn}
-                              >
-                                <RefreshCw className="w-3.5 h-3.5" />
-                              </button>
                             </div>
-
-                            {/* Accurate Attribution Badge */}
-                            <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur text-white text-[11px] font-sans flex items-center gap-1.5 shadow">
-                              <span className="font-bold tracking-wider">
-                                {currentScene.artStyle.toUpperCase()}
-                              </span>
-                              <span>·</span>
-                              <span className="opacity-90">
-                                {currentScene.imagePath
-                                  ? currentScene.imageSourceLabel || "AI Generated Art"
-                                  : `Procedural Waldorf Art (${currentScene.artStyle})`}
+                          ) : currentScene.isGenerating ? (
+                            <div className="max-w-2xl mx-auto p-2.5 px-3.5 rounded-xl border border-terra/40 bg-[#FFFDF8] shadow-sm flex items-center justify-between gap-3 text-xs">
+                              <div className="flex items-center gap-2 text-terra">
+                                <RefreshCw className="w-4 h-4 animate-spin flex-shrink-0" />
+                                <span className="font-serif italic font-semibold">
+                                  {t.story.generatingArtStatus || "Đang tạo tranh AI với muse-image-1.0..."}
+                                </span>
+                              </div>
+                              <span className="text-[11px] uppercase tracking-wider font-bold text-inkSoft px-2 py-0.5 rounded bg-white border border-line">
+                                {currentScene.artStyle}
                               </span>
                             </div>
-                          </div>
+                          ) : currentScene.generationError ? (
+                            <div className="max-w-2xl mx-auto p-2.5 px-3.5 rounded-xl border border-terra/50 bg-[#FDF2F0] shadow-sm flex items-center justify-between gap-3 text-xs">
+                              <div className="flex items-center gap-2 text-terra min-w-0">
+                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                <span className="font-medium truncate">{currentScene.generationError}</span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <button
+                                  onClick={() => handleGenerateSceneArt(currentScene.id)}
+                                  className="px-2.5 py-1 rounded-lg bg-terra text-white hover:bg-terra/90 font-semibold text-xs flex items-center gap-1 shadow-sm transition"
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                  <span>Thử lại</span>
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="max-w-2xl mx-auto p-2.5 px-3.5 rounded-xl border border-line/80 bg-white/70 shadow-sm flex items-center justify-between gap-3 text-xs">
+                              <div className="flex items-center gap-2 text-inkSoft">
+                                <Sparkles className="w-3.5 h-3.5 text-terra flex-shrink-0" />
+                                <span className="font-sans">
+                                  Chưa có tranh AI cho cảnh này ({currentScene.artStyle.toUpperCase()})
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <button
+                                  onClick={() => handleOpenArtworkInspector(currentScene)}
+                                  className="p-1 rounded-lg border border-line text-inkSoft hover:text-forest hover:bg-forest/5 transition"
+                                  title={t.aiInspector.inspectArtBtn}
+                                >
+                                  <Terminal className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleGenerateSceneArt(currentScene.id)}
+                                  className="px-3 py-1 rounded-lg bg-forest text-white hover:bg-forestDark font-semibold text-xs flex items-center gap-1.5 shadow-sm transition"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                                  <span>{t.story.generateAiArtBtn}</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
 
                           {/* Scene Title, Context Summary & Inline Editing */}
                           {isEditing ? (
@@ -1700,41 +1721,48 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
                         {/* Left Page: Large Waldorf Artwork */}
                         <div className="space-y-3">
-                          <div className="relative aspect-[16/10] sm:aspect-[4/3] rounded-xl overflow-hidden border border-line bg-[#FDF8EE] shadow-sm group">
-                            {(() => {
-                              const proceduralSvgUrl = ProceduralIllustrator.generateArtSVG(
-                                currentScene,
-                                currentScene.artStyle
-                              );
-                              const displayArtUrl = currentScene.imagePath || proceduralSvgUrl;
+                          {currentScene.imagePath ? (
+                            <div className="relative aspect-[16/10] sm:aspect-[4/3] rounded-xl overflow-hidden border border-line bg-[#FDF8EE] shadow-sm group">
+                              <img
+                                src={currentScene.imagePath}
+                                alt={currentScene.title}
+                                className="w-full h-full object-cover"
+                              />
 
-                              return (
-                                <img
-                                  src={displayArtUrl}
-                                  alt={currentScene.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              );
-                            })()}
+                              <div className="absolute top-2.5 right-2.5">
+                                <button
+                                  onClick={() => handleOpenArtworkInspector(currentScene)}
+                                  className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forestDark hover:bg-[#F7ECD8] transition text-xs flex items-center gap-1.5 font-semibold"
+                                  title={t.aiInspector.inspectArtBtn}
+                                >
+                                  <Terminal className="w-3.5 h-3.5 text-forest" />
+                                  <span className="text-xs">{t.aiInspector.inspectArtBtn}</span>
+                                </button>
+                              </div>
 
-                            <div className="absolute top-2.5 right-2.5">
+                              <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur text-white text-[11px] font-sans">
+                                {currentScene.artStyle.toUpperCase()} ·{" "}
+                                {currentScene.imageSourceLabel || "Tranh AI (muse-image-1.0)"}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-6 rounded-xl border border-line/70 bg-[#FDFBF7] text-center space-y-2.5 text-xs text-inkSoft">
+                              <Sparkles className="w-6 h-6 text-terra/60 mx-auto" />
+                              <p className="font-sans font-medium text-forestDark">
+                                Chưa có tranh AI cho cảnh {currentScene.ord} ({currentScene.artStyle})
+                              </p>
                               <button
-                                onClick={() => handleOpenArtworkInspector(currentScene)}
-                                className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forestDark hover:bg-[#F7ECD8] transition text-xs flex items-center gap-1.5 font-semibold"
-                                title={t.aiInspector.inspectArtBtn}
+                                onClick={() => {
+                                  setViewMode("studio");
+                                  handleGenerateSceneArt(currentScene.id);
+                                }}
+                                className="btn-primary text-xs py-1 px-3 inline-flex items-center gap-1.5"
                               >
-                                <Terminal className="w-3.5 h-3.5 text-forest" />
-                                <span className="text-xs">{t.aiInspector.inspectArtBtn}</span>
+                                <Sparkles className="w-3 h-3 text-amber-200" />
+                                <span>Tạo tranh AI trong Studio</span>
                               </button>
                             </div>
-
-                            <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur text-white text-[11px] font-sans">
-                              {currentScene.artStyle.toUpperCase()} ·{" "}
-                              {currentScene.imagePath
-                                ? currentScene.imageSourceLabel || "AI Art"
-                                : "Goethean Procedural Art"}
-                            </div>
-                          </div>
+                          )}
 
                           <div className="flex items-center justify-between text-xs text-inkSoft px-1">
                             <span className="italic">
@@ -1869,9 +1897,6 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
                       {/* Continuous scenes with illustration vignettes */}
                       <div className="space-y-6 font-serif text-base sm:text-lg leading-relaxed text-ink">
                         {selectedStory.scenes.map((sc, idx) => {
-                          const svgUrl = ProceduralIllustrator.generateArtSVG(sc, sc.artStyle);
-                          const artUrl = sc.imagePath || svgUrl;
-
                           return (
                             <div key={sc.id} className="space-y-3 pt-3 border-t border-line/40 first:border-t-0">
                               <div className="flex items-center justify-between">
@@ -1889,20 +1914,28 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
                                 </button>
                               </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
-                                <div className="sm:col-span-2">
+                              {sc.imagePath ? (
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                                  <div className="sm:col-span-2">
+                                    <p className="leading-relaxed whitespace-pre-line text-ink">
+                                      {sc.summary}
+                                    </p>
+                                  </div>
+                                  <div className="rounded-xl overflow-hidden border border-line shadow-sm aspect-[16/10] group">
+                                    <img
+                                      src={sc.imagePath}
+                                      alt={sc.title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                                    />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
                                   <p className="leading-relaxed whitespace-pre-line text-ink">
                                     {sc.summary}
                                   </p>
                                 </div>
-                                <div className="rounded-xl overflow-hidden border border-line shadow-sm aspect-[16/10] group">
-                                  <img
-                                    src={artUrl}
-                                    alt={sc.title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                                  />
-                                </div>
-                              </div>
+                              )}
                             </div>
                           );
                         })}

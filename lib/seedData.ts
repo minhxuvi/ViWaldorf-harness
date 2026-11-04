@@ -16,7 +16,7 @@ export function createScene(
     keywords,
     artStyle,
     imagePrompt,
-    imageSourceLabel: `Procedural Art (${artStyle})`,
+    imageSourceLabel: "",
   };
 }
 

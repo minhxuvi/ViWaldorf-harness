@@ -1,5 +1,4 @@
 import { WaldorfArtStyle, StoryScene, AIProvider, AIContextTelemetry } from "../types";
-import { ProceduralIllustrator } from "../art/proceduralIllustrator";
 
 export interface GenerateImageOptions {
   scene: StoryScene;
@@ -17,7 +16,7 @@ export interface StorySegmentationOptions {
 }
 
 export interface ImageGenerationResult {
-  imageUrl: string;
+  imageUrl?: string | null;
   sourceLabel: string;
   isAiGenerated: boolean;
   error?: string;
@@ -62,81 +61,65 @@ export class ModelGateway {
   }
 
   /**
-   * Generates artwork for a given scene via Meta AI (muse-image-1.0) or Procedural fallback.
+   * Generates artwork for a given scene via Meta AI (muse-image-1.0).
    */
   public static async generateSceneArtwork(
     options: GenerateImageOptions
   ): Promise<ImageGenerationResult> {
-    const { scene, style, provider, metaApiKey } = options;
+    const { scene, style, metaApiKey } = options;
     const prompt = this.buildWaldorfPrompt(scene.summary || scene.title, style);
 
-    // 1. Meta AI path (muse-image-1.0)
-    if (provider === "meta" && metaApiKey) {
-      try {
-        const res = await fetch("/api/ai/image", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${metaApiKey}`,
-          },
-          body: JSON.stringify({
-            prompt,
-            style,
-            provider: "meta",
-            sceneTitle: scene.title,
-            sceneSummary: scene.summary,
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.imageUrl) {
-            return {
-              imageUrl: data.imageUrl,
-              sourceLabel: data.sourceLabel || "Meta muse-image-1.0",
-              isAiGenerated: true,
-              contextInfo: data.contextInfo,
-            };
-          }
-        }
-      } catch (err) {
-        console.warn("Meta generation error, falling back to procedural:", err);
-      }
+    if (!metaApiKey || !metaApiKey.trim()) {
+      return {
+        imageUrl: null,
+        sourceLabel: "Chưa cấu hình API Key",
+        isAiGenerated: false,
+        error: "Chưa cấu hình Meta API Key. Vui lòng vào Cài đặt để nhập META_API_KEY.",
+      };
     }
 
-    // 2. Narrative-Harmonized Procedural Waldorf SVG Fallback
-    const fallbackSvg = ProceduralIllustrator.generateArtSVG(scene, style);
-    const proceduralContext: AIContextTelemetry = {
-      kind: "image-generation",
-      title: `Procedural Artwork: ${scene.title} (${style})`,
-      prompt,
-      styleInstruction: `Procedural Goethean color wash generator (${style}) with radial luminescence, feathery watercolor blooms or wax tooth layers, and zero black outlines.`,
-      model: "ProceduralIllustrator (Local Goethean Engine)",
-      provider: "local",
-      injectedContext: {
-        sceneTitle: scene.title,
-        sceneSummary: scene.summary,
-        artStyle: style,
-        keywords: scene.keywords,
-      },
-      rawPayload: {
-        sceneId: scene.id,
-        title: scene.title,
-        summary: scene.summary,
-        artStyle: style,
-        keywords: scene.keywords,
-        generator: "ProceduralIllustrator.generateArtSVG",
-      },
-      latencyMs: 12,
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const res = await fetch("/api/ai/image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${metaApiKey.trim()}`,
+        },
+        body: JSON.stringify({
+          prompt,
+          style,
+          provider: "meta",
+          sceneTitle: scene.title,
+          sceneSummary: scene.summary,
+        }),
+      });
 
-    return {
-      imageUrl: fallbackSvg,
-      sourceLabel: `Procedural Waldorf Art (${style})`,
-      isAiGenerated: false,
-      contextInfo: proceduralContext,
-    };
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.imageUrl) {
+        return {
+          imageUrl: data.imageUrl,
+          sourceLabel: data.sourceLabel || "Tranh AI (muse-image-1.0)",
+          isAiGenerated: true,
+          contextInfo: data.contextInfo,
+        };
+      } else {
+        const errorMsg = data.error || `Lỗi máy chủ HTTP ${res.status}`;
+        return {
+          imageUrl: null,
+          sourceLabel: "Lỗi tạo ảnh AI",
+          isAiGenerated: false,
+          error: errorMsg,
+        };
+      }
+    } catch (err: any) {
+      return {
+        imageUrl: null,
+        sourceLabel: "Lỗi kết nối",
+        isAiGenerated: false,
+        error: `Không thể kết nối tới dịch vụ AI: ${err.message || String(err)}`,
+      };
+    }
   }
 
   /**
@@ -253,7 +236,7 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "k
                 imagePrompt:
                   sc.imagePrompt ||
                   ModelGateway.buildWaldorfPrompt(sc.summary || sc.title, artStyle),
-                imageSourceLabel: `Procedural Art (${artStyle})`,
+                imageSourceLabel: "",
                 contextInfo: segTelemetry,
               }));
             }
@@ -366,7 +349,7 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "k
       keywords: sc.keywords,
       artStyle,
       imagePrompt: this.buildWaldorfPrompt(sc.summary, artStyle),
-      imageSourceLabel: `Procedural Art (${artStyle})`,
+      imageSourceLabel: "",
       contextInfo: localSegTelemetry,
     }));
   }
