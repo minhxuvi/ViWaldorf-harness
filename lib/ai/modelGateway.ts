@@ -46,7 +46,7 @@ export class ModelGateway {
   }
 
   /**
-   * Generates artwork for a given scene via Google Imagen 3, Meta AI, or Procedural fallback.
+   * Generates artwork for a given scene via Google AI (multimodal / SVG), Meta AI, or Procedural fallback.
    */
   public static async generateSceneArtwork(
     options: GenerateImageOptions
@@ -54,8 +54,9 @@ export class ModelGateway {
     const { scene, style, provider, googleApiKey, metaApiKey } = options;
     const prompt = this.buildWaldorfPrompt(scene.summary || scene.title, style);
 
-    // 1. Google Imagen 3 path
+    // 1. Google AI path
     if (provider === "google" || (googleApiKey && provider !== "meta" && provider !== "local")) {
+      // 1A. Try through Next.js server proxy route
       try {
         const res = await fetch("/api/ai/image", {
           method: "POST",
@@ -67,6 +68,8 @@ export class ModelGateway {
             prompt,
             style,
             aspectRatio: "16:9",
+            sceneTitle: scene.title,
+            sceneSummary: scene.summary,
           }),
         });
 
@@ -75,53 +78,122 @@ export class ModelGateway {
           if (data.imageUrl) {
             return {
               imageUrl: data.imageUrl,
-              sourceLabel: data.sourceLabel || "Google Imagen 3 AI",
+              sourceLabel: data.sourceLabel || "Google AI Artwork",
               isAiGenerated: true,
             };
           }
         }
+      } catch (proxyErr) {
+        console.warn("Server proxy image call error:", proxyErr);
+      }
 
-        // Try direct client call if server returned error and client has key
-        if (googleApiKey) {
-          const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(
+      // 1B. Direct client-side calls if server proxy failed and client has key
+      if (googleApiKey) {
+        // Try native multimodal image generation with gemini-2.0-flash-exp
+        try {
+          const nativeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${encodeURIComponent(
             googleApiKey
           )}`;
-          const directRes = await fetch(directUrl, {
+          const nativeRes = await fetch(nativeUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              instances: [{ prompt }],
-              parameters: { sampleCount: 1, aspectRatio: "16:9" },
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `Generate an authentic Waldorf style children's book illustration for: "${scene.summary || scene.title}". Style: ${style}. Soft organic Goethean color harmony, warm and gentle feeling, artistic painting.`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: {
+                responseModalities: ["TEXT", "IMAGE"],
+              },
             }),
           });
 
-          if (directRes.ok) {
-            const directJson = await directRes.json();
-            const b64 = directJson.predictions?.[0]?.bytesBase64Encoded;
-            const mime = directJson.predictions?.[0]?.mimeType || "image/jpeg";
-            if (b64) {
+          if (nativeRes.ok) {
+            const nativeJson = await nativeRes.json();
+            const parts = nativeJson.candidates?.[0]?.content?.parts || [];
+            for (const p of parts) {
+              if (p.inlineData?.data) {
+                const mime = p.inlineData.mimeType || "image/png";
+                return {
+                  imageUrl: `data:${mime};base64,${p.inlineData.data}`,
+                  sourceLabel: "Google Gemini 2.0 AI Art",
+                  isAiGenerated: true,
+                };
+              }
+            }
+          }
+        } catch (nativeClientErr) {
+          console.warn("Direct native image call error:", nativeClientErr);
+        }
+
+        // Try Scene-Specific Waldorf SVG generation with gemini-2.0-flash
+        try {
+          const svgUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(
+            googleApiKey
+          )}`;
+
+          const styleDesc =
+            style === "wet-on-wet"
+              ? "Wet-on-wet watercolor with flowing Goethean washes of lemon yellow, Prussian blue, vermilion rose, soft organic blending, gentle atmospheric gradients, no harsh black borders."
+              : style === "crayon"
+              ? "Beeswax block crayon drawing with broad strokes of warm ochre, terracotta, moss green, and golden yellow on textured cream paper."
+              : "Pastel chalkboard drawing with luminous warm yellow and soft azure chalk outlines glowing on a dark matte slate blackboard.";
+
+          const svgRes = await fetch(svgUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `You are an authentic Waldorf artist and illustrator.
+Create a complete, beautiful, valid SVG illustration depicting this story scene:
+Title: "${scene.title}"
+Summary: "${scene.summary}"
+Style: ${styleDesc}
+
+Rules:
+- ViewBox must be "0 0 640 400" with width="100%" height="100%".
+- Create richly layered, scene-specific visual elements illustrating the characters, landscape, heavens, earth, or objects in the summary.
+- Use soft organic curves (<path>, <ellipse>, <radialGradient>, <linearGradient>, soft gaussian blur filters).
+- Output ONLY the raw <svg>...</svg> element. Do not write markdown, do not write backticks, do not write explanations.`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.4,
+                maxOutputTokens: 2048,
+              },
+            }),
+          });
+
+          if (svgRes.ok) {
+            const svgData = await svgRes.json();
+            let rawText = svgData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            rawText = rawText.replace(/```xml/gi, "").replace(/```svg/gi, "").replace(/```/g, "").trim();
+
+            const startIdx = rawText.indexOf("<svg");
+            const endIdx = rawText.lastIndexOf("</svg>");
+            if (startIdx !== -1 && endIdx !== -1) {
+              const svgContent = rawText.substring(startIdx, endIdx + 6);
+              const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
               return {
-                imageUrl: `data:${mime};base64,${b64}`,
-                sourceLabel: "Google Imagen 3 AI",
+                imageUrl: dataUrl,
+                sourceLabel: "Google Gemini AI (Scene Artwork)",
                 isAiGenerated: true,
               };
             }
-          } else {
-            const errBody = await directRes.json().catch(() => ({}));
-            const errMsg = errBody.error?.message || `Google API status ${directRes.status}`;
-            console.warn("Direct Google Imagen call failed:", errMsg);
-            // Fallback with informative error
-            const proceduralSvg = ProceduralIllustrator.generateArtSVG(scene, style);
-            return {
-              imageUrl: proceduralSvg,
-              sourceLabel: `Procedural Art (${style}) - Quota/Error: ${errMsg.slice(0, 40)}`,
-              isAiGenerated: false,
-              error: errMsg,
-            };
           }
+        } catch (svgClientErr) {
+          console.warn("Direct AI SVG generation error:", svgClientErr);
         }
-      } catch (err: any) {
-        console.warn("Google Imagen generation error, falling back to procedural:", err);
       }
     }
 
