@@ -45,6 +45,8 @@ export interface StoryScene {
   ord: number;
   title: string;
   summary: string;
+  /** Verbatim story text for this scene (Level 1). Optional for backward compatibility. */
+  passage?: string;
   keywords: string[];
   artStyle: WaldorfArtStyle;
   imagePrompt: string;

@@ -9,6 +9,18 @@ Waldorf education honors the threefold nature of the growing child:
 - **Feeling (Heart)**: Aesthetic, empathetic connection cultivated through storytelling, poetry, and song.
 - **Willing (Hands)**: Purposeful, constructive action through practical crafts and artistic work.
 
+### Three Practice Levels (Retelling Studio)
+
+Scaffolding fades step by step, from reading to free recall from the inner picture:
+
+| Level | Story text | Keywords | Image |
+|---|---|---|---|
+| 1 · Full Story (`prompt`) | Full verbatim passage of the scene | hidden | shown |
+| 2 · Keywords (`fading`) | hidden | shown | shown |
+| 3 · Free Recall (`free`) | hidden (title reduced to "Scene N of M") | hidden | hidden by default, one-click reveal; re-hidden on scene change |
+
+Passage source order: `scene.passage` → matching paragraph of the story source text (when paragraph count equals scene count) → `scene.summary`.
+
 ## 2. Three Waldorf Art Techniques & Calibrated Aesthetic Standards
 
 ### 1. Wet-on-Wet Watercolor (`wet-on-wet`)

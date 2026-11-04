@@ -180,7 +180,8 @@ Story Title: "${storyTitle || "Story"}"
 Text:
 ${cleanText}
 
-Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "keywords": ["..."], "imagePrompt": "..."}]}`;
+"passage" must be the exact verbatim contiguous excerpt of the original text for that scene; together all passages must cover the whole story in order.
+Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "passage": "...", "keywords": ["..."], "imagePrompt": "..."}]}`;
 
         const res = await fetch("/api/ai/chat", {
           method: "POST",
@@ -231,6 +232,7 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "k
                 ord: idx + 1,
                 title: sc.title || `Scene ${idx + 1}`,
                 summary: sc.summary || "",
+                passage: typeof sc.passage === "string" ? sc.passage : "",
                 keywords: Array.isArray(sc.keywords) ? sc.keywords.slice(0, 5) : [],
                 artStyle,
                 imagePrompt:
@@ -282,7 +284,7 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "k
 
     // If no explicit transitions detected or too few/many, segment based on narrative arc (3 to 5 scenes)
     const targetSceneCount = Math.min(5, Math.max(3, Math.ceil(sentences.length / 3)));
-    const scenesData: { title: string; summary: string; keywords: string[] }[] = [];
+    const scenesData: { title: string; summary: string; passage: string; keywords: string[] }[] = [];
 
     if (breakIndices.length >= 3 && breakIndices.length <= 6) {
       for (let i = 0; i < breakIndices.length; i++) {
@@ -295,6 +297,7 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "k
         scenesData.push({
           title,
           summary,
+          passage: summary,
           keywords: this.extractKeywords(summary),
         });
       }
@@ -313,6 +316,7 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "k
         scenesData.push({
           title,
           summary,
+          passage: summary,
           keywords: this.extractKeywords(summary),
         });
       }
@@ -346,6 +350,7 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "k
       ord: idx + 1,
       title: sc.title,
       summary: sc.summary,
+      passage: sc.passage,
       keywords: sc.keywords,
       artStyle,
       imagePrompt: this.buildWaldorfPrompt(sc.summary, artStyle),
@@ -391,4 +396,13 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "k
       .sort((a, b) => counts[b] - counts[a])
       .slice(0, 4);
   }
+}
+
+/** Level-1 text: explicit passage → matching paragraph of source text → summary. */
+export function getScenePassage(sourceText: string, scenes: StoryScene[], idx: number): string {
+  const sc = scenes[idx];
+  if (sc?.passage?.trim()) return sc.passage;
+  const paras = (sourceText || "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (scenes.length > 0 && paras.length === scenes.length) return paras[idx];
+  return sc?.summary ?? "";
 }
