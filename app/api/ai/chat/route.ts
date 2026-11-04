@@ -13,7 +13,17 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   try {
     const body = await request.json();
-    const { prompt, history = [], lang = "vi", activeStory, dialectCount } = body;
+    const {
+      prompt,
+      history = [],
+      lang = "vi",
+      activeStory,
+      dialectCount,
+      systemPromptOverride,
+      modelOverride,
+      temperature,
+      maxOutputTokens,
+    } = body;
 
     const clientGoogleKey = request.headers.get("x-goog-api-key") || "";
     const serverGoogleKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "";
@@ -29,7 +39,7 @@ export async function POST(request: NextRequest) {
     const injectedStoryNote = activeStory?.title
       ? `\nActive Classroom Story: "${activeStory.title}" (${activeStory.ageRange || "Ages 7-9"} - ${activeStory.goal || "Oral imagination"}).`
       : "";
-    const effectiveSystemInstruction = SYSTEM_INSTRUCTION + injectedStoryNote;
+    const effectiveSystemInstruction = systemPromptOverride || (SYSTEM_INSTRUCTION + injectedStoryNote);
 
     const contents = [
       ...history.map((m: any) => ({
@@ -43,8 +53,8 @@ export async function POST(request: NextRequest) {
     ];
 
     const generationConfig = {
-      temperature: 0.7,
-      maxOutputTokens: 1024,
+      temperature: typeof temperature === "number" ? Math.max(0, Math.min(2, temperature)) : 0.7,
+      maxOutputTokens: typeof maxOutputTokens === "number" ? Math.max(100, Math.min(8192, maxOutputTokens)) : 1024,
     };
 
     const payloadBody = {
@@ -55,8 +65,11 @@ export async function POST(request: NextRequest) {
       generationConfig,
     };
 
-    // Try gemini-2.0-flash first, then gemini-1.5-flash
-    const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
+    // Use modelOverride if provided, otherwise fallback chain
+    const defaultModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
+    const models = modelOverride
+      ? [modelOverride, ...defaultModels.filter((m) => m !== modelOverride)]
+      : defaultModels;
     let lastError = "";
 
     for (const model of models) {

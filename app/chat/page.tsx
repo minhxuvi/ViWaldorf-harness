@@ -78,7 +78,30 @@ Principles:
 
   // Telemetry modal inspector state
   const [selectedTelemetry, setSelectedTelemetry] = useState<AIContextTelemetry | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+
+  const handleOpenInspector = (msg: ChatMessage) => {
+    if (!msg.contextInfo) return;
+    setSelectedMessageId(msg.id);
+    setSelectedTelemetry(msg.contextInfo);
+    setIsInspectorOpen(true);
+  };
+
+  const handleApplyTunedOutput = (newText: string, newTelemetry: AIContextTelemetry) => {
+    if (!selectedMessageId) return;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === selectedMessageId
+          ? {
+              ...m,
+              text: newText,
+              contextInfo: newTelemetry,
+            }
+          : m
+      )
+    );
+  };
 
   const suggestions = [
     lang === "vi"
@@ -94,12 +117,6 @@ Principles:
       ? "Cách bảo tồn phương ngữ vùng miền mà không tạo áp lực chuẩn hóa lên học sinh"
       : "How to preserve regional dialects without imposing standardization pressure",
   ];
-
-  const handleOpenInspector = (telemetry?: AIContextTelemetry) => {
-    if (!telemetry) return;
-    setSelectedTelemetry(telemetry);
-    setIsInspectorOpen(true);
-  };
 
   const handleSend = async (textToSend?: string) => {
     const prompt = (textToSend || input).trim();
@@ -405,7 +422,7 @@ Principles:
                     }`}
                   >
                     <button
-                      onClick={() => handleOpenInspector(telemetry)}
+                      onClick={() => handleOpenInspector(msg)}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/90 border border-line text-forestDark hover:bg-[#F7ECD8] transition shadow-xs group"
                       title={t.aiInspector.inspectMessageBtn}
                     >
@@ -435,7 +452,7 @@ Principles:
                         {telemetry.title || telemetry.model}
                       </span>
                       <button
-                        onClick={() => handleOpenInspector(telemetry)}
+                        onClick={() => handleOpenInspector(msg)}
                         className="text-forest hover:underline font-bold"
                       >
                         Inspect Payload →
@@ -517,6 +534,16 @@ Principles:
         telemetry={selectedTelemetry}
         isOpen={isInspectorOpen}
         onClose={() => setIsInspectorOpen(false)}
+        onApplyTunedOutput={handleApplyTunedOutput}
+        activeStoryContext={
+          selectedStory
+            ? {
+                title: selectedStory.title,
+                ageRange: selectedStory.ageRange,
+                goal: selectedStory.goal,
+              }
+            : undefined
+        }
       />
     </div>
   );

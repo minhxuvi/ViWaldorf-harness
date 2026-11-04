@@ -32,15 +32,32 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   try {
     const body = await request.json();
-    const { prompt, style = "wet-on-wet", aspectRatio = "16:9", provider, sceneTitle, sceneSummary } = body;
+    const {
+      prompt,
+      style = "wet-on-wet",
+      aspectRatio = "16:9",
+      provider,
+      sceneTitle,
+      sceneSummary,
+      promptOverride,
+      negativePromptOverride,
+      modelOverride,
+    } = body;
 
-    if (!prompt && !sceneSummary) {
+    if (!prompt && !sceneSummary && !promptOverride) {
       return NextResponse.json({ error: "Missing prompt or scene details in request." }, { status: 400 });
     }
 
-    const cleanPrompt = prompt || sceneSummary;
+    const cleanPrompt = prompt || sceneSummary || "Scene Illustration";
     const titleText = sceneTitle || "Scene";
     const promptConfig = buildWaldorfPrompt(style, titleText, cleanPrompt);
+
+    if (promptOverride) {
+      promptConfig.positivePrompt = promptOverride;
+    }
+    if (negativePromptOverride) {
+      promptConfig.negativePrompt = negativePromptOverride;
+    }
 
     // Determine Google Key: header from client takes precedence, then server env
     const clientGoogleKey = request.headers.get("x-goog-api-key") || "";

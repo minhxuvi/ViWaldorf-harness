@@ -187,6 +187,32 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
     setIsInspectorOpen(true);
   };
 
+  const handleApplyTunedSceneOutput = (newOutput: string, newTelemetry: AIContextTelemetry) => {
+    if (!selectedStory || !currentScene) return;
+
+    if (newTelemetry.kind === "image-generation") {
+      updateData((prev) => ({
+        ...prev,
+        stories: prev.stories.map((s) => {
+          if (s.id !== selectedStory.id) return s;
+          return {
+            ...s,
+            scenes: s.scenes.map((sc) => {
+              if (sc.id !== currentScene.id) return sc;
+              return {
+                ...sc,
+                imagePath: newOutput.startsWith("data:") ? newOutput : sc.imagePath,
+                imagePrompt: newTelemetry.prompt,
+                imageSourceLabel: newTelemetry.model,
+                contextInfo: newTelemetry,
+              };
+            }),
+          };
+        }),
+      }));
+    }
+  };
+
   // Refs for audio recording & speech recognition
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -2055,6 +2081,16 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
         telemetry={selectedTelemetry}
         isOpen={isInspectorOpen}
         onClose={() => setIsInspectorOpen(false)}
+        onApplyTunedOutput={handleApplyTunedSceneOutput}
+        activeStoryContext={
+          selectedStory
+            ? {
+                title: selectedStory.title,
+                ageRange: selectedStory.ageRange,
+                goal: selectedStory.goal,
+              }
+            : undefined
+        }
       />
     </div>
   );
