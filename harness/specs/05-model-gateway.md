@@ -7,8 +7,9 @@
 The system follows a multi-provider model gateway architecture supporting both Google Generative AI and Meta AI/Muse:
 
 ### A. Google Generative AI (`GOOGLE_API_KEY`)
-- `gemini-2.0-flash`: Low-latency conversational guide, lesson planning, and Waldorf pedagogical assistance.
-- `imagen-3.0-generate-002`: Studio-grade visual artwork generation tailored with Goethean aesthetic prompts (wet-on-wet watercolor washes, beeswax block crayons, and dark chalkboard slates).
+- `gemini-2.0-flash` / `gemini-2.5-flash`: Low-latency conversational guide, lesson planning, and Waldorf pedagogical assistance.
+- **Multimodal Image Generation** (`gemini-2.0-flash-exp` / `imagen-3.0-generate-002`): Visual artwork generation calibrated with authentic Waldorf classroom prompt blueprints (`wet-on-wet`, `crayon`, `chalkboard`) and strict negative prompt constraints (no ink lines, no CGI, no text).
+- **Scene-Specific SVG Vector Synthesis** (`gemini-2.5-flash` / `gemini-2.0-flash`): Scalable pedagogical SVG vector generation utilizing organic layered paths, multi-stop radial/linear gradients, and filter effects (`feGaussianBlur`, slate noise) matching Waldorf mediums.
 - `gemini-1.5-flash`: Automatic fallback tier for chat and multimodal reasoning.
 
 ### B. Meta AI / Muse Architecture (`META_API_KEY`)

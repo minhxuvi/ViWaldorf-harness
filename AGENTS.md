@@ -2,6 +2,7 @@
 
 - **NEVER SELF-EDIT `DAO.md`.**
 - **Difficult choices do not require asking the user; decide autonomously based on the ethos in `DAO.md`.**
+- **Default Push & Deploy Policy**: Always commit and push directly to `origin/main` upon completing and verifying code changes with a clean build. The user tests directly on the live website (Vercel). Do not pause or ask for confirmation before pushing/deploying unless there is a destructive action or special high-risk scenario that genuinely requires user attention before deployment.
 
 ---
 

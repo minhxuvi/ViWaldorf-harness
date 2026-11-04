@@ -101,6 +101,23 @@ export class ModelGateway {
 
       // 1B. Direct client-side calls if server proxy failed and client has key
       if (googleApiKey) {
+        const universalNegative =
+          "harsh black outlines, black ink contours, cartoon outlines, anime, manga, comic book style, 3D CGI plastic rendering, glossy digital art, photorealism, sharp mechanical edges, high-contrast black shadows, modern graphic design, text, watermark, typography, letters, signature, deformed limbs, hyper-detailed facial features, whiteboard, dry erase marker, neon glow, flat vector fills";
+
+        let positivePrompt = "";
+        let svgStyleDesc = "";
+
+        if (style === "wet-on-wet") {
+          positivePrompt = `An authentic Waldorf wet-on-wet watercolor painting depicting "${scene.title} - ${scene.summary}". Style: Traditional Steiner-Waldorf early childhood pedagogy wet-in-wet watercolor on moist 300gsm heavy cold-press cotton paper. Color Harmony: Luminous Goethean color washes; radiant warm lemon yellow and pure white paper light glowing at the center, softly blending into vermilion rose, soft peach, and deep ultramarine Prussian blue at the outer atmospheric edges. Technique: Forms and figures emerge naturally out of fluid translucent color fields rather than lines. Soft feathery blooming transitions, natural watercolor granulation, delicate watery pooling, zero black lineart, zero pen outlines. Subject: gentle archetypal gestures in loose natural attire, soft-focus poetic impression, reverent peaceful childlike wonder.`;
+          svgStyleDesc = `Wet-on-wet watercolor style on moist cotton paper: Soft glowing Goethean washes with a radiant warm lemon yellow (#FFF59E) or white light core radiating into vermilion rose (#E87A70), soft peach (#FAD7A0), and deep ultramarine Prussian blue (#4A7B9D). Forms emerge organically from translucent color fields using layered <ellipse> and organic curved <path> shapes, with <radialGradient>, <linearGradient>, and <feGaussianBlur> filter for watery blooming and feathered edges. Zero black outlines or harsh pen contours.`;
+        } else if (style === "crayon") {
+          positivePrompt = `An authentic Waldorf beeswax block crayon illustration on textured heavy cream drawing paper depicting "${scene.title} - ${scene.summary}". Medium: Pure natural Stockmar beeswax block crayons, visible pebbled paper tooth with speckled wax adherence and warm matte wax sheen. Color & Lighting: Concentric radiating aura of warm light; pure golden lemon yellow core radiating outwards through warm honey orange, peach, and vermilion, into soft turquoise and cobalt blue in the outer corners. Technique: Broad flat-edge wax block strokes layered with fine directional textured hatching following living organic contours; soft translucent layering where undertones shine through; shadows created with complementary deep blue and violet rather than black. Subject: tender and living archetypal forms, warm nurturing atmosphere, reverent storytelling quality.`;
+          svgStyleDesc = `Waldorf beeswax block crayon style on textured cream paper (#FAF6EE): Concentric radiating aura of warm light (golden lemon yellow #FFF382, honey orange #F5B277, vermilion #E74C3C, soft cobalt #3498DB in corners). Use layered translucent strokes with organic curves mimicking broad 45-degree flat-edge block crayon strokes and pebbled paper tooth. Shadows rendered in complementary deep violet/blue (#4A235A, #1B4F72), never flat black. No sharp pen outlines.`;
+        } else {
+          positivePrompt = `An authentic Waldorf Main Lesson chalkboard drawing depicting "${scene.title} - ${scene.summary}". Medium: Multi-layered soft pastel chalk on genuine matte dark slate blackboard, framed with warm natural wood. Technique: Light emerging dramatically out of cosmic darkness; broad sweeping side-of-the-chalk strokes for atmospheric skies, waves, and rolling earth; delicate chalk cross-hatching, stippling, and powdery finger-blended halos. Lighting & Drama: Brilliant pure white and golden-yellow chalk crepuscular light rays streaming down through dark skies; luminous radiant halos and starry points of light; deep black slate preserved as natural shadow and depth. Color Palette: Vibrant natural chalk pastels: warm butter yellow, golden ochre, terracotta, carmine red, soft cerulean blue, seafoam cyan, and earthy moss green against dark charcoal slate. Composition: dignified and archetypal living narrative, timeless reverent classroom pedagogical illustration, decorative hand-drawn chalk vine border.`;
+          svgStyleDesc = `Waldorf Main Lesson chalkboard style on dark matte slate: Deep charcoal slate blackboard background (#181C22) framed by a warm natural wooden border (#8D5B2A). Luminous light pulled out of darkness using brilliant white (#FFFFFF) and golden-yellow (#F9E79F, #F39C12) chalk rays (<polygon> or <path> crepuscular sunbeams streaming downward). Rolling earth, mountains, or waves depicted with side-of-the-chalk gradient bands and soft chalk dust texture. Pastel highlights in terracotta (#D35400), carmine (#C0392B), soft cyan (#85C1E9), and moss green (#58D68D). No whiteboards, no neon glow, no printed fonts.`;
+        }
+
         // Try native multimodal image generation models
         const nativeModels = ["gemini-nano-banana-2.1", "gemini-2.5-flash-image", "gemini-2.0-flash-exp"];
         for (const model of nativeModels) {
@@ -116,7 +133,7 @@ export class ModelGateway {
                   {
                     parts: [
                       {
-                        text: `Generate an authentic Waldorf style children's book illustration for: "${scene.title} - ${scene.summary}". Style: ${style}. Soft organic Goethean color harmony, warm and gentle feeling, artistic painting.`,
+                        text: `${positivePrompt}\n\nStrict Negative Constraints (Must NOT appear): ${universalNegative}`,
                       },
                     ],
                   },
@@ -154,13 +171,6 @@ export class ModelGateway {
               googleApiKey
             )}`;
 
-            const styleDesc =
-              style === "wet-on-wet"
-                ? "Wet-on-wet watercolor with flowing Goethean washes of lemon yellow, Prussian blue, vermilion rose, soft organic blending, gentle atmospheric gradients, no harsh black borders."
-                : style === "crayon"
-                ? "Beeswax block crayon drawing with broad strokes of warm ochre, terracotta, moss green, and golden yellow on textured cream paper."
-                : "Pastel chalkboard drawing with luminous warm yellow and soft azure chalk outlines glowing on a dark matte slate blackboard.";
-
             const svgRes = await fetch(svgUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -169,17 +179,18 @@ export class ModelGateway {
                   {
                     parts: [
                       {
-                        text: `You are an authentic Waldorf artist and illustrator.
-Create a complete, beautiful, valid SVG illustration depicting this story scene:
-Title: "${scene.title}"
-Summary: "${scene.summary}"
-Style: ${styleDesc}
+                        text: `You are an authentic master Waldorf artist and educator.
+Create a complete, visually breathtaking, valid SVG illustration depicting this story scene:
+Scene Title: "${scene.title}"
+Scene Story: "${scene.summary}"
+Art Technique Guidelines: ${svgStyleDesc}
 
 Requirements:
 1. Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="100%" height="100%">
-2. Visually illustrate the story elements: characters, mountains, heavens, pillar, earth, or objects in the scene.
-3. Use layered SVG shapes (<path>, <ellipse>, <rect>, <defs> with <radialGradient>, <linearGradient>, soft gaussian blur filters).
-4. Do NOT output markdown code blocks or backticks. Output ONLY valid SVG XML.`,
+2. Represent the scene visually: depict the sky, landscape, light source, nature elements, characters, or key story symbols.
+3. Use rich layered SVG elements: <defs> with <linearGradient>, <radialGradient>, <filter> (e.g. gaussian blur for watercolor, turbulence for chalk grain), plus <path>, <ellipse>, <rect>, <polygon>.
+4. Honor Waldorf pedagogy: warm living atmosphere, gentle soft forms, no harsh cartoon outlines, no modern fonts or text inside the image.
+5. Do NOT output markdown code blocks or backticks. Output ONLY valid SVG XML.`,
                       },
                     ],
                   },
