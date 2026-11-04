@@ -3,6 +3,43 @@ export type AIProvider = "google" | "meta" | "local";
 export type StoryViewMode = "studio" | "reader";
 export type ReaderViewMode = "picture-book" | "continuous";
 
+export type AIOperationKind =
+  | "chat"
+  | "image-generation"
+  | "audio-analysis"
+  | "story-segmentation";
+
+export interface AIContextTelemetry {
+  kind: AIOperationKind;
+  title: string;
+  prompt: string;
+  systemPrompt?: string;
+  negativePrompt?: string;
+  styleInstruction?: string;
+  model: string;
+  provider: "google" | "local" | "meta";
+  historyTurns?: number;
+  injectedContext?: Record<string, any>;
+  generationConfig?: {
+    temperature?: number;
+    maxOutputTokens?: number;
+    aspectRatio?: string;
+    responseModalities?: string[];
+  };
+  rawPayload?: any;
+  latencyMs?: number;
+  timestamp: string;
+  metrics?: Record<string, any>;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: "user" | "viwaldorf";
+  text: string;
+  timestamp?: string;
+  contextInfo?: AIContextTelemetry;
+}
+
 export interface StoryScene {
   id: string;
   ord: number;
@@ -15,6 +52,7 @@ export interface StoryScene {
   imageSourceLabel: string;
   isGenerating?: boolean;
   generationError?: string | null;
+  contextInfo?: AIContextTelemetry;
 }
 
 export interface WaldorfStory {
@@ -28,6 +66,7 @@ export interface WaldorfStory {
   goal: string;
   defaultArtStyle: WaldorfArtStyle;
   scenes: StoryScene[];
+  segmentationContextInfo?: AIContextTelemetry;
 }
 
 export interface AudioDeliveryMetrics {
@@ -54,6 +93,7 @@ export interface PracticeAttempt {
   appliedDialectRules: string[];
   storySnapshot: string;
   createdAt: string;
+  contextInfo?: AIContextTelemetry;
 }
 
 export interface TimetableEntry {

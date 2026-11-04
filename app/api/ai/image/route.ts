@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AIContextTelemetry } from "@/lib/types";
 
 // Master prompt builder calibrated against authentic Waldorf classroom reference works
 function buildWaldorfPrompt(style: string, titleText: string, cleanPrompt: string) {
@@ -28,6 +29,7 @@ function buildWaldorfPrompt(style: string, titleText: string, cleanPrompt: strin
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
   try {
     const body = await request.json();
     const { prompt, style = "wet-on-wet", aspectRatio = "16:9", provider, sceneTitle, sceneSummary } = body;
@@ -61,23 +63,25 @@ export async function POST(request: NextRequest) {
             effectiveGoogleKey
           )}`;
 
+          const nativePayload = {
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `${promptConfig.positivePrompt}\n\nStrict Negative Constraints (Must NOT appear): ${promptConfig.negativePrompt}`,
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              responseModalities: ["TEXT", "IMAGE"],
+            },
+          };
+
           const nativeRes = await fetch(nativeEndpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `${promptConfig.positivePrompt}\n\nStrict Negative Constraints (Must NOT appear): ${promptConfig.negativePrompt}`,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: {
-                responseModalities: ["TEXT", "IMAGE"],
-              },
-            }),
+            body: JSON.stringify(nativePayload),
           });
 
           if (nativeRes.ok) {
@@ -86,10 +90,35 @@ export async function POST(request: NextRequest) {
             for (const part of candidateParts) {
               if (part.inlineData?.data) {
                 const mime = part.inlineData.mimeType || "image/png";
+                const latencyMs = Date.now() - startTime;
+                const contextInfo: AIContextTelemetry = {
+                  kind: "image-generation",
+                  title: `Artwork: ${titleText} (${style})`,
+                  prompt: promptConfig.positivePrompt,
+                  negativePrompt: promptConfig.negativePrompt,
+                  styleInstruction: promptConfig.svgInstruction,
+                  model,
+                  provider: "google",
+                  injectedContext: {
+                    sceneTitle: titleText,
+                    sceneSummary: cleanPrompt,
+                    artStyle: style,
+                    aspectRatio,
+                  },
+                  generationConfig: {
+                    aspectRatio,
+                    responseModalities: ["TEXT", "IMAGE"],
+                  },
+                  rawPayload: nativePayload,
+                  latencyMs,
+                  timestamp: new Date().toISOString(),
+                };
+
                 return NextResponse.json({
                   imageUrl: `data:${mime};base64,${part.inlineData.data}`,
                   sourceLabel: `Google Gemini AI (${model})`,
                   style,
+                  contextInfo,
                 });
               }
             }
@@ -108,15 +137,7 @@ export async function POST(request: NextRequest) {
             effectiveGoogleKey
           )}`;
 
-          const svgRes = await fetch(svgEndpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `You are an authentic master Waldorf artist and educator.
+          const svgPromptText = `You are an authentic master Waldorf artist and educator.
 Create a complete, visually breathtaking, valid SVG illustration for this story scene:
 Scene Title: "${titleText}"
 Scene Story: "${cleanPrompt}"
@@ -127,16 +148,28 @@ Requirements:
 2. Represent the scene visually: depict the sky, landscape, light source, nature elements, characters, or key story symbols.
 3. Use rich layered SVG elements: <defs> with <linearGradient>, <radialGradient>, <filter> (e.g. gaussian blur for watercolor, turbulence for chalk grain), plus <path>, <ellipse>, <rect>, <polygon>.
 4. Honor Waldorf pedagogy: warm living atmosphere, gentle soft forms, no harsh cartoon outlines, no modern fonts or text inside the image.
-5. Do NOT include markdown code blocks or backticks. Output ONLY valid SVG XML.`,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.5,
-                maxOutputTokens: 8192,
+5. Do NOT include markdown code blocks or backticks. Output ONLY valid SVG XML.`;
+
+          const svgPayload = {
+            contents: [
+              {
+                parts: [
+                  {
+                    text: svgPromptText,
+                  },
+                ],
               },
-            }),
+            ],
+            generationConfig: {
+              temperature: 0.5,
+              maxOutputTokens: 8192,
+            },
+          };
+
+          const svgRes = await fetch(svgEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(svgPayload),
           });
 
           if (svgRes.ok) {
@@ -149,10 +182,36 @@ Requirements:
               const endIdx = rawText.lastIndexOf("</svg>");
               let svgContent = endIdx !== -1 ? rawText.substring(startIdx, endIdx + 6) : rawText.substring(startIdx) + "\n</svg>";
               const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
+              const latencyMs = Date.now() - startTime;
+
+              const contextInfo: AIContextTelemetry = {
+                kind: "image-generation",
+                title: `Artwork Vector: ${titleText} (${style})`,
+                prompt: svgPromptText,
+                negativePrompt: promptConfig.negativePrompt,
+                styleInstruction: promptConfig.svgInstruction,
+                model: gemModel,
+                provider: "google",
+                injectedContext: {
+                  sceneTitle: titleText,
+                  sceneSummary: cleanPrompt,
+                  artStyle: style,
+                  aspectRatio,
+                },
+                generationConfig: {
+                  temperature: 0.5,
+                  maxOutputTokens: 8192,
+                },
+                rawPayload: svgPayload,
+                latencyMs,
+                timestamp: new Date().toISOString(),
+              };
+
               return NextResponse.json({
                 imageUrl: dataUrl,
                 sourceLabel: `Google Gemini AI (${gemModel})`,
                 style,
+                contextInfo,
               });
             }
           }

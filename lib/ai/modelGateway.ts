@@ -1,4 +1,4 @@
-import { WaldorfArtStyle, StoryScene, AIProvider } from "../types";
+import { WaldorfArtStyle, StoryScene, AIProvider, AIContextTelemetry } from "../types";
 import { ProceduralIllustrator } from "../art/proceduralIllustrator";
 
 export interface GenerateImageOptions {
@@ -23,6 +23,7 @@ export interface ImageGenerationResult {
   sourceLabel: string;
   isAiGenerated: boolean;
   error?: string;
+  contextInfo?: AIContextTelemetry;
 }
 
 export class ModelGateway {
@@ -97,6 +98,7 @@ export class ModelGateway {
               imageUrl: data.imageUrl,
               sourceLabel: data.sourceLabel || "Google AI Artwork",
               isAiGenerated: true,
+              contextInfo: data.contextInfo,
             };
           }
         } else {
@@ -158,10 +160,31 @@ export class ModelGateway {
               for (const p of parts) {
                 if (p.inlineData?.data) {
                   const mime = p.inlineData.mimeType || "image/png";
+                  const contextInfo: AIContextTelemetry = {
+                    kind: "image-generation",
+                    title: `Artwork: ${scene.title} (${style})`,
+                    prompt: positivePrompt,
+                    negativePrompt: universalNegative,
+                    model,
+                    provider: "google",
+                    injectedContext: {
+                      sceneTitle: scene.title,
+                      sceneSummary: scene.summary,
+                      artStyle: style,
+                    },
+                    generationConfig: {
+                      responseModalities: ["TEXT", "IMAGE"],
+                    },
+                    rawPayload: {
+                      contents: [{ parts: [{ text: `${positivePrompt}\n\nStrict Negative Constraints: ${universalNegative}` }] }],
+                    },
+                    timestamp: new Date().toISOString(),
+                  };
                   return {
                     imageUrl: `data:${mime};base64,${p.inlineData.data}`,
                     sourceLabel: `Google Gemini AI (${model})`,
                     isAiGenerated: true,
+                    contextInfo,
                   };
                 }
               }
@@ -179,15 +202,7 @@ export class ModelGateway {
               googleApiKey
             )}`;
 
-            const svgRes = await fetch(svgUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    parts: [
-                      {
-                        text: `You are an authentic master Waldorf artist and educator.
+            const svgPromptText = `You are an authentic master Waldorf artist and educator.
 Create a complete, visually breathtaking, valid SVG illustration depicting this story scene:
 Scene Title: "${scene.title}"
 Scene Story: "${scene.summary}"
@@ -198,16 +213,28 @@ Requirements:
 2. Represent the scene visually: depict the sky, landscape, light source, nature elements, characters, or key story symbols.
 3. Use rich layered SVG elements: <defs> with <linearGradient>, <radialGradient>, <filter> (e.g. gaussian blur for watercolor, turbulence for chalk grain), plus <path>, <ellipse>, <rect>, <polygon>.
 4. Honor Waldorf pedagogy: warm living atmosphere, gentle soft forms, no harsh cartoon outlines, no modern fonts or text inside the image.
-5. Do NOT output markdown code blocks or backticks. Output ONLY valid SVG XML.`,
-                      },
-                    ],
-                  },
-                ],
-                generationConfig: {
-                  temperature: 0.5,
-                  maxOutputTokens: 8192,
+5. Do NOT output markdown code blocks or backticks. Output ONLY valid SVG XML.`;
+
+            const svgPayload = {
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: svgPromptText,
+                    },
+                  ],
                 },
-              }),
+              ],
+              generationConfig: {
+                temperature: 0.5,
+                maxOutputTokens: 8192,
+              },
+            };
+
+            const svgRes = await fetch(svgUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(svgPayload),
             });
 
             if (svgRes.ok) {
@@ -223,10 +250,30 @@ Requirements:
                     ? rawText.substring(startIdx, endIdx + 6)
                     : rawText.substring(startIdx) + "\n</svg>";
                 const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
+                const contextInfo: AIContextTelemetry = {
+                  kind: "image-generation",
+                  title: `Artwork Vector: ${scene.title} (${style})`,
+                  prompt: svgPromptText,
+                  styleInstruction: svgStyleDesc,
+                  model: textModel,
+                  provider: "google",
+                  injectedContext: {
+                    sceneTitle: scene.title,
+                    sceneSummary: scene.summary,
+                    artStyle: style,
+                  },
+                  generationConfig: {
+                    temperature: 0.5,
+                    maxOutputTokens: 8192,
+                  },
+                  rawPayload: svgPayload,
+                  timestamp: new Date().toISOString(),
+                };
                 return {
                   imageUrl: dataUrl,
                   sourceLabel: `Google Gemini AI (${textModel})`,
                   isAiGenerated: true,
+                  contextInfo,
                 };
               }
             }
@@ -260,6 +307,7 @@ Requirements:
               imageUrl: data.imageUrl,
               sourceLabel: "Meta muse-image-1.0",
               isAiGenerated: true,
+              contextInfo: data.contextInfo,
             };
           }
         }
@@ -270,10 +318,36 @@ Requirements:
 
     // 3. Narrative-Harmonized Procedural Waldorf SVG Fallback
     const fallbackSvg = ProceduralIllustrator.generateArtSVG(scene, style);
+    const proceduralContext: AIContextTelemetry = {
+      kind: "image-generation",
+      title: `Procedural Artwork: ${scene.title} (${style})`,
+      prompt,
+      styleInstruction: `Procedural Goethean color wash generator (${style}) with radial luminescence, feathery watercolor blooms or wax tooth layers, and zero black outlines.`,
+      model: "ProceduralIllustrator (Local Goethean Engine)",
+      provider: "local",
+      injectedContext: {
+        sceneTitle: scene.title,
+        sceneSummary: scene.summary,
+        artStyle: style,
+        keywords: scene.keywords,
+      },
+      rawPayload: {
+        sceneId: scene.id,
+        title: scene.title,
+        summary: scene.summary,
+        artStyle: style,
+        keywords: scene.keywords,
+        generator: "ProceduralIllustrator.generateArtSVG",
+      },
+      latencyMs: 12,
+      timestamp: new Date().toISOString(),
+    };
+
     return {
       imageUrl: fallbackSvg,
       sourceLabel: `Procedural Waldorf Art (${style})`,
       isAiGenerated: false,
+      contextInfo: proceduralContext,
     };
   }
 
@@ -377,6 +451,29 @@ Return ONLY valid JSON (no markdown formatting, no backticks, no extra commentar
                   const parsed = JSON.parse(cleanedJson);
                   const rawScenes = Array.isArray(parsed) ? parsed : parsed.scenes;
                   if (Array.isArray(rawScenes) && rawScenes.length > 0) {
+                    const segTelemetry: AIContextTelemetry = {
+                      kind: "story-segmentation",
+                      title: `Narrative Segmentation: "${storyTitle || "Story"}"`,
+                      prompt,
+                      systemPrompt:
+                        "You are a Waldorf pedagogical storyteller and children's book illustrator. Analyze narrative context and divide into 3 to 6 distinct scenes.",
+                      model,
+                      provider: "google",
+                      injectedContext: {
+                        storyTitle,
+                        artStyle,
+                        storyLengthChars: cleanText.length,
+                      },
+                      generationConfig: {
+                        temperature: 0.3,
+                      },
+                      rawPayload: {
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0.3, responseMimeType: "application/json" },
+                      },
+                      timestamp: new Date().toISOString(),
+                    };
+
                     return rawScenes.slice(0, 6).map((sc: any, idx: number) => ({
                       id: `scene-${Date.now()}-${idx}`,
                       ord: idx + 1,
@@ -388,6 +485,7 @@ Return ONLY valid JSON (no markdown formatting, no backticks, no extra commentar
                         sc.imagePrompt ||
                         ModelGateway.buildWaldorfPrompt(sc.summary || sc.title, artStyle),
                       imageSourceLabel: `Procedural Art (${artStyle})`,
+                      contextInfo: segTelemetry,
                     }));
                   }
                 }
@@ -473,6 +571,29 @@ Return ONLY valid JSON (no markdown formatting, no backticks, no extra commentar
       }
     }
 
+    const localSegTelemetry: AIContextTelemetry = {
+      kind: "story-segmentation",
+      title: `Local Narrative Segmentation: "${storyTitle || "Story"}"`,
+      prompt: `Segmenting "${storyTitle}" into narrative arcs based on punctuation, transition markers, and pacing.`,
+      systemPrompt: "Local Waldorf Narrative Context Segmenter (DAO.md compliant)",
+      model: "Local Semantic Narrative Segmenter",
+      provider: "local",
+      injectedContext: {
+        storyTitle,
+        artStyle,
+        sentencesCount: sentences.length,
+        breakIndicesCount: breakIndices.length,
+      },
+      rawPayload: {
+        sentencesCount: sentences.length,
+        breakIndices,
+        targetSceneCount,
+        artStyle,
+      },
+      latencyMs: 5,
+      timestamp: new Date().toISOString(),
+    };
+
     return scenesData.map((sc, idx) => ({
       id: `scene-${Date.now()}-${idx}`,
       ord: idx + 1,
@@ -482,6 +603,7 @@ Return ONLY valid JSON (no markdown formatting, no backticks, no extra commentar
       artStyle,
       imagePrompt: this.buildWaldorfPrompt(sc.summary, artStyle),
       imageSourceLabel: `Procedural Art (${artStyle})`,
+      contextInfo: localSegTelemetry,
     }));
   }
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AIContextTelemetry } from "@/lib/types";
 
 const SYSTEM_INSTRUCTION = `You are ViWaldorf, a gentle, wise Waldorf pedagogical companion in Vietnam, strictly governed by DAO.md.
 Principles:
@@ -9,9 +10,10 @@ Principles:
 - Respond warmly and poetically in the user's language (Vietnamese or English). Keep answers practical and inspiring.`;
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
   try {
     const body = await request.json();
-    const { prompt, history = [], lang = "vi" } = body;
+    const { prompt, history = [], lang = "vi", activeStory, dialectCount } = body;
 
     const clientGoogleKey = request.headers.get("x-goog-api-key") || "";
     const serverGoogleKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "";
@@ -24,6 +26,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const injectedStoryNote = activeStory?.title
+      ? `\nActive Classroom Story: "${activeStory.title}" (${activeStory.ageRange || "Ages 7-9"} - ${activeStory.goal || "Oral imagination"}).`
+      : "";
+    const effectiveSystemInstruction = SYSTEM_INSTRUCTION + injectedStoryNote;
+
     const contents = [
       ...history.map((m: any) => ({
         role: m.sender === "user" ? "user" : "model",
@@ -34,6 +41,19 @@ export async function POST(request: NextRequest) {
         parts: [{ text: prompt }],
       },
     ];
+
+    const generationConfig = {
+      temperature: 0.7,
+      maxOutputTokens: 1024,
+    };
+
+    const payloadBody = {
+      contents,
+      systemInstruction: {
+        parts: [{ text: effectiveSystemInstruction }],
+      },
+      generationConfig,
+    };
 
     // Try gemini-2.0-flash first, then gemini-1.5-flash
     const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
@@ -48,23 +68,41 @@ export async function POST(request: NextRequest) {
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents,
-            systemInstruction: {
-              parts: [{ text: SYSTEM_INSTRUCTION }],
-            },
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 1024,
-            },
-          }),
+          body: JSON.stringify(payloadBody),
         });
 
         if (res.ok) {
           const data = await res.json();
           const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (reply) {
-            return NextResponse.json({ text: reply, model });
+            const latencyMs = Date.now() - startTime;
+            const contextInfo: AIContextTelemetry = {
+              kind: "chat",
+              title: `Assistant Chat (${model})`,
+              prompt,
+              systemPrompt: effectiveSystemInstruction,
+              model,
+              provider: "google",
+              historyTurns: history.length,
+              injectedContext: {
+                language: lang,
+                ...(activeStory?.title
+                  ? {
+                      storyTitle: activeStory.title,
+                      storyAge: activeStory.ageRange,
+                      storyGoal: activeStory.goal,
+                    }
+                  : {}),
+                ...(dialectCount !== undefined ? { dialectRulesCount: dialectCount } : {}),
+                governance: "DAO.md (Life First, Truthfulness, Privacy, Learnability)",
+              },
+              generationConfig,
+              rawPayload: payloadBody,
+              latencyMs,
+              timestamp: new Date().toISOString(),
+            };
+
+            return NextResponse.json({ text: reply, model, contextInfo });
           }
         } else {
           const err = await res.json().catch(() => ({}));

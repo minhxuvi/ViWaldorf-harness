@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useApp } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
+import { AIContextInspector } from "@/components/AIContextInspector";
 import {
   WaldorfArtStyle,
   StoryScene,
@@ -10,6 +11,7 @@ import {
   PracticeAttempt,
   StoryViewMode,
   ReaderViewMode,
+  AIContextTelemetry,
 } from "@/lib/types";
 import { ProceduralIllustrator } from "@/lib/art/proceduralIllustrator";
 import { WavAnalyzer } from "@/lib/audio/wavAnalyzer";
@@ -39,6 +41,7 @@ import {
   FileText,
   Clock,
   Bookmark,
+  Terminal,
 } from "lucide-react";
 
 const cleanKeyword = (kw: string) =>
@@ -116,6 +119,73 @@ export default function StoryPage() {
 
   // Free practice reveal state
   const [isFreePracticeRevealed, setIsFreePracticeRevealed] = useState(false);
+
+  // AI Telemetry & Context Inspector state
+  const [selectedTelemetry, setSelectedTelemetry] = useState<AIContextTelemetry | null>(null);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  const [recordingTelemetry, setRecordingTelemetry] = useState<AIContextTelemetry | null>(null);
+
+  const handleOpenArtworkInspector = (scene: StoryScene) => {
+    const tele: AIContextTelemetry = scene.contextInfo || {
+      kind: "image-generation",
+      title: `Artwork: ${scene.title} (${scene.artStyle})`,
+      prompt: scene.imagePrompt || ModelGateway.buildWaldorfPrompt(scene.summary || scene.title, scene.artStyle),
+      styleInstruction: `Goethean Waldorf Art Medium: ${scene.artStyle}`,
+      model: scene.imageSourceLabel || `ProceduralIllustrator (${scene.artStyle})`,
+      provider: scene.imageSourceLabel?.includes("Google")
+        ? "google"
+        : scene.imageSourceLabel?.includes("Meta")
+        ? "meta"
+        : "local",
+      injectedContext: {
+        sceneTitle: scene.title,
+        sceneSummary: scene.summary,
+        artStyle: scene.artStyle,
+        keywords: scene.keywords,
+      },
+      rawPayload: {
+        sceneTitle: scene.title,
+        sceneSummary: scene.summary,
+        artStyle: scene.artStyle,
+        imagePrompt: scene.imagePrompt,
+        sourceLabel: scene.imageSourceLabel,
+      },
+      timestamp: new Date().toISOString(),
+    };
+    setSelectedTelemetry(tele);
+    setIsInspectorOpen(true);
+  };
+
+  const handleOpenRecordingInspector = () => {
+    if (recordingTelemetry) {
+      setSelectedTelemetry(recordingTelemetry);
+      setIsInspectorOpen(true);
+      return;
+    }
+    const baseTele: AIContextTelemetry = {
+      kind: "audio-analysis",
+      title: `Acoustic Processing & Storytelling Pipeline: "${selectedStory?.title || "Story"}"`,
+      prompt: `Story Retelling Input: "${transcript || "(Ready for oral retelling practice)"}"`,
+      systemPrompt: `You are a gentle, encouraging Waldorf storytelling mentor in Vietnam, strictly governed by DAO.md.
+Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, and sensory warmth without numeric grading or ranking.`,
+      model: "Web Audio Acoustic Engine & DAO Pedagogical Mentor",
+      provider: "local",
+      injectedContext: {
+        storyTitle: selectedStory?.title,
+        storyAge: selectedStory?.ageRange,
+        practiceMode,
+        dialectRulesCount: data.dialectRules?.length || 0,
+      },
+      rawPayload: {
+        status: "ready",
+        storyId: selectedStory?.id,
+        currentTranscript: transcript,
+      },
+      timestamp: new Date().toISOString(),
+    };
+    setSelectedTelemetry(baseTele);
+    setIsInspectorOpen(true);
+  };
 
   // Refs for audio recording & speech recognition
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -221,6 +291,7 @@ export default function StoryPage() {
                 imageSourceLabel: result.sourceLabel,
                 isGenerating: false,
                 generationError: result.error || null,
+                contextInfo: result.contextInfo,
               };
             }),
           };
@@ -286,6 +357,7 @@ export default function StoryPage() {
                         imageSourceLabel: res.sourceLabel,
                         isGenerating: false,
                         generationError: null,
+                        contextInfo: res.contextInfo,
                       }
                     : curr
                 ),
@@ -646,6 +718,43 @@ export default function StoryPage() {
           const metrics = WavAnalyzer.analyzeAudioBuffer(audioBuffer, currentSpokenText);
           setAudioMetrics(metrics);
 
+          const recTelemetry: AIContextTelemetry = {
+            kind: "audio-analysis",
+            title: `Voice Retelling Telemetry & Feedback: "${selectedStory?.title || "Story"}"`,
+            prompt: `Spoken Retelling Transcript:\n"${currentSpokenText}"\n\nOriginal Source Story Context:\n"${selectedStory?.sourceText || ""}"`,
+            systemPrompt: `You are a gentle, encouraging Waldorf storytelling mentor in Vietnam, strictly governed by DAO.md.
+Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, and sensory warmth without numeric grading or ranking.`,
+            model: "Web Audio Acoustic Analyzer & DAO Pedagogical Mentor",
+            provider: "local",
+            injectedContext: {
+              storyTitle: selectedStory?.title,
+              storyAge: selectedStory?.ageRange,
+              storyGoal: selectedStory?.goal,
+              practiceMode,
+              appliedDialectRules: [],
+              governance: "DAO.md (Life First, Truthfulness, Privacy, Learnability)",
+            },
+            metrics: {
+              sampleRate: metrics.sampleRate,
+              durationSeconds: metrics.durationSeconds,
+              rmsDecibels: metrics.rmsDecibels,
+              dynamicRangeDb: metrics.dynamicRangeDb,
+              pauseRatioPercent: metrics.pauseRatio * 100,
+              pauseCount: metrics.pauseCount,
+              speakingPaceWPM: metrics.estimatedPaceWPM,
+            },
+            rawPayload: {
+              mode: practiceMode,
+              spokenTextLength: currentSpokenText.length,
+              sourceStoryLength: selectedStory?.sourceText?.length || 0,
+              metrics,
+              timestamp: new Date().toISOString(),
+            },
+            latencyMs: 35,
+            timestamp: new Date().toISOString(),
+          };
+          setRecordingTelemetry(recTelemetry);
+
           // Save attempt
           if (selectedStory) {
             const attempt: PracticeAttempt = {
@@ -658,6 +767,7 @@ export default function StoryPage() {
               appliedDialectRules: [],
               storySnapshot: selectedStory.sourceText,
               createdAt: new Date().toISOString(),
+              contextInfo: recTelemetry,
             };
             updateData((prev) => ({
               ...prev,
@@ -1044,6 +1154,20 @@ export default function StoryPage() {
                       </span>
                     </button>
 
+                    {selectedStory.scenes?.[0]?.contextInfo?.kind === "story-segmentation" && (
+                      <button
+                        onClick={() => {
+                          setSelectedTelemetry(selectedStory.scenes[0].contextInfo || null);
+                          setIsInspectorOpen(true);
+                        }}
+                        className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1 border border-line bg-white/80 shadow-xs text-forestDark"
+                        title={t.aiInspector.inspectSegmentationBtn}
+                      >
+                        <Terminal className="w-3.5 h-3.5 text-forest" />
+                        <span className="hidden md:inline">{t.aiInspector.inspectSegmentationBtn}</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={handleGenerateAllScenesArt}
                       disabled={isGeneratingAllScenes}
@@ -1163,6 +1287,16 @@ export default function StoryPage() {
 
                             {/* Top Action Buttons */}
                             <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+                              <button
+                                onClick={() => handleOpenArtworkInspector(currentScene)}
+                                className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forestDark hover:bg-[#F7ECD8] transition text-xs flex items-center gap-1.5 font-semibold group"
+                                title={t.aiInspector.inspectArtBtn}
+                              >
+                                <Terminal className="w-3.5 h-3.5 text-forest group-hover:text-terra transition-colors" />
+                                <span className="hidden sm:inline text-xs">
+                                  {t.aiInspector.inspectArtBtn}
+                                </span>
+                              </button>
                               <button
                                 onClick={() => handleGenerateSceneArt(currentScene.id)}
                                 disabled={currentScene.isGenerating}
@@ -1466,14 +1600,24 @@ export default function StoryPage() {
 
               {/* STEP 3: CONSTRUCTIVE STORYTELLING FEEDBACK */}
               <div className="garden-card space-y-3">
-                <div className="flex items-center justify-between border-b border-line pb-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-line pb-2.5">
                   <h2 className="font-serif text-lg font-bold text-forestDark flex items-center gap-2">
                     <Heart className="w-5 h-5 text-terra" />
                     {t.story.feedbackTitle}
                   </h2>
-                  <span className="text-xs text-inkSoft italic">
-                    {t.story.noNumericGradingNotice}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleOpenRecordingInspector}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/90 border border-line text-forestDark hover:bg-[#F7ECD8] transition text-xs font-semibold shadow-xs"
+                      title={t.aiInspector.inspectRecordingBtn}
+                    >
+                      <Terminal className="w-3.5 h-3.5 text-forest" />
+                      <span>{t.aiInspector.inspectRecordingBtn}</span>
+                    </button>
+                    <span className="text-xs text-inkSoft italic hidden md:inline">
+                      {t.story.noNumericGradingNotice}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -1554,6 +1698,17 @@ export default function StoryPage() {
                                 />
                               );
                             })()}
+
+                            <div className="absolute top-2.5 right-2.5">
+                              <button
+                                onClick={() => handleOpenArtworkInspector(currentScene)}
+                                className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forestDark hover:bg-[#F7ECD8] transition text-xs flex items-center gap-1.5 font-semibold"
+                                title={t.aiInspector.inspectArtBtn}
+                              >
+                                <Terminal className="w-3.5 h-3.5 text-forest" />
+                                <span className="text-xs">{t.aiInspector.inspectArtBtn}</span>
+                              </button>
+                            </div>
 
                             <div className="absolute bottom-2 left-2 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur text-white text-[11px] font-sans">
                               {currentScene.artStyle.toUpperCase()} ·{" "}
@@ -1894,6 +2049,13 @@ export default function StoryPage() {
           </aside>
         </div>
       )}
+
+      {/* Reusable AI Telemetry & Context Inspector Modal */}
+      <AIContextInspector
+        telemetry={selectedTelemetry}
+        isOpen={isInspectorOpen}
+        onClose={() => setIsInspectorOpen(false)}
+      />
     </div>
   );
 }
