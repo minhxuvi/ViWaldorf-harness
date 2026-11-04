@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 export default function ChatPage() {
-  const { data, t, lang, selectedStory, googleApiKey, aiProvider } = useApp();
+  const { data, t, lang, selectedStory, metaApiKey, aiProvider } = useApp();
 
   const initialGreetingContext: AIContextTelemetry = {
     kind: "chat",
@@ -158,14 +158,14 @@ Principles:
 
     const callStartTime = Date.now();
 
-    // Attempt real Google Gemini call if configured or on production
-    if (aiProvider === "google" || googleApiKey) {
+    // Attempt real Meta AI call if configured
+    if (aiProvider === "meta" || metaApiKey) {
       try {
         const res = await fetch("/api/ai/chat", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(googleApiKey ? { "x-goog-api-key": googleApiKey } : {}),
+            ...(metaApiKey ? { Authorization: `Bearer ${metaApiKey}` } : {}),
           },
           body: JSON.stringify({
             prompt,
@@ -200,7 +200,7 @@ Principles:
           }
         }
       } catch (err) {
-        console.warn("Gemini chat fetch error, falling back to local heuristics:", err);
+        console.warn("Meta AI chat fetch error, falling back to local heuristics:", err);
       }
     }
 
@@ -432,7 +432,7 @@ Principles:
                       </span>
                       {telemetry.model && (
                         <span className="text-inkSoft font-mono text-[9px] sm:text-[10px] bg-[#FAF7F0] px-1.5 py-0.5 rounded border border-line/50">
-                          {telemetry.model.replace("gemini-", "").replace("Local ", "")}
+                          {telemetry.model.replace("Local ", "")}
                         </span>
                       )}
                       {telemetry.latencyMs !== undefined && (

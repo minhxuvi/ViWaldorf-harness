@@ -5,7 +5,6 @@ export interface GenerateImageOptions {
   scene: StoryScene;
   style: WaldorfArtStyle;
   provider: AIProvider;
-  googleApiKey?: string;
   metaApiKey?: string;
 }
 
@@ -14,7 +13,6 @@ export interface StorySegmentationOptions {
   storyTitle: string;
   artStyle: WaldorfArtStyle;
   provider: AIProvider;
-  googleApiKey?: string;
   metaApiKey?: string;
 }
 
@@ -64,227 +62,15 @@ export class ModelGateway {
   }
 
   /**
-   * Generates artwork for a given scene via Google AI (multimodal / SVG), Meta AI, or Procedural fallback.
+   * Generates artwork for a given scene via Meta AI (muse-image-1.0) or Procedural fallback.
    */
   public static async generateSceneArtwork(
     options: GenerateImageOptions
   ): Promise<ImageGenerationResult> {
-    const { scene, style, provider, googleApiKey, metaApiKey } = options;
+    const { scene, style, provider, metaApiKey } = options;
     const prompt = this.buildWaldorfPrompt(scene.summary || scene.title, style);
 
-    // 1. Google AI path
-    if (provider === "google" || (googleApiKey && provider !== "meta" && provider !== "local")) {
-      // 1A. Try through Next.js server proxy route
-      try {
-        const res = await fetch("/api/ai/image", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(googleApiKey ? { "x-goog-api-key": googleApiKey } : {}),
-          },
-          body: JSON.stringify({
-            prompt,
-            style,
-            aspectRatio: "16:9",
-            sceneTitle: scene.title,
-            sceneSummary: scene.summary,
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.imageUrl) {
-            return {
-              imageUrl: data.imageUrl,
-              sourceLabel: data.sourceLabel || "Google AI Artwork",
-              isAiGenerated: true,
-              contextInfo: data.contextInfo,
-            };
-          }
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          console.warn("Server proxy image call non-200:", errData);
-        }
-      } catch (proxyErr) {
-        console.warn("Server proxy image call network error:", proxyErr);
-      }
-
-      // 1B. Direct client-side calls if server proxy failed and client has key
-      if (googleApiKey) {
-        const universalNegative =
-          "harsh black outlines, black ink contours, cartoon outlines, anime, manga, comic book style, 3D CGI plastic rendering, glossy digital art, photorealism, sharp mechanical edges, high-contrast black shadows, modern graphic design, text, watermark, typography, letters, signature, deformed limbs, hyper-detailed facial features, whiteboard, dry erase marker, neon glow, flat vector fills";
-
-        let positivePrompt = "";
-        let svgStyleDesc = "";
-
-        if (style === "wet-on-wet") {
-          positivePrompt = `An authentic Waldorf wet-on-wet watercolor painting depicting "${scene.title} - ${scene.summary}". Style: Traditional Steiner-Waldorf early childhood pedagogy wet-in-wet watercolor on moist 300gsm heavy cold-press cotton paper. Color Harmony: Luminous Goethean color washes; radiant warm lemon yellow and pure white paper light glowing at the center, softly blending into vermilion rose, soft peach, and deep ultramarine Prussian blue at the outer atmospheric edges. Technique: Forms and figures emerge naturally out of fluid translucent color fields rather than lines. Soft feathery blooming transitions, natural watercolor granulation, delicate watery pooling, zero black lineart, zero pen outlines. Subject: gentle archetypal gestures in loose natural attire, soft-focus poetic impression, reverent peaceful childlike wonder.`;
-          svgStyleDesc = `Wet-on-wet watercolor style on moist cotton paper: Soft glowing Goethean washes with a radiant warm lemon yellow (#FFF59E) or white light core radiating into vermilion rose (#E87A70), soft peach (#FAD7A0), and deep ultramarine Prussian blue (#4A7B9D). Forms emerge organically from translucent color fields using layered <ellipse> and organic curved <path> shapes, with <radialGradient>, <linearGradient>, and <feGaussianBlur> filter for watery blooming and feathered edges. Zero black outlines or harsh pen contours.`;
-        } else if (style === "crayon") {
-          positivePrompt = `An authentic Waldorf beeswax block crayon illustration on textured heavy cream drawing paper depicting "${scene.title} - ${scene.summary}". Medium: Pure natural Stockmar beeswax block crayons, visible pebbled paper tooth with speckled wax adherence and warm matte wax sheen. Color & Lighting: Concentric radiating aura of warm light; pure golden lemon yellow core radiating outwards through warm honey orange, peach, and vermilion, into soft turquoise and cobalt blue in the outer corners. Technique: Broad flat-edge wax block strokes layered with fine directional textured hatching following living organic contours; soft translucent layering where undertones shine through; shadows created with complementary deep blue and violet rather than black. Subject: tender and living archetypal forms, warm nurturing atmosphere, reverent storytelling quality.`;
-          svgStyleDesc = `Waldorf beeswax block crayon style on textured cream paper (#FAF6EE): Concentric radiating aura of warm light (golden lemon yellow #FFF382, honey orange #F5B277, vermilion #E74C3C, soft cobalt #3498DB in corners). Use layered translucent strokes with organic curves mimicking broad 45-degree flat-edge block crayon strokes and pebbled paper tooth. Shadows rendered in complementary deep violet/blue (#4A235A, #1B4F72), never flat black. No sharp pen outlines.`;
-        } else {
-          positivePrompt = `An authentic Waldorf Main Lesson chalkboard drawing depicting "${scene.title} - ${scene.summary}". Medium: Multi-layered soft pastel chalk on genuine matte dark slate blackboard, framed with warm natural wood. Technique: Light emerging dramatically out of cosmic darkness; broad sweeping side-of-the-chalk strokes for atmospheric skies, waves, and rolling earth; delicate chalk cross-hatching, stippling, and powdery finger-blended halos. Lighting & Drama: Brilliant pure white and golden-yellow chalk crepuscular light rays streaming down through dark skies; luminous radiant halos and starry points of light; deep black slate preserved as natural shadow and depth. Color Palette: Vibrant natural chalk pastels: warm butter yellow, golden ochre, terracotta, carmine red, soft cerulean blue, seafoam cyan, and earthy moss green against dark charcoal slate. Composition: dignified and archetypal living narrative, timeless reverent classroom pedagogical illustration, decorative hand-drawn chalk vine border.`;
-          svgStyleDesc = `Waldorf Main Lesson chalkboard style on dark matte slate: Deep charcoal slate blackboard background (#181C22) framed by a warm natural wooden border (#8D5B2A). Luminous light pulled out of darkness using brilliant white (#FFFFFF) and golden-yellow (#F9E79F, #F39C12) chalk rays (<polygon> or <path> crepuscular sunbeams streaming downward). Rolling earth, mountains, or waves depicted with side-of-the-chalk gradient bands and soft chalk dust texture. Pastel highlights in terracotta (#D35400), carmine (#C0392B), soft cyan (#85C1E9), and moss green (#58D68D). No whiteboards, no neon glow, no printed fonts.`;
-        }
-
-        // Try native multimodal image generation models
-        const nativeModels = ["gemini-nano-banana-2.1", "gemini-2.5-flash-image", "gemini-2.0-flash-exp"];
-        for (const model of nativeModels) {
-          try {
-            const nativeUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
-              googleApiKey
-            )}`;
-            const nativeRes = await fetch(nativeUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [
-                  {
-                    parts: [
-                      {
-                        text: `${positivePrompt}\n\nStrict Negative Constraints (Must NOT appear): ${universalNegative}`,
-                      },
-                    ],
-                  },
-                ],
-                generationConfig: {
-                  responseModalities: ["TEXT", "IMAGE"],
-                },
-              }),
-            });
-
-            if (nativeRes.ok) {
-              const nativeJson = await nativeRes.json();
-              const parts = nativeJson.candidates?.[0]?.content?.parts || [];
-              for (const p of parts) {
-                if (p.inlineData?.data) {
-                  const mime = p.inlineData.mimeType || "image/png";
-                  const contextInfo: AIContextTelemetry = {
-                    kind: "image-generation",
-                    title: `Artwork: ${scene.title} (${style})`,
-                    prompt: positivePrompt,
-                    negativePrompt: universalNegative,
-                    model,
-                    provider: "google",
-                    injectedContext: {
-                      sceneTitle: scene.title,
-                      sceneSummary: scene.summary,
-                      artStyle: style,
-                    },
-                    generationConfig: {
-                      responseModalities: ["TEXT", "IMAGE"],
-                    },
-                    rawPayload: {
-                      contents: [{ parts: [{ text: `${positivePrompt}\n\nStrict Negative Constraints: ${universalNegative}` }] }],
-                    },
-                    timestamp: new Date().toISOString(),
-                  };
-                  return {
-                    imageUrl: `data:${mime};base64,${p.inlineData.data}`,
-                    sourceLabel: `Google Gemini AI (${model})`,
-                    isAiGenerated: true,
-                    contextInfo,
-                  };
-                }
-              }
-            }
-          } catch (nativeClientErr) {
-            console.warn(`Direct native image call ${model} error:`, nativeClientErr);
-          }
-        }
-
-        // Try Scene-Specific Waldorf SVG generation with gemini-2.5-flash or gemini-2.0-flash
-        const textModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-        for (const textModel of textModels) {
-          try {
-            const svgUrl = `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${encodeURIComponent(
-              googleApiKey
-            )}`;
-
-            const svgPromptText = `You are an authentic master Waldorf artist and educator.
-Create a complete, visually breathtaking, valid SVG illustration depicting this story scene:
-Scene Title: "${scene.title}"
-Scene Story: "${scene.summary}"
-Art Technique Guidelines: ${svgStyleDesc}
-
-Requirements:
-1. Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="100%" height="100%">
-2. Represent the scene visually: depict the sky, landscape, light source, nature elements, characters, or key story symbols.
-3. Use rich layered SVG elements: <defs> with <linearGradient>, <radialGradient>, <filter> (e.g. gaussian blur for watercolor, turbulence for chalk grain), plus <path>, <ellipse>, <rect>, <polygon>.
-4. Honor Waldorf pedagogy: warm living atmosphere, gentle soft forms, no harsh cartoon outlines, no modern fonts or text inside the image.
-5. Do NOT output markdown code blocks or backticks. Output ONLY valid SVG XML.`;
-
-            const svgPayload = {
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: svgPromptText,
-                    },
-                  ],
-                },
-              ],
-              generationConfig: {
-                temperature: 0.5,
-                maxOutputTokens: 8192,
-              },
-            };
-
-            const svgRes = await fetch(svgUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(svgPayload),
-            });
-
-            if (svgRes.ok) {
-              const svgData = await svgRes.json();
-              let rawText = svgData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-              rawText = rawText.replace(/```xml/gi, "").replace(/```svg/gi, "").replace(/```/g, "").trim();
-
-              const startIdx = rawText.indexOf("<svg");
-              if (startIdx !== -1) {
-                const endIdx = rawText.lastIndexOf("</svg>");
-                let svgContent =
-                  endIdx !== -1
-                    ? rawText.substring(startIdx, endIdx + 6)
-                    : rawText.substring(startIdx) + "\n</svg>";
-                const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
-                const contextInfo: AIContextTelemetry = {
-                  kind: "image-generation",
-                  title: `Artwork Vector: ${scene.title} (${style})`,
-                  prompt: svgPromptText,
-                  styleInstruction: svgStyleDesc,
-                  model: textModel,
-                  provider: "google",
-                  injectedContext: {
-                    sceneTitle: scene.title,
-                    sceneSummary: scene.summary,
-                    artStyle: style,
-                  },
-                  generationConfig: {
-                    temperature: 0.5,
-                    maxOutputTokens: 8192,
-                  },
-                  rawPayload: svgPayload,
-                  timestamp: new Date().toISOString(),
-                };
-                return {
-                  imageUrl: dataUrl,
-                  sourceLabel: `Google Gemini AI (${textModel})`,
-                  isAiGenerated: true,
-                  contextInfo,
-                };
-              }
-            }
-          } catch (svgClientErr) {
-            console.warn(`Direct AI SVG generation error with ${textModel}:`, svgClientErr);
-          }
-        }
-      }
-    }
-
-    // 2. Meta AI path
+    // 1. Meta AI path (muse-image-1.0)
     if (provider === "meta" && metaApiKey) {
       try {
         const res = await fetch("/api/ai/image", {
@@ -297,6 +83,8 @@ Requirements:
             prompt,
             style,
             provider: "meta",
+            sceneTitle: scene.title,
+            sceneSummary: scene.summary,
           }),
         });
 
@@ -305,18 +93,18 @@ Requirements:
           if (data.imageUrl) {
             return {
               imageUrl: data.imageUrl,
-              sourceLabel: "Meta muse-image-1.0",
+              sourceLabel: data.sourceLabel || "Meta muse-image-1.0",
               isAiGenerated: true,
               contextInfo: data.contextInfo,
             };
           }
         }
       } catch (err) {
-        console.warn("Meta generation error, falling back:", err);
+        console.warn("Meta generation error, falling back to procedural:", err);
       }
     }
 
-    // 3. Narrative-Harmonized Procedural Waldorf SVG Fallback
+    // 2. Narrative-Harmonized Procedural Waldorf SVG Fallback
     const fallbackSvg = ProceduralIllustrator.generateArtSVG(scene, style);
     const proceduralContext: AIContextTelemetry = {
       kind: "image-generation",
@@ -352,151 +140,127 @@ Requirements:
   }
 
   /**
-   * Verifies if a Google API Key is valid and active.
+   * Verifies if a Meta API Key is valid and active.
    */
-  public static async testGoogleApiKey(
+  public static async testMetaApiKey(
     apiKey: string
   ): Promise<{ valid: boolean; message: string }> {
     if (!apiKey || !apiKey.trim()) {
       return { valid: false, message: "API Key cannot be empty." };
     }
 
+    const cleanKey = apiKey.trim();
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(
-        apiKey.trim()
-      )}`;
-      const res = await fetch(url);
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${cleanKey}`,
+        },
+        body: JSON.stringify({
+          prompt: "ping",
+          testConnection: true,
+        }),
+      });
+
       if (res.ok) {
-        const data = await res.json();
-        const modelCount = data.models?.length || 0;
         return {
           valid: true,
-          message: `Connected successfully! Access to ${modelCount} Google Gemini/Imagen models confirmed.`,
+          message: "Connected successfully! Meta AI (muse-wonder-1.0, muse-image-1.0) active.",
         };
       } else {
         const errJson = await res.json().catch(() => ({}));
-        const msg = errJson.error?.message || `HTTP ${res.status}`;
-        return { valid: false, message: `Google API rejected key: ${msg}` };
+        const msg = errJson.error || `HTTP ${res.status}`;
+        return { valid: false, message: `Meta AI rejected key: ${msg}` };
       }
     } catch (e: any) {
-      return { valid: false, message: `Network error connecting to Google: ${e.message || String(e)}` };
+      return { valid: false, message: `Network error connecting to Meta AI: ${e.message || String(e)}` };
     }
   }
 
   /**
    * Intelligently segments a story into 3-6 context-driven Waldorf scenes.
-   * Uses Gemini AI when an API key is available, and falls back to a semantic narrative segmenter.
+   * Uses Meta AI when an API key is available, and falls back to a semantic narrative segmenter.
    */
   public static async segmentStoryIntoScenes(
     options: StorySegmentationOptions
   ): Promise<StoryScene[]> {
-    const { storyText, storyTitle, artStyle, provider, googleApiKey, metaApiKey } = options;
+    const { storyText, storyTitle, artStyle, provider, metaApiKey } = options;
     const cleanText = storyText.trim();
     if (!cleanText) return [];
 
-    // 1. If Google API key is available, try Contextual AI Segmentation
-    if (provider === "google" || (googleApiKey && provider !== "meta" && provider !== "local")) {
-      if (googleApiKey) {
-        try {
-          const prompt = `You are a Waldorf pedagogical storyteller and children's book illustrator.
-Analyze the narrative context of this story and divide it into 3 to 6 distinct, context-driven scenes for oral retelling practice.
-Do NOT just divide naively by newlines; identify the true narrative arc (awakening/setting, journey/challenge, transformation/climax, gentle resolution).
-
-Story Title: "${storyTitle || "Untitled Story"}"
-Story Text:
-"""
+    // 1. If Meta API key is available, attempt Contextual AI Segmentation
+    if (provider === "meta" && metaApiKey) {
+      try {
+        const prompt = `Analyze the narrative context of this story and divide it into 3 to 6 distinct scenes for Waldorf oral retelling:
+Story Title: "${storyTitle || "Story"}"
+Text:
 ${cleanText}
-"""
 
-Art technique: ${artStyle} (Waldorf Goethean style).
+Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "keywords": ["..."], "imagePrompt": "..."}]}`;
 
-Return ONLY valid JSON (no markdown formatting, no backticks, no extra commentary) in this exact structure:
-{
-  "scenes": [
-    {
-      "title": "Scene title",
-      "summary": "Contextual excerpt or narrative focus (1-3 sentences)",
-      "keywords": ["keyword1", "keyword2"],
-      "imagePrompt": "Detailed Waldorf art prompt describing the mood, characters, and Goethean colors"
-    }
-  ]
-}`;
+        const res = await fetch("/api/ai/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${metaApiKey}`,
+          },
+          body: JSON.stringify({
+            prompt,
+            systemPromptOverride:
+              "You are a Waldorf pedagogical storyteller and children's book illustrator. Analyze narrative context and divide into 3 to 6 distinct scenes.",
+            temperature: 0.3,
+          }),
+        });
 
-          const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-          for (const model of models) {
-            try {
-              const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
-                googleApiKey
-              )}`;
-              const res = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  contents: [{ parts: [{ text: prompt }] }],
-                  generationConfig: {
-                    temperature: 0.3,
-                    responseMimeType: "application/json",
-                  },
-                }),
-              });
+        if (res.ok) {
+          const data = await res.json();
+          const rawResponse = data.text;
+          if (rawResponse) {
+            const cleanedJson = rawResponse
+              .replace(/```json/gi, "")
+              .replace(/```/g, "")
+              .trim();
+            const parsed = JSON.parse(cleanedJson);
+            const rawScenes = Array.isArray(parsed) ? parsed : parsed.scenes;
+            if (Array.isArray(rawScenes) && rawScenes.length > 0) {
+              const segTelemetry: AIContextTelemetry = {
+                kind: "story-segmentation",
+                title: `Narrative Segmentation: "${storyTitle || "Story"}"`,
+                prompt,
+                systemPrompt:
+                  "You are a Waldorf pedagogical storyteller and children's book illustrator.",
+                model: data.model || "muse-wonder-1.0",
+                provider: "meta",
+                injectedContext: {
+                  storyTitle,
+                  artStyle,
+                  storyLengthChars: cleanText.length,
+                },
+                generationConfig: {
+                  temperature: 0.3,
+                },
+                timestamp: new Date().toISOString(),
+              };
 
-              if (res.ok) {
-                const data = await res.json();
-                const rawResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (rawResponse) {
-                  const cleanedJson = rawResponse
-                    .replace(/```json/gi, "")
-                    .replace(/```/g, "")
-                    .trim();
-                  const parsed = JSON.parse(cleanedJson);
-                  const rawScenes = Array.isArray(parsed) ? parsed : parsed.scenes;
-                  if (Array.isArray(rawScenes) && rawScenes.length > 0) {
-                    const segTelemetry: AIContextTelemetry = {
-                      kind: "story-segmentation",
-                      title: `Narrative Segmentation: "${storyTitle || "Story"}"`,
-                      prompt,
-                      systemPrompt:
-                        "You are a Waldorf pedagogical storyteller and children's book illustrator. Analyze narrative context and divide into 3 to 6 distinct scenes.",
-                      model,
-                      provider: "google",
-                      injectedContext: {
-                        storyTitle,
-                        artStyle,
-                        storyLengthChars: cleanText.length,
-                      },
-                      generationConfig: {
-                        temperature: 0.3,
-                      },
-                      rawPayload: {
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { temperature: 0.3, responseMimeType: "application/json" },
-                      },
-                      timestamp: new Date().toISOString(),
-                    };
-
-                    return rawScenes.slice(0, 6).map((sc: any, idx: number) => ({
-                      id: `scene-${Date.now()}-${idx}`,
-                      ord: idx + 1,
-                      title: sc.title || `Scene ${idx + 1}`,
-                      summary: sc.summary || "",
-                      keywords: Array.isArray(sc.keywords) ? sc.keywords.slice(0, 5) : [],
-                      artStyle,
-                      imagePrompt:
-                        sc.imagePrompt ||
-                        ModelGateway.buildWaldorfPrompt(sc.summary || sc.title, artStyle),
-                      imageSourceLabel: `Procedural Art (${artStyle})`,
-                      contextInfo: segTelemetry,
-                    }));
-                  }
-                }
-              }
-            } catch (modelErr) {
-              console.warn(`Gemini scene segmentation model ${model} error:`, modelErr);
+              return rawScenes.slice(0, 6).map((sc: any, idx: number) => ({
+                id: `scene-${Date.now()}-${idx}`,
+                ord: idx + 1,
+                title: sc.title || `Scene ${idx + 1}`,
+                summary: sc.summary || "",
+                keywords: Array.isArray(sc.keywords) ? sc.keywords.slice(0, 5) : [],
+                artStyle,
+                imagePrompt:
+                  sc.imagePrompt ||
+                  ModelGateway.buildWaldorfPrompt(sc.summary || sc.title, artStyle),
+                imageSourceLabel: `Procedural Art (${artStyle})`,
+                contextInfo: segTelemetry,
+              }));
             }
           }
-        } catch (aiErr) {
-          console.warn("AI scene segmentation error, falling back to local semantic parser:", aiErr);
         }
+      } catch (err) {
+        console.warn("Meta scene segmentation error, falling back to local semantic parser:", err);
       }
     }
 

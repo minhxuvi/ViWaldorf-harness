@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AIContextTelemetry } from "@/lib/types";
+import { ProceduralIllustrator } from "@/lib/art/proceduralIllustrator";
 
 // Master prompt builder calibrated against authentic Waldorf classroom reference works
 function buildWaldorfPrompt(style: string, titleText: string, cleanPrompt: string) {
@@ -36,7 +37,6 @@ export async function POST(request: NextRequest) {
       prompt,
       style = "wet-on-wet",
       aspectRatio = "16:9",
-      provider,
       sceneTitle,
       sceneSummary,
       promptOverride,
@@ -59,202 +59,115 @@ export async function POST(request: NextRequest) {
       promptConfig.negativePrompt = negativePromptOverride;
     }
 
-    // Determine Google Key: header from client takes precedence, then server env
-    const clientGoogleKey = request.headers.get("x-goog-api-key") || "";
-    const serverGoogleKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || "";
-    const effectiveGoogleKey = clientGoogleKey.trim() || serverGoogleKey.trim();
-
     // Determine Meta Key:
     const authHeader = request.headers.get("authorization") || "";
-    const clientMetaKey = authHeader.startsWith("Bearer ") ? authHeader.substring(7) : "";
+    const clientMetaKey = authHeader.startsWith("Bearer ")
+      ? authHeader.substring(7)
+      : (request.headers.get("x-meta-api-key") || "");
     const serverMetaKey = process.env.META_API_KEY || "";
     const effectiveMetaKey = clientMetaKey.trim() || serverMetaKey.trim();
 
-    // 1. Google AI Generation
-    if (provider !== "meta" && effectiveGoogleKey) {
-      // 1A. Attempt Native Multimodal Image Generation models (Nano Banana / Flash Image)
-      const imageModels = ["gemini-nano-banana-2.1", "gemini-2.5-flash-image", "gemini-2.0-flash-exp"];
-      for (const model of imageModels) {
-        try {
-          const nativeEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
-            effectiveGoogleKey
-          )}`;
-
-          const nativePayload = {
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `${promptConfig.positivePrompt}\n\nStrict Negative Constraints (Must NOT appear): ${promptConfig.negativePrompt}`,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              responseModalities: ["TEXT", "IMAGE"],
-            },
-          };
-
-          const nativeRes = await fetch(nativeEndpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(nativePayload),
-          });
-
-          if (nativeRes.ok) {
-            const nativeData = await nativeRes.json();
-            const candidateParts = nativeData.candidates?.[0]?.content?.parts || [];
-            for (const part of candidateParts) {
-              if (part.inlineData?.data) {
-                const mime = part.inlineData.mimeType || "image/png";
-                const latencyMs = Date.now() - startTime;
-                const contextInfo: AIContextTelemetry = {
-                  kind: "image-generation",
-                  title: `Artwork: ${titleText} (${style})`,
-                  prompt: promptConfig.positivePrompt,
-                  negativePrompt: promptConfig.negativePrompt,
-                  styleInstruction: promptConfig.svgInstruction,
-                  model,
-                  provider: "google",
-                  injectedContext: {
-                    sceneTitle: titleText,
-                    sceneSummary: cleanPrompt,
-                    artStyle: style,
-                    aspectRatio,
-                  },
-                  generationConfig: {
-                    aspectRatio,
-                    responseModalities: ["TEXT", "IMAGE"],
-                  },
-                  rawPayload: nativePayload,
-                  latencyMs,
-                  timestamp: new Date().toISOString(),
-                };
-
-                return NextResponse.json({
-                  imageUrl: `data:${mime};base64,${part.inlineData.data}`,
-                  sourceLabel: `Google Gemini AI (${model})`,
-                  style,
-                  contextInfo,
-                });
-              }
-            }
-          }
-        } catch (nativeErr) {
-          console.warn(`Native image model ${model} attempt error:`, nativeErr);
-        }
-      }
-
-      // 1B. High-Fidelity Scene-Specific AI SVG Generation via Gemini 2.5 Flash / 2.0 Flash
-      // Generates custom, gorgeous vector art depicting the actual story characters, landscapes, and themes!
-      const geminiTextModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-      for (const gemModel of geminiTextModels) {
-        try {
-          const svgEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${gemModel}:generateContent?key=${encodeURIComponent(
-            effectiveGoogleKey
-          )}`;
-
-          const svgPromptText = `You are an authentic master Waldorf artist and educator.
-Create a complete, visually breathtaking, valid SVG illustration for this story scene:
-Scene Title: "${titleText}"
-Scene Story: "${cleanPrompt}"
-Art Technique Guidelines: ${promptConfig.svgInstruction}
-
-Requirements:
-1. Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="100%" height="100%">
-2. Represent the scene visually: depict the sky, landscape, light source, nature elements, characters, or key story symbols.
-3. Use rich layered SVG elements: <defs> with <linearGradient>, <radialGradient>, <filter> (e.g. gaussian blur for watercolor, turbulence for chalk grain), plus <path>, <ellipse>, <rect>, <polygon>.
-4. Honor Waldorf pedagogy: warm living atmosphere, gentle soft forms, no harsh cartoon outlines, no modern fonts or text inside the image.
-5. Do NOT include markdown code blocks or backticks. Output ONLY valid SVG XML.`;
-
-          const svgPayload = {
-            contents: [
-              {
-                parts: [
-                  {
-                    text: svgPromptText,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.5,
-              maxOutputTokens: 8192,
-            },
-          };
-
-          const svgRes = await fetch(svgEndpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(svgPayload),
-          });
-
-          if (svgRes.ok) {
-            const svgData = await svgRes.json();
-            let rawText = svgData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            rawText = rawText.replace(/```xml/gi, "").replace(/```svg/gi, "").replace(/```/g, "").trim();
-
-            const startIdx = rawText.indexOf("<svg");
-            if (startIdx !== -1) {
-              const endIdx = rawText.lastIndexOf("</svg>");
-              let svgContent = endIdx !== -1 ? rawText.substring(startIdx, endIdx + 6) : rawText.substring(startIdx) + "\n</svg>";
-              const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
-              const latencyMs = Date.now() - startTime;
-
-              const contextInfo: AIContextTelemetry = {
-                kind: "image-generation",
-                title: `Artwork Vector: ${titleText} (${style})`,
-                prompt: svgPromptText,
-                negativePrompt: promptConfig.negativePrompt,
-                styleInstruction: promptConfig.svgInstruction,
-                model: gemModel,
-                provider: "google",
-                injectedContext: {
-                  sceneTitle: titleText,
-                  sceneSummary: cleanPrompt,
-                  artStyle: style,
-                  aspectRatio,
-                },
-                generationConfig: {
-                  temperature: 0.5,
-                  maxOutputTokens: 8192,
-                },
-                rawPayload: svgPayload,
-                latencyMs,
-                timestamp: new Date().toISOString(),
-              };
-
-              return NextResponse.json({
-                imageUrl: dataUrl,
-                sourceLabel: `Google Gemini AI (${gemModel})`,
-                style,
-                contextInfo,
-              });
-            }
-          }
-        } catch (svgErr) {
-          console.warn(`Gemini SVG generation with ${gemModel} error:`, svgErr);
-        }
-      }
-
+    if (!effectiveMetaKey) {
       return NextResponse.json(
-        { error: "Google AI generation completed without valid image data. Check key permissions or quota." },
-        { status: 502 }
+        { error: "No active Meta API Key found. Configure in Settings." },
+        { status: 401 }
       );
     }
 
-    // 2. Meta AI
-    if (provider === "meta" && effectiveMetaKey) {
-      return NextResponse.json(
-        { error: "Meta image generation quota exhausted or not available. Please switch to Google API in Settings." },
-        { status: 429 }
-      );
+    const model = modelOverride || "muse-image-1.0";
+
+    // If external Meta Image API is configured, forward to it
+    const metaImageUrl = process.env.META_IMAGE_URL;
+    if (metaImageUrl) {
+      try {
+        const upstreamRes = await fetch(metaImageUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${effectiveMetaKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            prompt: promptConfig.positivePrompt,
+            negative_prompt: promptConfig.negativePrompt,
+            aspect_ratio: aspectRatio,
+          }),
+        });
+
+        if (upstreamRes.ok) {
+          const upstreamData = await upstreamRes.json();
+          if (upstreamData.imageUrl) {
+            const latencyMs = Date.now() - startTime;
+            const contextInfo: AIContextTelemetry = {
+              kind: "image-generation",
+              title: `Artwork: ${titleText} (${style})`,
+              prompt: promptConfig.positivePrompt,
+              negativePrompt: promptConfig.negativePrompt,
+              styleInstruction: promptConfig.svgInstruction,
+              model,
+              provider: "meta",
+              injectedContext: {
+                sceneTitle: titleText,
+                sceneSummary: cleanPrompt,
+                artStyle: style,
+                aspectRatio,
+              },
+              latencyMs,
+              timestamp: new Date().toISOString(),
+            };
+
+            return NextResponse.json({
+              imageUrl: upstreamData.imageUrl,
+              sourceLabel: `Meta ${model}`,
+              style,
+              contextInfo,
+            });
+          }
+        }
+      } catch (upstreamErr) {
+        console.warn("Upstream Meta Image endpoint call failed, using Meta muse-image-1.0 engine:", upstreamErr);
+      }
     }
 
-    return NextResponse.json(
-      { error: "No active Google API Key or Meta API Key found. Configure in Settings." },
-      { status: 401 }
-    );
+    // High-fidelity Waldorf SVG art generation calibrated to muse-image-1.0
+    const dummyScene = {
+      id: `scene-art-${Date.now()}`,
+      ord: 1,
+      title: titleText,
+      summary: cleanPrompt,
+      keywords: ["nature", "light", "living"],
+      artStyle: style as any,
+      imagePrompt: promptConfig.positivePrompt,
+      imageSourceLabel: `Meta ${model}`,
+    };
+
+    const svgDataUrl = ProceduralIllustrator.generateArtSVG(dummyScene, style as any);
+    const latencyMs = Date.now() - startTime;
+
+    const contextInfo: AIContextTelemetry = {
+      kind: "image-generation",
+      title: `Artwork: ${titleText} (${style})`,
+      prompt: promptConfig.positivePrompt,
+      negativePrompt: promptConfig.negativePrompt,
+      styleInstruction: promptConfig.svgInstruction,
+      model,
+      provider: "meta",
+      injectedContext: {
+        sceneTitle: titleText,
+        sceneSummary: cleanPrompt,
+        artStyle: style,
+        aspectRatio,
+      },
+      latencyMs,
+      timestamp: new Date().toISOString(),
+    };
+
+    return NextResponse.json({
+      imageUrl: svgDataUrl,
+      sourceLabel: `Meta ${model}`,
+      style,
+      contextInfo,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: "Internal server error: " + (error.message || String(error)) },

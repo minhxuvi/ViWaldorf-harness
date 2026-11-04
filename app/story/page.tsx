@@ -71,7 +71,6 @@ export default function StoryPage() {
     updateData,
     selectedStory,
     setSelectedStoryId,
-    googleApiKey,
     metaApiKey,
     aiProvider,
     t,
@@ -132,9 +131,7 @@ export default function StoryPage() {
       prompt: scene.imagePrompt || ModelGateway.buildWaldorfPrompt(scene.summary || scene.title, scene.artStyle),
       styleInstruction: `Goethean Waldorf Art Medium: ${scene.artStyle}`,
       model: scene.imageSourceLabel || `ProceduralIllustrator (${scene.artStyle})`,
-      provider: scene.imageSourceLabel?.includes("Google")
-        ? "google"
-        : scene.imageSourceLabel?.includes("Meta")
+      provider: scene.imageSourceLabel?.includes("Meta")
         ? "meta"
         : "local",
       injectedContext: {
@@ -299,7 +296,6 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
         scene: targetScene,
         style: targetScene.artStyle,
         provider: aiProvider,
-        googleApiKey,
         metaApiKey,
       });
 
@@ -365,7 +361,6 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
             scene: sc,
             style: sc.artStyle,
             provider: aiProvider,
-            googleApiKey,
             metaApiKey,
           });
 
@@ -426,7 +421,6 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
         storyTitle: title,
         artStyle: uploadStyle,
         provider: aiProvider,
-        googleApiKey,
         metaApiKey,
       });
     } catch (segErr) {
@@ -461,7 +455,7 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
     setUploadText("");
     setIsSegmenting(false);
 
-    if (autoGenerateArtOnUpload && (googleApiKey || metaApiKey)) {
+    if (autoGenerateArtOnUpload && metaApiKey) {
       setTimeout(async () => {
         for (const sc of generatedScenes) {
           try {
@@ -469,7 +463,6 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
               scene: sc,
               style: sc.artStyle,
               provider: aiProvider,
-              googleApiKey,
               metaApiKey,
             });
             updateData((prev) => ({
@@ -512,7 +505,6 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
         storyTitle: title,
         artStyle: selectedStory.defaultArtStyle,
         provider: aiProvider,
-        googleApiKey,
         metaApiKey,
       });
 

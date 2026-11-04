@@ -34,7 +34,7 @@ flowchart TD
 
 | Step | Lead Role | Mandatory Deliverable |
 |---|---|---|
-| **1. Review & Refactor Architecture** | `architect` (`Gemini` + `muse-wonder-1.0`) | Identify bottlenecks/duplicates, unify modules, delete dead code. |
+| **1. Review & Refactor Architecture** | `architect` (`muse-wonder-1.0`) | Identify bottlenecks/duplicates, unify modules, delete dead code. |
 | **2. Enhance `AGENTS.md` & `cron.md`** | `orchestrator` | Condense instructions, sharpen multi-model division of labor and hard boundaries. |
 | **3. Enhance `researcher`** | `researcher` (Root) & `plugin-researcher` | Update `researcher/specs/` or `plugins/<name>/researcher/specs/` with clear `adopt / watch / reject` verdicts. |
 | **4. Enhance `benchmarker`** | `benchmarker` | Add automated regression checks, runtime invariants, and test contracts. |

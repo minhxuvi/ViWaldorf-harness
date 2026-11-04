@@ -40,14 +40,14 @@ export function AIContextInspector({
   onApplyTunedOutput,
   activeStoryContext,
 }: AIContextInspectorProps) {
-  const { t, lang, googleApiKey } = useApp();
+  const { t, lang, metaApiKey } = useApp();
   const [activeTab, setActiveTab] = useState<"context" | "prompts" | "pedagogy" | "raw" | "playground">("context");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Playground tuning state
   const [tunedSystemPrompt, setTunedSystemPrompt] = useState("");
   const [tunedPrompt, setTunedPrompt] = useState("");
-  const [tunedModel, setTunedModel] = useState("gemini-2.0-flash");
+  const [tunedModel, setTunedModel] = useState("muse-wonder-1.0");
   const [tunedTemperature, setTunedTemperature] = useState(0.7);
   const [tunedMaxTokens, setTunedMaxTokens] = useState(1024);
   const [isRunningPlayground, setIsRunningPlayground] = useState(false);
@@ -73,7 +73,15 @@ Principles:
 - Provide warm, non-punitive, non-judgmental guidance.`
       );
       setTunedPrompt(telemetry.prompt || "");
-      setTunedModel(telemetry.model?.includes("1.5") ? "gemini-1.5-flash" : telemetry.model?.includes("2.5") ? "gemini-2.5-flash" : "gemini-2.0-flash");
+      setTunedModel(
+        telemetry.model?.includes("image")
+          ? "muse-image-1.0"
+          : telemetry.model?.includes("spark")
+          ? "muse-spark-1.3"
+          : telemetry.model?.includes("local") || telemetry.model?.includes("Local")
+          ? "local"
+          : "muse-wonder-1.0"
+      );
       setTunedTemperature(telemetry.generationConfig?.temperature ?? 0.7);
       setTunedMaxTokens(telemetry.generationConfig?.maxOutputTokens ?? 1024);
       setPlaygroundResult(null);
@@ -175,7 +183,7 @@ Principles:
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(googleApiKey ? { "x-goog-api-key": googleApiKey } : {}),
+            ...(metaApiKey ? { Authorization: `Bearer ${metaApiKey}` } : {}),
           },
           body: JSON.stringify({
             promptOverride: tunedPrompt,
@@ -204,7 +212,7 @@ Principles:
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(googleApiKey ? { "x-goog-api-key": googleApiKey } : {}),
+            ...(metaApiKey ? { Authorization: `Bearer ${metaApiKey}` } : {}),
           },
           body: JSON.stringify({
             prompt: tunedPrompt,
@@ -410,9 +418,7 @@ Principles:
                     <span>{t.aiInspector.providerLabel}</span>
                   </div>
                   <div className="font-semibold text-ink capitalize">
-                    {telemetry.provider === "google"
-                      ? "Google AI / Gemini"
-                      : telemetry.provider === "meta"
+                    {telemetry.provider === "meta"
                       ? "Meta AI / Muse"
                       : "Local Heuristic / Procedural"}
                   </div>
@@ -645,9 +651,9 @@ Principles:
                       onChange={(e) => setTunedModel(e.target.value)}
                       className="w-full px-2.5 py-1.5 rounded-lg border border-line bg-white font-mono text-xs text-ink"
                     >
-                      <option value="gemini-2.0-flash">gemini-2.0-flash (Fast & Crisp)</option>
-                      <option value="gemini-2.5-flash">gemini-2.5-flash (Advanced Reasoning)</option>
-                      <option value="gemini-1.5-flash">gemini-1.5-flash (Standard Fallback)</option>
+                      <option value="muse-wonder-1.0">muse-wonder-1.0 (Orchestrator & Pedagogy)</option>
+                      <option value="muse-image-1.0">muse-image-1.0 (Waldorf Art Synthesis)</option>
+                      <option value="muse-spark-1.3">muse-spark-1.3 (Autonomous Worker)</option>
                       <option value="local">Local Pedagogical Synthesizer (Offline)</option>
                     </select>
                   </div>

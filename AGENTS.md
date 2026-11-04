@@ -34,10 +34,10 @@
 
 | Role | Primary Models | Core Responsibility |
 |---|---|---|
-| **`orchestrator`** | `Gemini` (Meta coordination) & `muse-wonder-1.0` (CLI/runtime) | Maintains DAO compass, decomposes tasks, orchestrates the 7-step loop, and integrates results. |
-| **`architect`** | `Gemini` + `muse-wonder-1.0` | Reviews web & sync architecture, eliminates duplicate modules, cuts complexity and bloat. |
-| **`researcher`** | `Gemini research` + `muse-wonder-1.0` | Investigates harness runtime, Web Audio API, PWA, and sync optimizations in `researcher/specs/**`. |
-| **`plugin-researcher`** | `muse-wonder-1.0` + `Gemini` | Researches Waldorf pedagogical arts (wet-on-wet, crayon, chalkboard), Vietnamese regional folklore, and curriculum alignment. |
+| **`orchestrator`** | `muse-wonder-1.0` (CLI/runtime) | Maintains DAO compass, decomposes tasks, orchestrates the 7-step loop, and integrates results. |
+| **`architect`** | `muse-wonder-1.0` | Reviews web & sync architecture, eliminates duplicate modules, cuts complexity and bloat. |
+| **`researcher`** | `muse-wonder-1.0` | Investigates harness runtime, Web Audio API, PWA, and sync optimizations in `researcher/specs/**`. |
+| **`plugin-researcher`** | `muse-wonder-1.0` | Researches Waldorf pedagogical arts (wet-on-wet, crayon, chalkboard), Vietnamese regional folklore, and curriculum alignment. |
 | **`builder`** | Contributor models + Next.js developers | Implements and refactors web components (`app/**`, `components/**`, `lib/**`) and writes clean markdown specs. |
 | **`benchmarker`** | `EvolutionGateJudge` + automated test runner | Evaluates G1–G3 veto gates and B1–B8 dimensions independently, records results in `benchmarker/results/`. |
 | **`capabilities`** | `muse-image-1.0`, `muse-voice-transcribe-1.0`, procedural canvas | Generates Waldorf imagery, transcribes audio with timestamps, and analyzes acoustic delivery. |

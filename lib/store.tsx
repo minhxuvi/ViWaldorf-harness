@@ -17,8 +17,6 @@ interface AppContextType {
   selectedStoryId: string;
   setSelectedStoryId: (id: string) => void;
   selectedStory: WaldorfStory | undefined;
-  googleApiKey: string;
-  setGoogleApiKey: (key: string) => void;
   metaApiKey: string;
   setMetaApiKey: (key: string) => void;
   aiProvider: AIProvider;
@@ -41,16 +39,14 @@ const STORAGE_KEY = "viwaldorf_data_v1";
 const LANG_STORAGE_KEY = "viwaldorf_lang_v1";
 const PASSKEY_STORAGE_KEY = "viwaldorf_sync_passkey";
 const API_KEY_STORAGE_KEY = "viwaldorf_meta_key";
-const GOOGLE_KEY_STORAGE_KEY = "viwaldorf_google_key";
 const AI_PROVIDER_STORAGE_KEY = "viwaldorf_ai_provider";
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [data, setInternalData] = useState<WaldorfData>(getSeedData());
   const [lang, setLangState] = useState<Language>("en");
   const [selectedStoryId, setSelectedStoryId] = useState<string>("story-hoian-money");
-  const [googleApiKey, setGoogleApiKeyState] = useState<string>("");
   const [metaApiKey, setMetaApiKeyState] = useState<string>("");
-  const [aiProvider, setAiProviderState] = useState<AIProvider>("google");
+  const [aiProvider, setAiProviderState] = useState<AIProvider>("meta");
   const [syncPasskey, setSyncPasskeyState] = useState<string>("");
   const [isLocalFolderLinked, setIsLocalFolderLinked] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
@@ -66,21 +62,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const savedPasskey = localStorage.getItem(PASSKEY_STORAGE_KEY);
       if (savedPasskey) setSyncPasskeyState(savedPasskey);
 
-      const savedGoogleKey = localStorage.getItem(GOOGLE_KEY_STORAGE_KEY);
-      if (savedGoogleKey) setGoogleApiKeyState(savedGoogleKey);
-
       const savedMetaKey = localStorage.getItem(API_KEY_STORAGE_KEY);
       if (savedMetaKey) setMetaApiKeyState(savedMetaKey);
 
       const savedProvider = localStorage.getItem(AI_PROVIDER_STORAGE_KEY) as AIProvider | null;
-      if (savedProvider === "google" || savedProvider === "meta" || savedProvider === "local") {
+      if (savedProvider === "meta" || savedProvider === "local") {
         setAiProviderState(savedProvider);
-      } else if (savedGoogleKey) {
-        setAiProviderState("google");
-      } else if (savedMetaKey) {
-        setAiProviderState("meta");
       } else {
-        setAiProviderState("google");
+        setAiProviderState("meta");
       }
 
       const savedData = localStorage.getItem(STORAGE_KEY);
@@ -129,14 +118,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLangState(newLang);
     try {
       localStorage.setItem(LANG_STORAGE_KEY, newLang);
-    } catch {}
-  };
-
-  const setGoogleApiKey = (key: string) => {
-    setGoogleApiKeyState(key);
-    try {
-      if (key) localStorage.setItem(GOOGLE_KEY_STORAGE_KEY, key);
-      else localStorage.removeItem(GOOGLE_KEY_STORAGE_KEY);
     } catch {}
   };
 
@@ -287,8 +268,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         selectedStoryId,
         setSelectedStoryId,
         selectedStory,
-        googleApiKey,
-        setGoogleApiKey,
         metaApiKey,
         setMetaApiKey,
         aiProvider,

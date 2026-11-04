@@ -26,8 +26,6 @@ import {
 export default function SettingsPage() {
   const {
     data,
-    googleApiKey,
-    setGoogleApiKey,
     metaApiKey,
     setMetaApiKey,
     aiProvider,
@@ -45,39 +43,12 @@ export default function SettingsPage() {
     t,
   } = useApp();
 
-  const [inputGoogleKey, setInputGoogleKey] = useState("");
   const [inputMetaKey, setInputMetaKey] = useState("");
   const [passkeyInput, setPasskeyInput] = useState(syncPasskey);
-  const [googleKeyNotice, setGoogleKeyNotice] = useState("");
   const [metaKeyNotice, setMetaKeyNotice] = useState("");
-  const [isTestingGoogleKey, setIsTestingGoogleKey] = useState(false);
-  const [googleTestResult, setGoogleTestResult] = useState<{ valid?: boolean; message?: string } | null>(null);
+  const [isTestingMetaKey, setIsTestingMetaKey] = useState(false);
+  const [metaTestResult, setMetaTestResult] = useState<{ valid?: boolean; message?: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const handleSaveGoogleKey = () => {
-    if (!inputGoogleKey.trim()) return;
-    setGoogleApiKey(inputGoogleKey.trim());
-    setInputGoogleKey("");
-    setGoogleKeyNotice(t.settings.googleKeyConfigured);
-    setTimeout(() => setGoogleKeyNotice(""), 3000);
-  };
-
-  const handleDeleteGoogleKey = () => {
-    setGoogleApiKey("");
-    setGoogleTestResult(null);
-    setGoogleKeyNotice("Google API Key removed.");
-    setTimeout(() => setGoogleKeyNotice(""), 3000);
-  };
-
-  const handleTestGoogleKey = async () => {
-    const keyToTest = inputGoogleKey.trim() || googleApiKey;
-    if (!keyToTest) return;
-    setIsTestingGoogleKey(true);
-    setGoogleTestResult(null);
-    const res = await ModelGateway.testGoogleApiKey(keyToTest);
-    setIsTestingGoogleKey(false);
-    setGoogleTestResult(res);
-  };
 
   const handleSaveMetaKey = () => {
     if (!inputMetaKey.trim()) return;
@@ -89,8 +60,19 @@ export default function SettingsPage() {
 
   const handleDeleteMetaKey = () => {
     setMetaApiKey("");
+    setMetaTestResult(null);
     setMetaKeyNotice("Meta API Key removed.");
     setTimeout(() => setMetaKeyNotice(""), 3000);
+  };
+
+  const handleTestMetaKey = async () => {
+    const keyToTest = inputMetaKey.trim() || metaApiKey;
+    if (!keyToTest) return;
+    setIsTestingMetaKey(true);
+    setMetaTestResult(null);
+    const res = await ModelGateway.testMetaApiKey(keyToTest);
+    setIsTestingMetaKey(false);
+    setMetaTestResult(res);
   };
 
   const handleSavePasskey = () => {
@@ -238,24 +220,7 @@ export default function SettingsPage() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button
-            onClick={() => setAiProvider("google")}
-            className={`p-3.5 rounded-xl border text-left transition space-y-1 ${
-              aiProvider === "google"
-                ? "border-forest bg-[#E3EFE0]/60 ring-2 ring-forest"
-                : "border-line bg-white hover:border-forest/40"
-            }`}
-          >
-            <div className="font-serif font-bold text-xs text-forestDark flex items-center justify-between">
-              <span>{t.settings.providerGoogle}</span>
-              {aiProvider === "google" && <CheckCircle className="w-3.5 h-3.5 text-forest" />}
-            </div>
-            <p className="text-[11px] text-inkSoft leading-tight">
-              Imagen 3 (Visual Art) + Gemini 2.0 Flash (Pedagogy). Low latency, high quota.
-            </p>
-          </button>
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             onClick={() => setAiProvider("meta")}
             className={`p-3.5 rounded-xl border text-left transition space-y-1 ${
@@ -292,95 +257,8 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* GOOGLE AI CREDENTIAL CARD */}
-      <div className="garden-card space-y-4 border-2 border-forest/30 bg-[#FDFBF7]">
-        <div className="flex items-center justify-between pb-2.5 border-b border-line">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-forest" />
-            <h2 className="font-serif text-base font-bold text-forestDark">
-              {t.settings.googleConnectionTitle}
-            </h2>
-          </div>
-          {aiProvider === "google" && (
-            <span className="badge-leaf text-xs">Active Provider</span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 text-xs">
-          {googleApiKey ? (
-            <span className="text-forest font-semibold flex items-center gap-1">
-              <ShieldCheck className="w-4 h-4 text-forest" />
-              {t.settings.googleKeyConfigured}
-            </span>
-          ) : (
-            <span className="text-inkSoft flex items-center gap-1">
-              <Lock className="w-4 h-4 text-inkSoft" />
-              {t.settings.googleKeyNotConfigured}
-            </span>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-xs font-semibold text-forestDark">
-            {t.settings.googleKeyLabel}
-          </label>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="password"
-              value={inputGoogleKey}
-              onChange={(e) => setInputGoogleKey(e.target.value)}
-              placeholder={googleApiKey ? "••••••••••••••••••••••••••••••••" : "Paste AIzaSy... key from Google AI Studio"}
-              className="flex-1 px-3 py-2 rounded-lg border border-line text-xs font-mono bg-white"
-            />
-            <button
-              onClick={handleSaveGoogleKey}
-              disabled={!inputGoogleKey.trim()}
-              className="btn-primary text-xs"
-            >
-              {t.settings.saveKeyBtn}
-            </button>
-            <button
-              onClick={handleTestGoogleKey}
-              disabled={isTestingGoogleKey || (!inputGoogleKey.trim() && !googleApiKey)}
-              className="btn-ghost text-xs whitespace-nowrap"
-            >
-              {isTestingGoogleKey ? t.settings.testingConnection : t.settings.testConnectionBtn}
-            </button>
-            {googleApiKey && (
-              <button
-                onClick={handleDeleteGoogleKey}
-                className="btn-ghost text-xs text-terra hover:border-terra"
-              >
-                {t.settings.deleteKeyBtn}
-              </button>
-            )}
-          </div>
-
-          {googleKeyNotice && (
-            <p className="text-xs text-forest font-medium">{googleKeyNotice}</p>
-          )}
-
-          {googleTestResult && (
-            <div
-              className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
-                googleTestResult.valid
-                  ? "bg-[#E3EFE0] text-forest border border-[#BEDEBA]"
-                  : "bg-red-50 text-red-700 border border-red-200"
-              }`}
-            >
-              {googleTestResult.valid ? (
-                <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
-              ) : (
-                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-              )}
-              <span>{googleTestResult.message}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* META AI CREDENTIAL CARD */}
-      <div className="garden-card space-y-4">
+      <div className="garden-card space-y-4 border-2 border-terra/30 bg-[#FDFBF7]">
         <div className="flex items-center justify-between pb-2.5 border-b border-line">
           <div className="flex items-center gap-2">
             <Key className="w-4 h-4 text-terra" />
@@ -426,6 +304,13 @@ export default function SettingsPage() {
             >
               {t.settings.saveKeyBtn}
             </button>
+            <button
+              onClick={handleTestMetaKey}
+              disabled={isTestingMetaKey || (!inputMetaKey.trim() && !metaApiKey)}
+              className="btn-ghost text-xs whitespace-nowrap"
+            >
+              {isTestingMetaKey ? t.settings.testingConnection : t.settings.testConnectionBtn}
+            </button>
             {metaApiKey && (
               <button
                 onClick={handleDeleteMetaKey}
@@ -437,6 +322,22 @@ export default function SettingsPage() {
           </div>
           {metaKeyNotice && (
             <p className="text-xs text-forest font-medium">{metaKeyNotice}</p>
+          )}
+          {metaTestResult && (
+            <div
+              className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
+                metaTestResult.valid
+                  ? "bg-[#E3EFE0] text-forest border border-[#BEDEBA]"
+                  : "bg-red-50 text-red-700 border border-red-200"
+              }`}
+            >
+              {metaTestResult.valid ? (
+                <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              )}
+              <span>{metaTestResult.message}</span>
+            </div>
           )}
         </div>
       </div>

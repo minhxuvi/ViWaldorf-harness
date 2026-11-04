@@ -1,5 +1,5 @@
 export type WaldorfArtStyle = "wet-on-wet" | "crayon" | "chalkboard";
-export type AIProvider = "google" | "meta" | "local";
+export type AIProvider = "meta" | "local";
 export type StoryViewMode = "studio" | "reader";
 export type ReaderViewMode = "picture-book" | "continuous";
 
@@ -17,7 +17,7 @@ export interface AIContextTelemetry {
   negativePrompt?: string;
   styleInstruction?: string;
   model: string;
-  provider: "google" | "local" | "meta";
+  provider: "meta" | "local";
   historyTurns?: number;
   injectedContext?: Record<string, any>;
   generationConfig?: {
