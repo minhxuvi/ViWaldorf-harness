@@ -2,152 +2,211 @@ import { WaldorfArtStyle, StoryScene } from "../types";
 
 export class ProceduralIllustrator {
   /**
-   * Generates an authentic SVG data URL representing the chosen Waldorf art style.
+   * Generates an authentic SVG data URL representing the chosen Waldorf art style,
+   * uniquely harmonized with the narrative content of the specific scene.
    */
   public static generateArtSVG(scene: StoryScene, style: WaldorfArtStyle): string {
     const width = 640;
     const height = 400;
-    const seed = scene.ord * 137 + scene.title.length * 31;
+    const textCorpus = (scene.title + " " + scene.summary).toLowerCase();
 
     switch (style) {
       case "wet-on-wet":
-        return this.renderWetOnWetSVG(width, height, seed, scene.title);
+        return this.renderWetOnWetSVG(width, height, scene.ord, scene.title, textCorpus);
       case "crayon":
-        return this.renderCrayonSVG(width, height, seed, scene.title);
+        return this.renderCrayonSVG(width, height, scene.ord, scene.title, textCorpus);
       case "chalkboard":
-        return this.renderChalkboardSVG(width, height, seed, scene.title);
+        return this.renderChalkboardSVG(width, height, scene.ord, scene.title, textCorpus);
     }
   }
 
-  private static renderWetOnWetSVG(w: number, h: number, seed: number, title: string): string {
-    // Soft flowing Goethean watercolor washes: Lemon yellow (#FFF382), Vermilion rose (#E87A70), Prussian blue (#4A7B9D), Leaf green (#7FA974)
-    const y1 = 40 + (seed % 40);
-    const y2 = 180 + ((seed * 7) % 50);
+  private static renderWetOnWetSVG(
+    w: number,
+    h: number,
+    ord: number,
+    title: string,
+    text: string
+  ): string {
+    // Narrative-specific Goethean palettes & shapes
+    const isPillarOrGod = text.includes("pillar") || text.includes("god") || text.includes("cột") || text.includes("thần");
+    const isCosmicOrChaos = text.includes("universe") || text.includes("void") || text.includes("dark") || text.includes("chaos") || text.includes("vũ trụ");
+    const isHeavenEarth = text.includes("heaven") || text.includes("earth") || text.includes("separated") || text.includes("trời") || text.includes("đất");
+
+    let topColor = "#FFF59E"; // warm lemon
+    let midColor = "#F5B277"; // warm amber
+    let bottomColor = "#4A7B9D"; // Prussian blue
+    let earthColor = "#6B9675"; // leaf green
+
+    if (isCosmicOrChaos) {
+      topColor = "#F39C12"; // primordial flame
+      midColor = "#8E44AD"; // deep cosmic violet
+      bottomColor = "#1B2631"; // deep void blue
+      earthColor = "#2C3E50";
+    } else if (isPillarOrGod) {
+      topColor = "#F9E79F"; // divine light
+      midColor = "#E67E22"; // terracotta strength
+      bottomColor = "#2980B9"; // heavenly vault
+      earthColor = "#7D6608"; // foundation earth
+    } else if (isHeavenEarth) {
+      topColor = "#AED6F1"; // open sky
+      midColor = "#F5CBA7"; // horizon dawn
+      bottomColor = "#52BE80"; // living earth
+      earthColor = "#1E8449";
+    } else if (ord % 3 === 1) {
+      topColor = "#FFF382";
+      midColor = "#E87A70";
+      bottomColor = "#4A7B9D";
+    } else if (ord % 3 === 2) {
+      topColor = "#FAD7A0";
+      midColor = "#85C1E9";
+      bottomColor = "#58D68D";
+    }
 
     const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" height="100%">
       <defs>
-        <filter id="watercolor-blur" x="-20%" y="-20%" width="140%" height="140%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="3" result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="22" xChannelSelector="R" yChannelSelector="G" />
-          <feGaussianBlur stdDeviation="16" />
+        <filter id="wet-blur-${ord}" x="-20%" y="-20%" width="140%" height="140%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.025" numOctaves="3" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="26" xChannelSelector="R" yChannelSelector="G" />
+          <feGaussianBlur stdDeviation="18" />
         </filter>
-        <linearGradient id="wet-paper" x1="0%" y1="0%" x2="0%" y2="100%">
+        <linearGradient id="wet-paper-${ord}" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stop-color="#FCF6E8" />
-          <stop offset="50%" stop-color="#FDF9ED" />
           <stop offset="100%" stop-color="#F7EED8" />
         </linearGradient>
-        <radialGradient id="sun-wash" cx="45%" cy="35%" r="60%">
-          <stop offset="0%" stop-color="#FFF59E" stop-opacity="0.85" />
-          <stop offset="50%" stop-color="#F5B277" stop-opacity="0.65" />
-          <stop offset="100%" stop-color="#E27464" stop-opacity="0" />
-        </radialGradient>
-        <radialGradient id="sky-water" cx="60%" cy="70%" r="55%">
-          <stop offset="0%" stop-color="#5B8FB9" stop-opacity="0.75" />
-          <stop offset="60%" stop-color="#73A992" stop-opacity="0.5" />
-          <stop offset="100%" stop-color="#9BC0A8" stop-opacity="0" />
+        <radialGradient id="sun-glow-${ord}" cx="50%" cy="30%" r="65%">
+          <stop offset="0%" stop-color="${topColor}" stop-opacity="0.9" />
+          <stop offset="55%" stop-color="${midColor}" stop-opacity="0.65" />
+          <stop offset="100%" stop-color="${bottomColor}" stop-opacity="0.3" />
         </radialGradient>
       </defs>
-      <rect width="${w}" height="${h}" fill="url(#wet-paper)" />
-      <g filter="url(#watercolor-blur)">
-        <ellipse cx="${w * 0.45}" cy="${y1}" rx="320" ry="170" fill="url(#sun-wash)" />
-        <ellipse cx="${w * 0.55}" cy="${y2}" rx="360" ry="190" fill="url(#sky-water)" />
-        <path d="M 0,${h * 0.6} Q ${w * 0.25},${h * 0.52} ${w * 0.5},${h * 0.62} T ${w},${h * 0.58} L ${w},${h} L 0,${h} Z" fill="#6B9675" fill-opacity="0.55" />
-        <path d="M 0,${h * 0.72} Q ${w * 0.35},${h * 0.68} ${w * 0.7},${h * 0.76} T ${w},${h * 0.7} L ${w},${h} L 0,${h} Z" fill="#47738F" fill-opacity="0.6" />
+      <rect width="${w}" height="${h}" fill="url(#wet-paper-${ord})" />
+      <g filter="url(#wet-blur-${ord})">
+        <!-- Living sky wash -->
+        <ellipse cx="${w * 0.5}" cy="${h * 0.35}" rx="${w * 0.6}" ry="${h * 0.4}" fill="url(#sun-glow-${ord})" />
+        
+        ${
+          isPillarOrGod
+            ? `<!-- Towering Pillar of Light & Stone -->
+               <rect x="${w * 0.42}" y="${h * 0.15}" width="${w * 0.16}" height="${h * 0.75}" rx="30" fill="${midColor}" fill-opacity="0.75" />
+               <ellipse cx="${w * 0.5}" cy="${h * 0.18}" rx="${w * 0.28}" ry="${h * 0.14}" fill="${topColor}" fill-opacity="0.8" />`
+            : ""
+        }
+
+        ${
+          isHeavenEarth
+            ? `<!-- Vault of Heaven arched over the Earth -->
+               <path d="M 0,${h * 0.55} Q ${w * 0.5},${h * 0.25} ${w},${h * 0.55} L ${w},${h} L 0,${h} Z" fill="${earthColor}" fill-opacity="0.65" />`
+            : `<!-- Rolling gentle Goethean landscape waves -->
+               <path d="M 0,${h * 0.58} Q ${w * 0.3},${h * 0.5} ${w * 0.6},${h * 0.62} T ${w},${h * 0.56} L ${w},${h} L 0,${h} Z" fill="${earthColor}" fill-opacity="0.6" />
+               <path d="M 0,${h * 0.72} Q ${w * 0.4},${h * 0.66} ${w * 0.75},${h * 0.76} T ${w},${h * 0.7} L ${w},${h} L 0,${h} Z" fill="${bottomColor}" fill-opacity="0.55" />`
+        }
       </g>
-      <text x="24" y="${h - 22}" font-family="Georgia, serif" font-size="14" fill="#2B3A2E" fill-opacity="0.65" font-style="italic">
+      <text x="24" y="${h - 20}" font-family="Georgia, serif" font-size="13" fill="#2B3A2E" fill-opacity="0.7" font-style="italic">
         Wet-on-Wet Watercolor: ${this.escapeXml(title)}
       </text>
     </svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg.trim())}`;
   }
 
-  private static renderCrayonSVG(w: number, h: number, seed: number, title: string): string {
-    // Beeswax block crayon strokes on textured cream paper: Ochre, Terracotta, Forest Green, Warm Gold
+  private static renderCrayonSVG(
+    w: number,
+    h: number,
+    ord: number,
+    title: string,
+    text: string
+  ): string {
+    const isPillar = text.includes("pillar") || text.includes("cột") || text.includes("god");
+    const isHeavenEarth = text.includes("heaven") || text.includes("earth") || text.includes("trời");
+
     const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" height="100%">
       <defs>
-        <pattern id="crayon-hatch" width="24" height="24" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-          <line x1="0" y1="0" x2="0" y2="24" stroke="#B85C38" stroke-width="3" stroke-opacity="0.18" />
-          <line x1="6" y1="0" x2="6" y2="24" stroke="#DDA15E" stroke-width="2.5" stroke-opacity="0.22" />
-          <line x1="12" y1="0" x2="12" y2="24" stroke="#2F5D3A" stroke-width="2" stroke-opacity="0.16" />
+        <pattern id="crayon-hatch-${ord}" width="20" height="20" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+          <line x1="0" y1="0" x2="0" y2="20" stroke="#B85C38" stroke-width="2.5" stroke-opacity="0.18" />
+          <line x1="10" y1="0" x2="10" y2="20" stroke="#DDA15E" stroke-width="2" stroke-opacity="0.22" />
         </pattern>
-        <filter id="crayon-grain">
-          <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" result="grain" />
-          <feColorMatrix type="matrix" values="0 0 0 0 0.9   0 0 0 0 0.85   0 0 0 0 0.75   0 0 0 0.12 0" />
+        <filter id="crayon-grain-${ord}">
+          <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" result="grain" />
+          <feColorMatrix type="matrix" values="0 0 0 0 0.9 0 0 0 0 0.85 0 0 0 0 0.75 0 0 0 0.12 0" />
           <feComposite in2="SourceGraphic" in="gl" operator="in" />
         </filter>
       </defs>
       <rect width="${w}" height="${h}" fill="#FFF8EE" />
-      <rect width="${w}" height="${h}" fill="url(#crayon-hatch)" />
-      <!-- Layered block strokes -->
-      <path d="M 40,320 C 140,220 280,240 380,290 C 460,330 540,280 600,310 L 600,380 L 40,380 Z" fill="#C45C4A" fill-opacity="0.65" stroke="#9A3C2A" stroke-width="3" stroke-dasharray="8 4" />
-      <path d="M 60,180 C 180,120 320,160 440,110 C 510,80 560,130 600,100 L 600,260 L 60,260 Z" fill="#E9C46A" fill-opacity="0.5" />
-      <circle cx="${w * 0.72}" cy="100" r="54" fill="#E76F51" fill-opacity="0.68" />
-      <rect x="0" y="0" width="${w}" height="${h}" filter="url(#crayon-grain)" pointer-events="none" />
-      <text x="24" y="${h - 22}" font-family="Georgia, serif" font-size="14" fill="#2B3A2E" fill-opacity="0.7" font-weight="600">
+      <rect width="${w}" height="${h}" fill="url(#crayon-hatch-${ord})" />
+      
+      <!-- Tactile Beeswax Block Crayon Layers -->
+      ${
+        isPillar
+          ? `<rect x="${w * 0.42}" y="60" width="${w * 0.16}" height="300" fill="#B85C38" fill-opacity="0.7" rx="8" />
+             <circle cx="${w * 0.5}" cy="60" r="50" fill="#E9C46A" fill-opacity="0.75" />
+             <path d="M 40,320 C 180,280 420,290 600,320 L 600,400 L 40,400 Z" fill="#2A9D8F" fill-opacity="0.65" />`
+          : isHeavenEarth
+          ? `<path d="M 0,160 Q ${w * 0.5},80 ${w},160 L ${w},400 L 0,400 Z" fill="#E76F51" fill-opacity="0.5" />
+             <circle cx="${w * 0.3}" cy="100" r="45" fill="#E9C46A" fill-opacity="0.8" />
+             <path d="M 0,260 Q ${w * 0.5},220 ${w},260 L ${w},400 L 0,400 Z" fill="#264653" fill-opacity="0.65" />`
+          : `<circle cx="${w * 0.7}" cy="110" r="50" fill="#E76F51" fill-opacity="0.7" />
+             <path d="M 40,240 C 160,180 340,220 580,180 L 580,380 L 40,380 Z" fill="#E9C46A" fill-opacity="0.6" />
+             <path d="M 20,310 C 180,260 380,310 620,270 L 620,400 L 20,400 Z" fill="#2A9D8F" fill-opacity="0.7" />`
+      }
+      <rect x="0" y="0" width="${w}" height="${h}" filter="url(#crayon-grain-${ord})" pointer-events="none" />
+      <text x="24" y="${h - 20}" font-family="Georgia, serif" font-size="13" fill="#2B3A2E" fill-opacity="0.75" font-weight="600">
         Beeswax Crayon: ${this.escapeXml(title)}
       </text>
     </svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg.trim())}`;
   }
 
-  private static renderChalkboardSVG(w: number, h: number, seed: number, title: string): string {
-    // Matte dark slate blackboard (#1C2420) with luminous soft pastel chalks (Warm Yellow #FFE270, Glowing Rose #F29089, Soft Azure #8EC5FC)
+  private static renderChalkboardSVG(
+    w: number,
+    h: number,
+    ord: number,
+    title: string,
+    text: string
+  ): string {
+    const isPillar = text.includes("pillar") || text.includes("cột");
+
     const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" height="100%">
       <defs>
-        <filter id="chalk-glow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="4.5" result="blur" />
+        <filter id="chalk-glow-${ord}" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        <radialGradient id="slate-bg" cx="50%" cy="40%" r="65%">
-          <stop offset="0%" stop-color="#26342E" />
-          <stop offset="100%" stop-color="#141C18" />
-        </radialGradient>
       </defs>
-      <!-- Slate Blackboard -->
-      <rect width="${w}" height="${h}" fill="url(#slate-bg)" />
-      <!-- Radiant Chalk Artwork -->
-      <g filter="url(#chalk-glow)">
-        <!-- Golden Star / Sun radiance -->
-        <circle cx="${w * 0.5}" cy="${h * 0.4}" r="50" fill="#FFF275" fill-opacity="0.4" />
-        <circle cx="${w * 0.5}" cy="${h * 0.4}" r="22" fill="#FFFBE0" fill-opacity="0.9" />
-        <!-- Radiant rays -->
-        ${Array.from({ length: 12 })
-          .map((_, i) => {
-            const angle = (i * 30 * Math.PI) / 180;
-            const x1 = w * 0.5 + Math.cos(angle) * 36;
-            const y1 = h * 0.4 + Math.sin(angle) * 36;
-            const x2 = w * 0.5 + Math.cos(angle) * (70 + (i % 3) * 20);
-            const y2 = h * 0.4 + Math.sin(angle) * (70 + (i % 3) * 20);
-            return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#FFE66D" stroke-width="3" stroke-linecap="round" stroke-opacity="0.75" />`;
-          })
-          .join("")}
-        <!-- Rolling pastel landscape lines -->
-        <path d="M 0,${h * 0.75} Q ${w * 0.25},${h * 0.65} ${w * 0.5},${h * 0.72} T ${w},${h * 0.68}" stroke="#89C2D9" stroke-width="3.5" fill="none" stroke-opacity="0.8" stroke-dasharray="6 3" />
-        <path d="M 0,${h * 0.85} Q ${w * 0.35},${h * 0.78} ${w * 0.7},${h * 0.84} T ${w},${h * 0.82}" stroke="#B5E48C" stroke-width="4" fill="none" stroke-opacity="0.7" stroke-dasharray="8 4" />
+      <!-- Slate Chalkboard Base -->
+      <rect width="${w}" height="${h}" fill="#1A2420" />
+      
+      <!-- Luminous Pastel Chalk Elements -->
+      <g filter="url(#chalk-glow-${ord})">
+        ${
+          isPillar
+            ? `<!-- Giant Pillar holding the Sky -->
+               <line x1="${w * 0.5}" y1="40" x2="${w * 0.5}" y2="350" stroke="#FFE270" stroke-width="12" stroke-linecap="round" stroke-opacity="0.85" />
+               <circle cx="${w * 0.5}" cy="50" r="40" stroke="#8EC5FC" stroke-width="4" fill="none" stroke-opacity="0.8" />
+               <path d="M 40,350 Q ${w * 0.5},310 ${w - 40},350" stroke="#F29089" stroke-width="6" fill="none" stroke-linecap="round" />`
+            : `<!-- Radiant Dawn / Horizon -->
+               <circle cx="${w * 0.5}" cy="${h * 0.4}" r="55" stroke="#FFE270" stroke-width="5" fill="none" stroke-opacity="0.85" />
+               <path d="M 60,${h * 0.65} Q ${w * 0.5},${h * 0.5} ${w - 60},${h * 0.65}" stroke="#8EC5FC" stroke-width="5" fill="none" stroke-linecap="round" />
+               <path d="M 40,${h * 0.8} Q ${w * 0.45},${h * 0.72} ${w - 40},${h * 0.8}" stroke="#F29089" stroke-width="5" fill="none" stroke-linecap="round" />`
+        }
       </g>
-      <text x="24" y="${h - 22}" font-family="Georgia, serif" font-size="14" fill="#E9F0E4" fill-opacity="0.8" font-style="italic">
-        Chalkboard Drawing: ${this.escapeXml(title)}
+      <text x="24" y="${h - 20}" font-family="Georgia, serif" font-size="13" fill="#F7ECD8" fill-opacity="0.85" font-style="italic">
+        Pastel Chalkboard: ${this.escapeXml(title)}
       </text>
     </svg>`;
     return `data:image/svg+xml;utf8,${encodeURIComponent(svg.trim())}`;
   }
 
   private static escapeXml(unsafe: string): string {
-    return unsafe.replace(/[<>&'"]/g, (c) => {
-      switch (c) {
-        case "<": return "&lt;";
-        case ">": return "&gt;";
-        case "&": return "&amp;";
-        case "'": return "&apos;";
-        case '"': return "&quot;";
-        default: return c;
-      }
-    });
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
   }
 }

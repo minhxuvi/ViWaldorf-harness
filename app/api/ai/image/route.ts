@@ -10,6 +10,7 @@ export async function POST(request: NextRequest) {
     }
 
     const cleanPrompt = prompt || sceneSummary;
+    const titleText = sceneTitle || "Scene";
 
     // Determine Google Key: header from client takes precedence, then server env
     const clientGoogleKey = request.headers.get("x-goog-api-key") || "";
@@ -24,95 +25,67 @@ export async function POST(request: NextRequest) {
 
     // 1. Google AI Generation
     if (provider !== "meta" && effectiveGoogleKey) {
-      // 1A. Attempt Native Multimodal Image Generation via gemini-2.0-flash-exp
-      try {
-        const nativeEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${encodeURIComponent(
-          effectiveGoogleKey
-        )}`;
+      // 1A. Attempt Native Multimodal Image Generation models (Nano Banana / Flash Image)
+      const imageModels = ["gemini-nano-banana-2.1", "gemini-2.5-flash-image", "gemini-2.0-flash-exp"];
+      for (const model of imageModels) {
+        try {
+          const nativeEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
+            effectiveGoogleKey
+          )}`;
 
-        const nativeRes = await fetch(nativeEndpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `Generate an authentic Waldorf style children's book illustration for: "${cleanPrompt}". Style: ${style}. Soft organic Goethean color harmony, warm and gentle feeling, artistic painting.`,
-                  },
-                ],
+          const nativeRes = await fetch(nativeEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    {
+                      text: `Generate an authentic Waldorf style children's book illustration for: "${titleText} - ${cleanPrompt}". Art style: ${style}. Soft organic Goethean watercolor color harmony, warm and gentle feeling, painterly.`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: {
+                responseModalities: ["TEXT", "IMAGE"],
               },
-            ],
-            generationConfig: {
-              responseModalities: ["TEXT", "IMAGE"],
-            },
-          }),
-        });
+            }),
+          });
 
-        if (nativeRes.ok) {
-          const nativeData = await nativeRes.json();
-          const candidateParts = nativeData.candidates?.[0]?.content?.parts || [];
-          for (const part of candidateParts) {
-            if (part.inlineData?.data) {
-              const mime = part.inlineData.mimeType || "image/png";
-              return NextResponse.json({
-                imageUrl: `data:${mime};base64,${part.inlineData.data}`,
-                sourceLabel: "Google Gemini 2.0 AI Art",
-                style,
-              });
+          if (nativeRes.ok) {
+            const nativeData = await nativeRes.json();
+            const candidateParts = nativeData.candidates?.[0]?.content?.parts || [];
+            for (const part of candidateParts) {
+              if (part.inlineData?.data) {
+                const mime = part.inlineData.mimeType || "image/png";
+                return NextResponse.json({
+                  imageUrl: `data:${mime};base64,${part.inlineData.data}`,
+                  sourceLabel: `Google Gemini AI (${model})`,
+                  style,
+                });
+              }
             }
           }
+        } catch (nativeErr) {
+          console.warn(`Native image model ${model} attempt error:`, nativeErr);
         }
-      } catch (nativeErr) {
-        console.warn("Native Gemini image generation attempt error:", nativeErr);
       }
 
-      // 1B. Attempt Imagen 3 endpoint (if supported for this key)
-      try {
-        const imagenEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${encodeURIComponent(
-          effectiveGoogleKey
-        )}`;
-
-        const imagenRes = await fetch(imagenEndpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            instances: [{ prompt: cleanPrompt }],
-            parameters: { sampleCount: 1, aspectRatio },
-          }),
-        });
-
-        if (imagenRes.ok) {
-          const imagenData = await imagenRes.json();
-          const prediction = imagenData.predictions?.[0];
-          if (prediction?.bytesBase64Encoded) {
-            const mime = prediction?.mimeType || "image/jpeg";
-            return NextResponse.json({
-              imageUrl: `data:${mime};base64,${prediction.bytesBase64Encoded}`,
-              sourceLabel: "Google Imagen 3 AI",
-              style,
-            });
-          }
-        }
-      } catch (imagenErr) {
-        console.warn("Imagen 3 predict attempt error:", imagenErr);
-      }
-
-      // 1C. High-Fidelity Scene-Specific AI SVG Generation via Gemini 2.0 Flash / 1.5 Flash
-      // This synthesizes custom, gorgeous, scene-specific Waldorf art matching the actual story scene!
-      try {
-        const geminiModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
-        for (const gemModel of geminiModels) {
+      // 1B. High-Fidelity Scene-Specific AI SVG Generation via Gemini 2.5 Flash / 2.0 Flash
+      // Generates custom, gorgeous vector art depicting the actual story characters, landscapes, and themes!
+      const geminiTextModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+      for (const gemModel of geminiTextModels) {
+        try {
           const svgEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${gemModel}:generateContent?key=${encodeURIComponent(
             effectiveGoogleKey
           )}`;
 
-          const stylePrompt =
+          const styleInstruction =
             style === "wet-on-wet"
-              ? "Wet-on-wet watercolor with flowing Goethean washes of lemon yellow, Prussian blue, vermilion rose, soft organic blending, gentle atmospheric gradients, no harsh black borders."
+              ? "Wet-on-wet watercolor style: soft glowing Goethean washes of lemon yellow, Prussian blue, vermilion rose, moss green. Soft organic blending with gentle curves, radial and linear gradients, watercolor blur effects, no hard black outlines."
               : style === "crayon"
-              ? "Beeswax block crayon drawing with broad strokes of warm ochre, terracotta, moss green, and golden yellow on textured cream paper."
-              : "Pastel chalkboard drawing with luminous warm yellow and soft azure chalk outlines glowing on a dark matte slate blackboard.";
+              ? "Beeswax block crayon style: broad layered strokes of warm ochre, terracotta, deep green, golden yellow, tactile hand-drawn texture on cream paper."
+              : "Pastel chalkboard style: luminous warm yellow and soft pastel chalk drawings on dark matte slate blackboard, soft atmospheric glowing outlines.";
 
           const svgRes = await fetch(svgEndpoint, {
             method: "POST",
@@ -122,24 +95,24 @@ export async function POST(request: NextRequest) {
                 {
                   parts: [
                     {
-                      text: `You are an authentic Waldorf artist and illustrator.
-Create a complete, beautiful, valid SVG illustration depicting this story scene:
-Title: "${sceneTitle || "Scene"}"
-Summary: "${sceneSummary || cleanPrompt}"
-Style: ${stylePrompt}
+                      text: `You are an authentic Waldorf artist.
+Create a complete, visually captivating, valid SVG illustration for this story scene:
+Scene Title: "${titleText}"
+Scene Story: "${cleanPrompt}"
+Art Technique: ${styleInstruction}
 
-Rules:
-- ViewBox must be "0 0 640 400" with width="100%" height="100%".
-- Create richly layered, scene-specific visual elements illustrating the characters, landscape, heavens, earth, or objects in the summary.
-- Use soft organic curves (<path>, <ellipse>, <radialGradient>, <linearGradient>, soft gaussian blur filters).
-- Output ONLY the raw <svg>...</svg> element. Do not write markdown, do not write backticks, do not write explanations.`,
+Requirements:
+1. Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="100%" height="100%">
+2. Represent the scene visually: depict the sky, mountains, pillar, earth, characters, or natural elements described in the story.
+3. Use layered SVG shapes: <defs> with <linearGradient>, <radialGradient>, <filter>, plus <path>, <ellipse>, <rect>, <circle>.
+4. Do NOT include markdown code blocks or backticks. Output ONLY valid SVG XML.`,
                     },
                   ],
                 },
               ],
               generationConfig: {
-                temperature: 0.4,
-                maxOutputTokens: 2048,
+                temperature: 0.5,
+                maxOutputTokens: 8192,
               },
             }),
           });
@@ -147,13 +120,12 @@ Rules:
           if (svgRes.ok) {
             const svgData = await svgRes.json();
             let rawText = svgData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            // Strip any code block backticks if present
             rawText = rawText.replace(/```xml/gi, "").replace(/```svg/gi, "").replace(/```/g, "").trim();
 
             const startIdx = rawText.indexOf("<svg");
-            const endIdx = rawText.lastIndexOf("</svg>");
-            if (startIdx !== -1 && endIdx !== -1) {
-              const svgContent = rawText.substring(startIdx, endIdx + 6);
+            if (startIdx !== -1) {
+              const endIdx = rawText.lastIndexOf("</svg>");
+              let svgContent = endIdx !== -1 ? rawText.substring(startIdx, endIdx + 6) : rawText.substring(startIdx) + "\n</svg>";
               const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
               return NextResponse.json({
                 imageUrl: dataUrl,
@@ -162,13 +134,13 @@ Rules:
               });
             }
           }
+        } catch (svgErr) {
+          console.warn(`Gemini SVG generation with ${gemModel} error:`, svgErr);
         }
-      } catch (svgErr) {
-        console.warn("AI SVG generation attempt error:", svgErr);
       }
 
       return NextResponse.json(
-        { error: "Google AI image models unavailable or returned invalid output." },
+        { error: "Google AI generation completed without valid image data. Check key permissions or quota." },
         { status: 502 }
       );
     }

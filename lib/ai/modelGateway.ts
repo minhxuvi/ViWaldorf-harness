@@ -82,117 +82,129 @@ export class ModelGateway {
               isAiGenerated: true,
             };
           }
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          console.warn("Server proxy image call non-200:", errData);
         }
       } catch (proxyErr) {
-        console.warn("Server proxy image call error:", proxyErr);
+        console.warn("Server proxy image call network error:", proxyErr);
       }
 
       // 1B. Direct client-side calls if server proxy failed and client has key
       if (googleApiKey) {
-        // Try native multimodal image generation with gemini-2.0-flash-exp
-        try {
-          const nativeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${encodeURIComponent(
-            googleApiKey
-          )}`;
-          const nativeRes = await fetch(nativeUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `Generate an authentic Waldorf style children's book illustration for: "${scene.summary || scene.title}". Style: ${style}. Soft organic Goethean color harmony, warm and gentle feeling, artistic painting.`,
-                    },
-                  ],
+        // Try native multimodal image generation models
+        const nativeModels = ["gemini-nano-banana-2.1", "gemini-2.5-flash-image", "gemini-2.0-flash-exp"];
+        for (const model of nativeModels) {
+          try {
+            const nativeUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
+              googleApiKey
+            )}`;
+            const nativeRes = await fetch(nativeUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `Generate an authentic Waldorf style children's book illustration for: "${scene.title} - ${scene.summary}". Style: ${style}. Soft organic Goethean color harmony, warm and gentle feeling, artistic painting.`,
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  responseModalities: ["TEXT", "IMAGE"],
                 },
-              ],
-              generationConfig: {
-                responseModalities: ["TEXT", "IMAGE"],
-              },
-            }),
-          });
+              }),
+            });
 
-          if (nativeRes.ok) {
-            const nativeJson = await nativeRes.json();
-            const parts = nativeJson.candidates?.[0]?.content?.parts || [];
-            for (const p of parts) {
-              if (p.inlineData?.data) {
-                const mime = p.inlineData.mimeType || "image/png";
-                return {
-                  imageUrl: `data:${mime};base64,${p.inlineData.data}`,
-                  sourceLabel: "Google Gemini 2.0 AI Art",
-                  isAiGenerated: true,
-                };
+            if (nativeRes.ok) {
+              const nativeJson = await nativeRes.json();
+              const parts = nativeJson.candidates?.[0]?.content?.parts || [];
+              for (const p of parts) {
+                if (p.inlineData?.data) {
+                  const mime = p.inlineData.mimeType || "image/png";
+                  return {
+                    imageUrl: `data:${mime};base64,${p.inlineData.data}`,
+                    sourceLabel: `Google Gemini AI (${model})`,
+                    isAiGenerated: true,
+                  };
+                }
               }
             }
+          } catch (nativeClientErr) {
+            console.warn(`Direct native image call ${model} error:`, nativeClientErr);
           }
-        } catch (nativeClientErr) {
-          console.warn("Direct native image call error:", nativeClientErr);
         }
 
-        // Try Scene-Specific Waldorf SVG generation with gemini-2.0-flash
-        try {
-          const svgUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(
-            googleApiKey
-          )}`;
+        // Try Scene-Specific Waldorf SVG generation with gemini-2.5-flash or gemini-2.0-flash
+        const textModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+        for (const textModel of textModels) {
+          try {
+            const svgUrl = `https://generativelanguage.googleapis.com/v1beta/models/${textModel}:generateContent?key=${encodeURIComponent(
+              googleApiKey
+            )}`;
 
-          const styleDesc =
-            style === "wet-on-wet"
-              ? "Wet-on-wet watercolor with flowing Goethean washes of lemon yellow, Prussian blue, vermilion rose, soft organic blending, gentle atmospheric gradients, no harsh black borders."
-              : style === "crayon"
-              ? "Beeswax block crayon drawing with broad strokes of warm ochre, terracotta, moss green, and golden yellow on textured cream paper."
-              : "Pastel chalkboard drawing with luminous warm yellow and soft azure chalk outlines glowing on a dark matte slate blackboard.";
+            const styleDesc =
+              style === "wet-on-wet"
+                ? "Wet-on-wet watercolor with flowing Goethean washes of lemon yellow, Prussian blue, vermilion rose, soft organic blending, gentle atmospheric gradients, no harsh black borders."
+                : style === "crayon"
+                ? "Beeswax block crayon drawing with broad strokes of warm ochre, terracotta, moss green, and golden yellow on textured cream paper."
+                : "Pastel chalkboard drawing with luminous warm yellow and soft azure chalk outlines glowing on a dark matte slate blackboard.";
 
-          const svgRes = await fetch(svgUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `You are an authentic Waldorf artist and illustrator.
+            const svgRes = await fetch(svgUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `You are an authentic Waldorf artist and illustrator.
 Create a complete, beautiful, valid SVG illustration depicting this story scene:
 Title: "${scene.title}"
 Summary: "${scene.summary}"
 Style: ${styleDesc}
 
-Rules:
-- ViewBox must be "0 0 640 400" with width="100%" height="100%".
-- Create richly layered, scene-specific visual elements illustrating the characters, landscape, heavens, earth, or objects in the summary.
-- Use soft organic curves (<path>, <ellipse>, <radialGradient>, <linearGradient>, soft gaussian blur filters).
-- Output ONLY the raw <svg>...</svg> element. Do not write markdown, do not write backticks, do not write explanations.`,
-                    },
-                  ],
+Requirements:
+1. Root element: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="100%" height="100%">
+2. Visually illustrate the story elements: characters, mountains, heavens, pillar, earth, or objects in the scene.
+3. Use layered SVG shapes (<path>, <ellipse>, <rect>, <defs> with <radialGradient>, <linearGradient>, soft gaussian blur filters).
+4. Do NOT output markdown code blocks or backticks. Output ONLY valid SVG XML.`,
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  temperature: 0.5,
+                  maxOutputTokens: 8192,
                 },
-              ],
-              generationConfig: {
-                temperature: 0.4,
-                maxOutputTokens: 2048,
-              },
-            }),
-          });
+              }),
+            });
 
-          if (svgRes.ok) {
-            const svgData = await svgRes.json();
-            let rawText = svgData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            rawText = rawText.replace(/```xml/gi, "").replace(/```svg/gi, "").replace(/```/g, "").trim();
+            if (svgRes.ok) {
+              const svgData = await svgRes.json();
+              let rawText = svgData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+              rawText = rawText.replace(/```xml/gi, "").replace(/```svg/gi, "").replace(/```/g, "").trim();
 
-            const startIdx = rawText.indexOf("<svg");
-            const endIdx = rawText.lastIndexOf("</svg>");
-            if (startIdx !== -1 && endIdx !== -1) {
-              const svgContent = rawText.substring(startIdx, endIdx + 6);
-              const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
-              return {
-                imageUrl: dataUrl,
-                sourceLabel: "Google Gemini AI (Scene Artwork)",
-                isAiGenerated: true,
-              };
+              const startIdx = rawText.indexOf("<svg");
+              if (startIdx !== -1) {
+                const endIdx = rawText.lastIndexOf("</svg>");
+                let svgContent =
+                  endIdx !== -1
+                    ? rawText.substring(startIdx, endIdx + 6)
+                    : rawText.substring(startIdx) + "\n</svg>";
+                const dataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
+                return {
+                  imageUrl: dataUrl,
+                  sourceLabel: `Google Gemini AI (${textModel})`,
+                  isAiGenerated: true,
+                };
+              }
             }
+          } catch (svgClientErr) {
+            console.warn(`Direct AI SVG generation error with ${textModel}:`, svgClientErr);
           }
-        } catch (svgClientErr) {
-          console.warn("Direct AI SVG generation error:", svgClientErr);
         }
       }
     }
@@ -228,7 +240,7 @@ Rules:
       }
     }
 
-    // 3. High-fidelity Procedural Waldorf SVG Fallback
+    // 3. Narrative-Harmonized Procedural Waldorf SVG Fallback
     const fallbackSvg = ProceduralIllustrator.generateArtSVG(scene, style);
     return {
       imageUrl: fallbackSvg,
