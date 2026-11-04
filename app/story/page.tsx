@@ -26,6 +26,8 @@ import {
   Layers,
   RotateCcw,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 export default function StoryPage() {
@@ -51,6 +53,12 @@ export default function StoryPage() {
   const [uploadText, setUploadText] = useState("");
   const [autoGenerateArtOnUpload, setAutoGenerateArtOnUpload] = useState(true);
 
+  // Active scene & carousel/swipe state
+  const [activeSceneIndex, setActiveSceneIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  const [isSegmenting, setIsSegmenting] = useState(false);
+
   // Scene editing state
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -59,6 +67,7 @@ export default function StoryPage() {
 
   // Recording & live speech dictation state
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null);
   const [audioMetrics, setAudioMetrics] = useState<AudioDeliveryMetrics | null>(null);
   const [transcript, setTranscript] = useState("");
@@ -76,6 +85,7 @@ export default function StoryPage() {
   const speechRecognitionRef = useRef<any>(null);
   const isRecordingRef = useRef(false);
   const transcriptRef = useRef("");
+  const recordingIntervalRef = useRef<any>(null);
 
   // Keep transcriptRef synchronized with transcript state
   useEffect(() => {
@@ -98,8 +108,16 @@ export default function StoryPage() {
       setInterimSpoken("");
       setRecordedAudioUrl(null);
       setAudioMetrics(null);
+      setActiveSceneIndex(0);
     }
   }, [selectedStory?.id]);
+
+  // Clean up recording interval on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+    };
+  }, []);
 
   // Generate AI artwork for a single scene
   const handleGenerateSceneArt = async (sceneId: string) => {
@@ -176,31 +194,30 @@ export default function StoryPage() {
     setIsGeneratingAllScenes(false);
   };
 
-  // Handle Manual Story Submission & Auto Scene Splitting
+  // Handle Manual Story Submission & Context-Aware Semantic Scene Splitting
   const handleSaveUploadedStory = async () => {
-    if (!uploadText.trim()) return;
+    if (!uploadText.trim() || isSegmenting) return;
+    setIsSegmenting(true);
 
     const title = uploadTitle.trim() || uploadText.trim().split("\n")[0].substring(0, 40) + "...";
-    const paragraphs = uploadText
-      .split(/\n\s*\n/)
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0)
-      .slice(0, 8);
-
-    const generatedScenes: StoryScene[] = paragraphs.map((para, idx) => {
-      const sceneTitle = `Scene ${idx + 1}: ${para.substring(0, 45)}...`;
-      const words = para.split(/\s+/).slice(0, 4);
-      return {
-        id: `scene-${Date.now()}-${idx}`,
-        ord: idx + 1,
-        title: sceneTitle,
-        summary: para,
-        keywords: words,
+    let generatedScenes: StoryScene[] = [];
+    try {
+      generatedScenes = await ModelGateway.segmentStoryIntoScenes({
+        storyText: uploadText,
+        storyTitle: title,
         artStyle: uploadStyle,
-        imagePrompt: `Waldorf illustration (${uploadStyle}) of ${para.substring(0, 80)}, soft organic colors`,
-        imageSourceLabel: `Procedural Art (${uploadStyle})`,
-      };
-    });
+        provider: aiProvider,
+        googleApiKey,
+        metaApiKey,
+      });
+    } catch (segErr) {
+      console.warn("Context segmentation error:", segErr);
+      generatedScenes = ModelGateway.segmentLocallyByContext(uploadText, title, uploadStyle);
+    }
+
+    if (!generatedScenes || generatedScenes.length === 0) {
+      generatedScenes = ModelGateway.segmentLocallyByContext(uploadText, title, uploadStyle);
+    }
 
     const newStory = {
       id: `story-${Date.now()}`,
@@ -219,9 +236,11 @@ export default function StoryPage() {
     }));
 
     setSelectedStoryId(newStory.id);
+    setActiveSceneIndex(0);
     setShowUploadForm(false);
     setUploadTitle("");
     setUploadText("");
+    setIsSegmenting(false);
 
     // If auto-generation is enabled and an API key is available, generate artwork asynchronously
     if (autoGenerateArtOnUpload && (googleApiKey || metaApiKey)) {
@@ -256,6 +275,97 @@ export default function StoryPage() {
       }, 300);
     }
   };
+
+  // Re-segment currently selected story using narrative context analysis
+  const handleResegmentActiveStory = async () => {
+    if (!selectedStory || isSegmenting) return;
+    setIsSegmenting(true);
+
+    try {
+      const source =
+        lang === "vi" && selectedStory.sourceTextVi
+          ? selectedStory.sourceTextVi
+          : selectedStory.sourceText;
+      const title =
+        lang === "vi" && selectedStory.titleVi ? selectedStory.titleVi : selectedStory.title;
+
+      const newScenes = await ModelGateway.segmentStoryIntoScenes({
+        storyText: source,
+        storyTitle: title,
+        artStyle: selectedStory.defaultArtStyle,
+        provider: aiProvider,
+        googleApiKey,
+        metaApiKey,
+      });
+
+      if (newScenes && newScenes.length > 0) {
+        updateData((prev) => ({
+          ...prev,
+          stories: prev.stories.map((s) =>
+            s.id === selectedStory.id ? { ...s, scenes: newScenes } : s
+          ),
+        }));
+        setActiveSceneIndex(0);
+      }
+    } catch (err) {
+      console.warn("Re-segmenting active story error:", err);
+    } finally {
+      setIsSegmenting(false);
+    }
+  };
+
+  const totalScenes = selectedStory?.scenes.length || 0;
+  const currentScene =
+    selectedStory?.scenes[activeSceneIndex] || selectedStory?.scenes[0];
+
+  const handlePrevScene = () => {
+    setActiveSceneIndex((prev) => Math.max(0, prev - 1));
+  };
+
+  const handleNextScene = () => {
+    setActiveSceneIndex((prev) => Math.min(totalScenes - 1, prev + 1));
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.targetTouches[0].clientX);
+    setTouchEndX(null);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX === null || touchEndX === null) return;
+    const deltaX = touchStartX - touchEndX;
+    const minSwipeDistance = 45;
+    if (deltaX > minSwipeDistance) {
+      handleNextScene();
+    } else if (deltaX < -minSwipeDistance) {
+      handlePrevScene();
+    }
+    setTouchStartX(null);
+    setTouchEndX(null);
+  };
+
+  // Keyboard left/right arrow navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        handlePrevScene();
+      } else if (e.key === "ArrowRight") {
+        handleNextScene();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [totalScenes, activeSceneIndex]);
 
   // Handle File Upload (.txt / .md)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -345,6 +455,11 @@ export default function StoryPage() {
 
       isRecordingRef.current = true;
       setIsRecording(true);
+      setRecordingDuration(0);
+      if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingDuration((prev) => prev + 1);
+      }, 1000);
       setInterimSpoken("");
 
       // Start Web Speech Recognition for live text streaming
@@ -399,6 +514,10 @@ export default function StoryPage() {
 
       mediaRecorder.onstop = async () => {
         isRecordingRef.current = false;
+        if (recordingIntervalRef.current) {
+          clearInterval(recordingIntervalRef.current);
+          recordingIntervalRef.current = null;
+        }
         if (speechRecognitionRef.current) {
           try {
             speechRecognitionRef.current.stop();
@@ -459,6 +578,10 @@ export default function StoryPage() {
 
   const stopRecording = () => {
     isRecordingRef.current = false;
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
+    }
     if (speechRecognitionRef.current) {
       try {
         speechRecognitionRef.current.stop();
@@ -493,7 +616,7 @@ export default function StoryPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-28">
       <DemoBanner />
 
       <PageHeader title={t.story.title} subtitle={t.story.subtitle} />
@@ -691,202 +814,260 @@ export default function StoryPage() {
             </div>
           </div>
 
-          {/* STEP 1: SCENE MAP & 3 WALDORF ART TECHNIQUES */}
-          <div className="garden-card space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-2.5">
+          {/* MERGED STEP 1 & 2: INTERACTIVE STORY RETELLING STUDIO */}
+          <div className="garden-card space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
               <div className="flex items-center gap-2">
                 <Layers className="w-5 h-5 text-forest" />
                 <h2 className="font-serif text-lg font-bold text-forestDark">
-                  {t.story.step1Title}
+                  {t.story.mergedStudioTitle || "Interactive Retelling Studio: Scene Journey & Voice Recording"}
                 </h2>
                 <span className="badge-leaf text-xs">
-                  {selectedStory.scenes.length} Scenes
+                  {t.story.sceneCounter} {activeSceneIndex + 1} {t.story.ofWord || "of"} {totalScenes}
                 </span>
               </div>
 
-              {/* Batch Generate All Scenes Art */}
-              <button
-                onClick={handleGenerateAllScenesArt}
-                disabled={isGeneratingAllScenes}
-                className="btn-primary text-xs py-1"
-                title={t.story.generateAllArtBtn}
-              >
-                {isGeneratingAllScenes ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-                <span>
-                  {isGeneratingAllScenes ? "Painting all scenes..." : t.story.generateAllArtBtn}
-                </span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleResegmentActiveStory}
+                  disabled={isSegmenting}
+                  className="btn-ghost text-xs py-1 text-forestDark hover:text-forest"
+                  title={t.story.resegmentByContextBtn}
+                >
+                  {isSegmenting ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 text-terra" />
+                  )}
+                  <span>
+                    {isSegmenting ? t.story.segmentingStatus : t.story.resegmentByContextBtn}
+                  </span>
+                </button>
+
+                <button
+                  onClick={handleGenerateAllScenesArt}
+                  disabled={isGeneratingAllScenes}
+                  className="btn-primary text-xs py-1"
+                  title={t.story.generateAllArtBtn}
+                >
+                  {isGeneratingAllScenes ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  <span>
+                    {isGeneratingAllScenes ? "Painting all scenes..." : t.story.generateAllArtBtn}
+                  </span>
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {selectedStory.scenes.map((scene) => {
-                const proceduralSvgUrl = ProceduralIllustrator.generateArtSVG(scene, scene.artStyle);
-                const displayArtUrl = scene.imagePath || proceduralSvgUrl;
-                const isEditing = editingSceneId === scene.id;
+            {/* SINGLE SCENE THEATER CAROUSEL (Touch Swipable & Button Controllable) */}
+            {currentScene && (
+              <div
+                className="relative rounded-2xl bg-[#FFFDF9] border border-line p-4 sm:p-5 space-y-4 shadow-sm"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                {/* Scene Navigation Bar */}
+                <div className="flex items-center justify-between gap-2 border-b border-line pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handlePrevScene}
+                      disabled={activeSceneIndex <= 0}
+                      className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span>{t.story.prevSceneBtn}</span>
+                    </button>
+                    <button
+                      onClick={handleNextScene}
+                      disabled={activeSceneIndex >= totalScenes - 1}
+                      className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1 disabled:opacity-30 disabled:pointer-events-none"
+                    >
+                      <span>{t.story.nextSceneBtn}</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
 
-                return (
-                  <div
-                    key={scene.id}
-                    className="p-3.5 rounded-xl border border-line bg-[#FFFDF9] space-y-3 shadow-sm hover:shadow transition"
-                  >
-                    {/* Rendered Artwork Card */}
-                    <div className="relative w-full aspect-[16/10] rounded-lg overflow-hidden border border-line bg-[#FDF8EE]">
-                      <img
-                        src={displayArtUrl}
-                        alt={scene.title}
-                        className="w-full h-full object-cover"
+                  <span className="text-[11px] text-inkSoft italic hidden sm:inline">
+                    {t.story.swipeHint}
+                  </span>
+
+                  {/* Scene Stepper Indicator Dots */}
+                  <div className="flex items-center gap-1.5">
+                    {selectedStory.scenes.map((sc, idx) => (
+                      <button
+                        key={sc.id}
+                        onClick={() => setActiveSceneIndex(idx)}
+                        className={`transition-all rounded-full ${
+                          idx === activeSceneIndex
+                            ? "w-7 h-2 bg-forest shadow-sm"
+                            : "w-2 h-2 bg-[#D5C7B0] hover:bg-forest/60"
+                        }`}
+                        title={`Scene ${idx + 1}: ${sc.title}`}
                       />
+                    ))}
+                  </div>
+                </div>
 
-                      {/* Generating shimmer overlay */}
-                      {scene.isGenerating && (
-                        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center gap-2 text-white p-4 text-center">
-                          <RefreshCw className="w-6 h-6 animate-spin text-amber-300" />
-                          <span className="text-xs font-serif italic text-amber-100">
-                            {t.story.generatingArtStatus}
+                {/* Single Artwork Card with Overlay Navigation Chevrons */}
+                {(() => {
+                  const proceduralSvgUrl = ProceduralIllustrator.generateArtSVG(
+                    currentScene,
+                    currentScene.artStyle
+                  );
+                  const displayArtUrl = currentScene.imagePath || proceduralSvgUrl;
+                  const isEditing = editingSceneId === currentScene.id;
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="relative w-full max-w-2xl mx-auto aspect-[16/10] rounded-xl overflow-hidden border border-line bg-[#FDF8EE] shadow-md group">
+                        <img
+                          src={displayArtUrl}
+                          alt={currentScene.title}
+                          className="w-full h-full object-cover transition duration-300"
+                        />
+
+                        {/* Side Overlay Chevrons on Artwork */}
+                        {activeSceneIndex > 0 && (
+                          <button
+                            onClick={handlePrevScene}
+                            className="absolute left-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-80 group-hover:opacity-100"
+                            title={t.story.prevSceneBtn}
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                        )}
+                        {activeSceneIndex < totalScenes - 1 && (
+                          <button
+                            onClick={handleNextScene}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-80 group-hover:opacity-100"
+                            title={t.story.nextSceneBtn}
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        )}
+
+                        {/* Generating shimmer overlay */}
+                        {currentScene.isGenerating && (
+                          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center gap-2 text-white p-4 text-center">
+                            <RefreshCw className="w-7 h-7 animate-spin text-amber-300" />
+                            <span className="text-sm font-serif italic text-amber-100">
+                              {t.story.generatingArtStatus}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Top Action Buttons */}
+                        <div className="absolute top-2.5 right-2.5 flex gap-1.5">
+                          <button
+                            onClick={() => handleGenerateSceneArt(currentScene.id)}
+                            disabled={currentScene.isGenerating}
+                            className="px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1.5 font-semibold"
+                            title={t.story.generateAiArtBtn}
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-terra" />
+                            <span className="hidden sm:inline text-xs">{t.story.generateAiArtBtn}</span>
+                          </button>
+                          <button
+                            onClick={() => handleRegenerateScene(currentScene.id)}
+                            disabled={currentScene.isGenerating}
+                            className="p-1.5 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1"
+                            title={t.story.regenerateArtBtn}
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Attribution Badge */}
+                        <div className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur text-white text-[11px] font-sans flex items-center gap-1.5">
+                          <span className="font-bold">{currentScene.artStyle.toUpperCase()}</span>
+                          <span>·</span>
+                          <span className="opacity-90">
+                            {currentScene.imageSourceLabel || "Procedural Art"}
                           </span>
                         </div>
+                      </div>
+
+                      {/* Scene Title, Context Summary & Inline Editing */}
+                      {isEditing ? (
+                        <div className="max-w-2xl mx-auto space-y-2.5 p-3.5 rounded-xl bg-white border border-line">
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-lg border border-line text-sm font-semibold"
+                          />
+                          <textarea
+                            rows={3}
+                            value={editSummary}
+                            onChange={(e) => setEditSummary(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-line text-xs font-sans"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleSaveSceneEdit(currentScene.id)}
+                              className="btn-primary text-xs py-1"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Save</span>
+                            </button>
+                            <button
+                              onClick={() => setEditingSceneId(null)}
+                              className="btn-ghost text-xs py-1"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="max-w-2xl mx-auto space-y-2 p-3.5 rounded-xl bg-white/70 border border-line">
+                          <div className="flex items-start justify-between gap-3">
+                            <h4 className="font-serif font-bold text-base text-forestDark leading-snug">
+                              {currentScene.title}
+                            </h4>
+                            <button
+                              onClick={() => {
+                                setEditingSceneId(currentScene.id);
+                                setEditTitle(currentScene.title);
+                                setEditSummary(currentScene.summary);
+                              }}
+                              className="text-inkSoft hover:text-forest p-1 rounded hover:bg-[#F7ECD8]/50"
+                              title="Edit scene summary"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <p
+                            className={`text-xs text-ink leading-relaxed ${
+                              practiceMode === "fading" ? "fading" : ""
+                            }`}
+                          >
+                            {currentScene.summary}
+                          </p>
+                          {currentScene.keywords?.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {currentScene.keywords.map((kw, i) => (
+                                <span
+                                  key={i}
+                                  className="px-2 py-0.5 rounded bg-[#F7ECD8]/70 text-[10px] font-medium text-forestDark"
+                                >
+                                  {kw}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
-
-                      {/* Top Action Buttons */}
-                      <div className="absolute top-2 right-2 flex gap-1">
-                        <button
-                          onClick={() => handleGenerateSceneArt(scene.id)}
-                          disabled={scene.isGenerating}
-                          className="px-2 py-1 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1 font-semibold"
-                          title={t.story.generateAiArtBtn}
-                        >
-                          <Sparkles className="w-3.5 h-3.5 text-terra" />
-                          <span className="hidden sm:inline text-[11px]">{t.story.generateAiArtBtn}</span>
-                        </button>
-                        <button
-                          onClick={() => handleRegenerateScene(scene.id)}
-                          disabled={scene.isGenerating}
-                          className="p-1.5 rounded-lg bg-white/95 backdrop-blur shadow text-forest hover:bg-white transition text-xs flex items-center gap-1"
-                          title={t.story.regenerateArtBtn}
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Attribution Badge */}
-                      <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/55 backdrop-blur text-white text-[10px] font-sans flex items-center gap-1.5">
-                        <span className="font-bold">{scene.artStyle.toUpperCase()}</span>
-                        <span>·</span>
-                        <span className="opacity-90">{scene.imageSourceLabel || "Procedural Art"}</span>
-                      </div>
                     </div>
-
-                    {/* Scene Details & Edit */}
-                    {isEditing ? (
-                      <div className="space-y-2 pt-1">
-                        <input
-                          type="text"
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded border border-line text-xs font-semibold"
-                        />
-                        <textarea
-                          rows={2}
-                          value={editSummary}
-                          onChange={(e) => setEditSummary(e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded border border-line text-xs"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleSaveSceneEdit(scene.id)}
-                            className="btn-primary text-xs py-1"
-                          >
-                            <Check className="w-3 h-3" />
-                            <span>Save</span>
-                          </button>
-                          <button
-                            onClick={() => setEditingSceneId(null)}
-                            className="btn-ghost text-xs py-1"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-serif font-bold text-sm text-forestDark leading-snug">
-                            {scene.title}
-                          </h4>
-                          <button
-                            onClick={() => {
-                              setEditingSceneId(scene.id);
-                              setEditTitle(scene.title);
-                              setEditSummary(scene.summary);
-                            }}
-                            className="text-inkSoft hover:text-forest p-1"
-                          >
-                            <Edit2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                        <p
-                          className={`text-xs text-inkSoft leading-relaxed ${
-                            practiceMode === "fading" ? "fading" : ""
-                          }`}
-                        >
-                          {scene.summary}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* STEP 2: VOICE RECORDING, ACOUSTIC METRICS & REAL-TIME SPEECH DICTATION */}
-          <div className="garden-card space-y-4">
-            <div className="flex items-center justify-between border-b border-line pb-2.5">
-              <h2 className="font-serif text-lg font-bold text-forestDark flex items-center gap-2">
-                <Mic className="w-5 h-5 text-terra" />
-                {t.story.step2Title}
-              </h2>
-            </div>
-
-            {/* Recording Controls */}
-            <div className="p-4 rounded-xl bg-[#F7ECD8]/50 border border-line flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                {!isRecording ? (
-                  <button
-                    onClick={startRecording}
-                    className="btn-primary bg-terra hover:bg-[#a84736] border-terra"
-                  >
-                    <Mic className="w-4 h-4" />
-                    <span>{t.story.recordBtn}</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={stopRecording}
-                    className="btn-primary bg-red-700 hover:bg-red-800 border-red-700 animate-pulse"
-                  >
-                    <Square className="w-4 h-4" />
-                    <span>{t.story.stopRecordBtn}</span>
-                  </button>
-                )}
-
-                {recordedAudioUrl && (
-                  <audio controls src={recordedAudioUrl} className="h-9 max-w-xs" />
-                )}
+                  );
+                })()}
               </div>
+            )}
 
-              {isRecording && (
-                <div className="flex items-center gap-2 text-xs font-semibold text-terra animate-pulse">
-                  <div className="w-2.5 h-2.5 rounded-full bg-terra" />
-                  <span>{t.story.recordingInProgress}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Direct Acoustic Analysis Metrics */}
+            {/* DIRECT ACOUSTIC ANALYSIS METRICS (if recorded) */}
             {audioMetrics && (
               <div className="p-4 rounded-xl bg-[#E3EFE0]/70 border border-[#BEDEBA] space-y-3">
                 <h4 className="font-serif font-bold text-sm text-forestDark flex items-center gap-1.5">
@@ -1106,6 +1287,67 @@ export default function StoryPage() {
               </div>
             </div>
           </div>
+
+          {/* PERSISTENT FLOATING VOICE RECORDING DOCK */}
+          <aside
+            aria-label="Story retelling quick recording bar"
+            className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-xl bg-[#FFFDF7]/95 backdrop-blur-md border-2 border-forest/30 shadow-2xl rounded-2xl p-2.5 sm:px-5 flex items-center justify-between gap-3 transition-all"
+          >
+            {/* Scene Stepper in Dock */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                onClick={handlePrevScene}
+                disabled={activeSceneIndex <= 0}
+                className="p-1.5 sm:p-2 rounded-lg bg-white/90 border border-line text-forestDark hover:bg-[#F7ECD8] disabled:opacity-30 disabled:pointer-events-none transition shadow-sm"
+                title={t.story.prevSceneBtn}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="text-center px-1">
+                <div className="text-[11px] sm:text-xs font-serif font-bold text-forestDark whitespace-nowrap">
+                  {t.story.sceneCounter} {activeSceneIndex + 1}/{totalScenes}
+                </div>
+              </div>
+              <button
+                onClick={handleNextScene}
+                disabled={activeSceneIndex >= totalScenes - 1}
+                className="p-1.5 sm:p-2 rounded-lg bg-white/90 border border-line text-forestDark hover:bg-[#F7ECD8] disabled:opacity-30 disabled:pointer-events-none transition shadow-sm"
+                title={t.story.nextSceneBtn}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Main Voice Recording Action Button */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {!isRecording ? (
+                <button
+                  onClick={startRecording}
+                  className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-terra hover:bg-[#a84736] text-white font-medium text-xs sm:text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition active:scale-95"
+                >
+                  <Mic className="w-4 h-4 text-white" />
+                  <span className="font-semibold">{t.story.dockRecord || t.story.recordBtn}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={stopRecording}
+                  className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-red-700 hover:bg-red-800 text-white font-medium text-xs sm:text-sm flex items-center gap-2 shadow-md animate-pulse active:scale-95"
+                >
+                  <Square className="w-4 h-4 text-white fill-white" />
+                  <span className="font-semibold">{t.story.dockStop || t.story.stopRecordBtn}</span>
+                  <span className="font-mono text-xs bg-red-900/60 px-1.5 py-0.5 rounded ml-1">
+                    {Math.floor(recordingDuration / 60)}:
+                    {(recordingDuration % 60).toString().padStart(2, "0")}
+                  </span>
+                </button>
+              )}
+
+              {/* Compact Audio Playback if audio exists */}
+              {recordedAudioUrl && !isRecording && (
+                <audio controls src={recordedAudioUrl} className="h-8 w-28 sm:w-36" />
+              )}
+            </div>
+          </aside>
         </div>
       )}
     </div>

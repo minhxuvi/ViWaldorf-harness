@@ -26,3 +26,8 @@ The interface reproduces the warmth, texture, and organic serenity of hand-craft
 - **Body**: Clean system sans-serif — high legibility across desktop and mobile.
 - **Cards**: Rounded 14px–16px corners with subtle warm shadows (`rgba(60, 50, 20, 0.05)`).
 - **Navigation**: Persistent left sidebar (250px) on desktop; fluid top-bar drawer on mobile screens.
+
+## 3. Story Retelling Studio & Accessible Voice Bar
+
+- **Single-Scene Theater Stage**: Displays exactly one scene artwork at a time to prevent cognitive overload. Navigable via Prev/Next buttons, keyboard arrow keys, progress stepper dots, and touch-swipe gestures.
+- **Persistent Floating Voice Bar**: Docked at `bottom-4` / `bottom-6` with backdrop blur, terracotta/forest buttons, live recording timer, scene index stepper (`< Scene X / Y >`), and audio playback—guaranteeing zero loss of recording controls during page scrolling.

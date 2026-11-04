@@ -9,6 +9,15 @@ export interface GenerateImageOptions {
   metaApiKey?: string;
 }
 
+export interface StorySegmentationOptions {
+  storyText: string;
+  storyTitle: string;
+  artStyle: WaldorfArtStyle;
+  provider: AIProvider;
+  googleApiKey?: string;
+  metaApiKey?: string;
+}
+
 export interface ImageGenerationResult {
   imageUrl: string;
   sourceLabel: string;
@@ -279,5 +288,204 @@ Requirements:
     } catch (e: any) {
       return { valid: false, message: `Network error connecting to Google: ${e.message || String(e)}` };
     }
+  }
+
+  /**
+   * Intelligently segments a story into 3-6 context-driven Waldorf scenes.
+   * Uses Gemini AI when an API key is available, and falls back to a semantic narrative segmenter.
+   */
+  public static async segmentStoryIntoScenes(
+    options: StorySegmentationOptions
+  ): Promise<StoryScene[]> {
+    const { storyText, storyTitle, artStyle, provider, googleApiKey, metaApiKey } = options;
+    const cleanText = storyText.trim();
+    if (!cleanText) return [];
+
+    // 1. If Google API key is available, try Contextual AI Segmentation
+    if (provider === "google" || (googleApiKey && provider !== "meta" && provider !== "local")) {
+      if (googleApiKey) {
+        try {
+          const prompt = `You are a Waldorf pedagogical storyteller and children's book illustrator.
+Analyze the narrative context of this story and divide it into 3 to 6 distinct, context-driven scenes for oral retelling practice.
+Do NOT just divide naively by newlines; identify the true narrative arc (awakening/setting, journey/challenge, transformation/climax, gentle resolution).
+
+Story Title: "${storyTitle || "Untitled Story"}"
+Story Text:
+"""
+${cleanText}
+"""
+
+Art technique: ${artStyle} (Waldorf Goethean style).
+
+Return ONLY valid JSON (no markdown formatting, no backticks, no extra commentary) in this exact structure:
+{
+  "scenes": [
+    {
+      "title": "Scene title",
+      "summary": "Contextual excerpt or narrative focus (1-3 sentences)",
+      "keywords": ["keyword1", "keyword2"],
+      "imagePrompt": "Detailed Waldorf art prompt describing the mood, characters, and Goethean colors"
+    }
+  ]
+}`;
+
+          const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+          for (const model of models) {
+            try {
+              const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(
+                googleApiKey
+              )}`;
+              const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: prompt }] }],
+                  generationConfig: {
+                    temperature: 0.3,
+                    responseMimeType: "application/json",
+                  },
+                }),
+              });
+
+              if (res.ok) {
+                const data = await res.json();
+                const rawResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (rawResponse) {
+                  const cleanedJson = rawResponse
+                    .replace(/```json/gi, "")
+                    .replace(/```/g, "")
+                    .trim();
+                  const parsed = JSON.parse(cleanedJson);
+                  const rawScenes = Array.isArray(parsed) ? parsed : parsed.scenes;
+                  if (Array.isArray(rawScenes) && rawScenes.length > 0) {
+                    return rawScenes.slice(0, 6).map((sc: any, idx: number) => ({
+                      id: `scene-${Date.now()}-${idx}`,
+                      ord: idx + 1,
+                      title: sc.title || `Scene ${idx + 1}`,
+                      summary: sc.summary || "",
+                      keywords: Array.isArray(sc.keywords) ? sc.keywords.slice(0, 5) : [],
+                      artStyle,
+                      imagePrompt:
+                        sc.imagePrompt ||
+                        ModelGateway.buildWaldorfPrompt(sc.summary || sc.title, artStyle),
+                      imageSourceLabel: `Procedural Art (${artStyle})`,
+                    }));
+                  }
+                }
+              }
+            } catch (modelErr) {
+              console.warn(`Gemini scene segmentation model ${model} error:`, modelErr);
+            }
+          }
+        } catch (aiErr) {
+          console.warn("AI scene segmentation error, falling back to local semantic parser:", aiErr);
+        }
+      }
+    }
+
+    // 2. Local Semantic Narrative Segmentation Fallback (offline / no API key)
+    return this.segmentLocallyByContext(cleanText, storyTitle, artStyle);
+  }
+
+  /**
+   * Local context-aware narrative segmenter.
+   * Analyzes sentence boundaries and narrative transitions without depending on blank lines.
+   */
+  public static segmentLocallyByContext(
+    storyText: string,
+    storyTitle: string,
+    artStyle: WaldorfArtStyle
+  ): StoryScene[] {
+    // 1. Break text into discrete sentences using punctuation boundaries
+    const rawSentences = storyText
+      .replace(/\r\n/g, "\n")
+      .split(/(?<=[.?!;:\u2026])\s+|\n{2,}/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    const sentences = rawSentences.length > 0 ? rawSentences : [storyText.trim()];
+
+    // Narrative transition clues in Vietnamese and English
+    const transitionRegex = /^(ngày xửa|ngày xưa|thuở xưa|một hôm|sáng hôm|chiều nọ|khi ấy|bỗng nhiên|thế rồi|đến khi|về sau|cuối cùng|từ đó|once upon|long ago|one day|one morning|one evening|as they|suddenly|then|later|when the|finally|in the end|from that day)/i;
+
+    // Detect natural transition points
+    const breakIndices: number[] = [0];
+    sentences.forEach((s, idx) => {
+      if (idx > 0 && transitionRegex.test(s) && idx - breakIndices[breakIndices.length - 1] >= 2) {
+        breakIndices.push(idx);
+      }
+    });
+
+    // If no explicit transitions detected or too few/many, segment based on narrative arc (3 to 5 scenes)
+    const targetSceneCount = Math.min(5, Math.max(3, Math.ceil(sentences.length / 3)));
+    const scenesData: { title: string; summary: string; keywords: string[] }[] = [];
+
+    if (breakIndices.length >= 3 && breakIndices.length <= 6) {
+      for (let i = 0; i < breakIndices.length; i++) {
+        const start = breakIndices[i];
+        const end = i + 1 < breakIndices.length ? breakIndices[i + 1] : sentences.length;
+        const sceneSentences = sentences.slice(start, end);
+        const summary = sceneSentences.join(" ");
+        const firstSentence = sceneSentences[0] || "";
+        const title = firstSentence.length > 40 ? firstSentence.substring(0, 40) + "..." : firstSentence;
+        scenesData.push({
+          title: `Scene ${i + 1}: ${title}`,
+          summary,
+          keywords: this.extractKeywords(summary),
+        });
+      }
+    } else {
+      // Chunk sentences evenly into targetSceneCount
+      const chunkSize = Math.ceil(sentences.length / targetSceneCount);
+      for (let i = 0; i < targetSceneCount; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(sentences.length, (i + 1) * chunkSize);
+        if (start >= sentences.length) break;
+
+        const sceneSentences = sentences.slice(start, end);
+        const summary = sceneSentences.join(" ");
+        const firstSentence = sceneSentences[0] || "";
+        const title = firstSentence.length > 40 ? firstSentence.substring(0, 40) + "..." : firstSentence;
+        scenesData.push({
+          title: `Scene ${i + 1}: ${title}`,
+          summary,
+          keywords: this.extractKeywords(summary),
+        });
+      }
+    }
+
+    return scenesData.map((sc, idx) => ({
+      id: `scene-${Date.now()}-${idx}`,
+      ord: idx + 1,
+      title: sc.title,
+      summary: sc.summary,
+      keywords: sc.keywords,
+      artStyle,
+      imagePrompt: this.buildWaldorfPrompt(sc.summary, artStyle),
+      imageSourceLabel: `Procedural Art (${artStyle})`,
+    }));
+  }
+
+  private static extractKeywords(text: string): string[] {
+    const stopWords = new Set([
+      "the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "with", "by", "from",
+      "và", "hoặc", "trong", "trên", "tại", "cho", "với", "từ", "của", "những", "các", "một",
+      "đã", "đang", "sẽ", "là", "thì", "mà", "nhưng", "được", "bị", "bởi"
+    ]);
+
+    const words = text
+      .toLowerCase()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'“”]/g, "")
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !stopWords.has(w));
+
+    const counts: Record<string, number> = {};
+    for (const w of words) {
+      counts[w] = (counts[w] || 0) + 1;
+    }
+
+    return Object.keys(counts)
+      .sort((a, b) => counts[b] - counts[a])
+      .slice(0, 4);
   }
 }
