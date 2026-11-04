@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useApp } from "@/lib/store";
-import { DemoBanner, PageHeader } from "@/components/PageHeader";
+import { PageHeader } from "@/components/PageHeader";
 import { TimetableEntry } from "@/lib/types";
 import {
   Calendar,
@@ -112,8 +112,6 @@ export default function SchedulePage() {
 
   return (
     <div className="space-y-6">
-      <DemoBanner />
-
       <PageHeader
         title={t.schedule.title}
         subtitle={t.schedule.subtitle}

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { useApp } from "@/lib/store";
-import { DemoBanner, PageHeader } from "@/components/PageHeader";
+import { PageHeader } from "@/components/PageHeader";
 import { ModelGateway } from "@/lib/ai/modelGateway";
 import { AIProvider } from "@/lib/types";
 import {
@@ -119,8 +119,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <DemoBanner />
-
       <PageHeader title={t.settings.title} subtitle={t.settings.subtitle} />
 
       {/* SEAMLESS SYNCHRONIZATION HUB */}

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useApp } from "@/lib/store";
-import { DemoBanner, PageHeader } from "@/components/PageHeader";
+import { PageHeader } from "@/components/PageHeader";
 import {
   MessageSquare,
   Send,
@@ -144,8 +144,6 @@ Children absorb the living picture in the silent space between words. When trans
 
   return (
     <div className="space-y-4">
-      <DemoBanner />
-
       <PageHeader title={t.chat.title} subtitle={t.chat.subtitle} />
 
       {/* Suggested Prompt Chips */}

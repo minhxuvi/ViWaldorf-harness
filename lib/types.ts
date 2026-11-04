@@ -1,5 +1,7 @@
 export type WaldorfArtStyle = "wet-on-wet" | "crayon" | "chalkboard";
 export type AIProvider = "google" | "meta" | "local";
+export type StoryViewMode = "studio" | "reader";
+export type ReaderViewMode = "picture-book" | "continuous";
 
 export interface StoryScene {
   id: string;

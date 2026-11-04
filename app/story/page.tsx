@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useApp } from "@/lib/store";
-import { DemoBanner, PageHeader } from "@/components/PageHeader";
+import { PageHeader } from "@/components/PageHeader";
 import { WaldorfArtStyle, StoryScene, AudioDeliveryMetrics, PracticeAttempt } from "@/lib/types";
 import { ProceduralIllustrator } from "@/lib/art/proceduralIllustrator";
 import { WavAnalyzer } from "@/lib/audio/wavAnalyzer";
@@ -617,8 +617,6 @@ export default function StoryPage() {
 
   return (
     <div className="space-y-6 pb-28">
-      <DemoBanner />
-
       <PageHeader title={t.story.title} subtitle={t.story.subtitle} />
 
       {/* Story Picker & Upload Bar */}

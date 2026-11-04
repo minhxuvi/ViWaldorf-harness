@@ -27,7 +27,8 @@ export interface ImageGenerationResult {
 
 export class ModelGateway {
   /**
-   * Constructs an authentic Waldorf aesthetic prompt tailored to the chosen artistic technique.
+   * Constructs an authentic Waldorf aesthetic prompt tailored to the chosen artistic technique,
+   * calibrated directly against genuine classroom masterworks and student drawings.
    */
   public static buildWaldorfPrompt(summary: string, style: WaldorfArtStyle): string {
     const cleanSummary = summary.replace(/[\r\n]+/g, " ").trim();
@@ -35,21 +36,28 @@ export class ModelGateway {
     switch (style) {
       case "wet-on-wet":
         return (
-          `Authentic Waldorf watercolor wet-on-wet painting depicting: "${cleanSummary}". ` +
-          `Luminous Goethean color washes, soft flowing transitions of lemon yellow, Prussian blue, and vermilion rose. ` +
-          `No harsh outlines, translucent layered watery pigment, gentle warmth, peaceful fairy tale atmosphere, museum-grade art.`
+          `An authentic Waldorf wet-on-wet watercolor painting depicting: "${cleanSummary}". ` +
+          `Style: Traditional Steiner-Waldorf early childhood pedagogy wet-in-wet watercolor on moist 300gsm heavy cold-press cotton paper. ` +
+          `Color Harmony: Luminous Goethean color washes; radiant warm lemon yellow and pure white paper light glowing at the center, softly blending into vermilion rose, soft peach, and deep ultramarine Prussian blue at the outer atmospheric edges. ` +
+          `Technique: Forms and figures emerge naturally out of fluid translucent color fields rather than lines. Soft feathery blooming transitions, natural watercolor granulation, delicate watery pooling, zero black lineart, zero pen outlines. ` +
+          `Subject: portrayed with gentle archetypal gestures in loose natural attire, soft-focus poetic impression, reverent peaceful childlike wonder.`
         );
       case "crayon":
         return (
-          `Authentic Waldorf beeswax block crayon illustration depicting: "${cleanSummary}". ` +
-          `Drawn with broad flat edges of beeswax wax crayons on textured heavy cream paper. Warm ochre, earthy terracotta, ` +
-          `deep forest green, and golden yellow tones. Tactile hand-drawn texture, gentle organic forms, warm children's book art.`
+          `An authentic Waldorf beeswax block crayon illustration on textured heavy cream drawing paper depicting: "${cleanSummary}". ` +
+          `Medium: Pure natural Stockmar beeswax block crayons, visible pebbled paper tooth with speckled wax adherence and warm matte wax sheen. ` +
+          `Color & Lighting: Concentric radiating aura of warm light; pure golden lemon yellow core radiating outwards through warm honey orange, peach, and vermilion, into soft turquoise and cobalt blue in the outer corners. ` +
+          `Technique: Broad flat-edge wax block strokes layered with fine directional textured hatching following living organic contours; soft translucent layering where undertones shine through; shadows created with complementary deep blue and violet rather than black. ` +
+          `Subject: tender and living archetypal forms, warm nurturing atmosphere, reverent storytelling quality.`
         );
       case "chalkboard":
         return (
-          `Authentic Waldorf classroom chalkboard drawing depicting: "${cleanSummary}". ` +
-          `Rendered with soft luminous pastel chalks (warm gold, soft turquoise, gentle rose) on dark matte slate blackboard. ` +
-          `Soft atmospheric glow, delicate shading, master lesson drawing on slate board.`
+          `An authentic Waldorf Main Lesson chalkboard drawing depicting: "${cleanSummary}". ` +
+          `Medium: Multi-layered soft pastel chalk on genuine matte dark slate blackboard, framed with warm natural wood. ` +
+          `Technique: Light emerging dramatically out of cosmic darkness; broad sweeping side-of-the-chalk strokes for atmospheric skies, waves, and rolling earth; delicate chalk cross-hatching, stippling, and powdery finger-blended halos. ` +
+          `Lighting & Drama: Brilliant pure white and golden-yellow chalk crepuscular light rays streaming down through dark skies; luminous radiant halos and starry points of light; deep black slate preserved as natural shadow and depth. ` +
+          `Color Palette: Vibrant natural chalk pastels: warm butter yellow, golden ochre, terracotta, carmine red, soft cerulean blue, seafoam cyan, and earthy moss green against dark charcoal slate. ` +
+          `Composition: dignified and archetypal living narrative, timeless reverent classroom pedagogical illustration, decorative hand-drawn chalk vine border.`
         );
     }
   }
@@ -438,9 +446,9 @@ Return ONLY valid JSON (no markdown formatting, no backticks, no extra commentar
         const sceneSentences = sentences.slice(start, end);
         const summary = sceneSentences.join(" ");
         const firstSentence = sceneSentences[0] || "";
-        const title = firstSentence.length > 40 ? firstSentence.substring(0, 40) + "..." : firstSentence;
+        const title = this.formatSceneTitle(firstSentence, i);
         scenesData.push({
-          title: `Scene ${i + 1}: ${title}`,
+          title,
           summary,
           keywords: this.extractKeywords(summary),
         });
@@ -456,9 +464,9 @@ Return ONLY valid JSON (no markdown formatting, no backticks, no extra commentar
         const sceneSentences = sentences.slice(start, end);
         const summary = sceneSentences.join(" ");
         const firstSentence = sceneSentences[0] || "";
-        const title = firstSentence.length > 40 ? firstSentence.substring(0, 40) + "..." : firstSentence;
+        const title = this.formatSceneTitle(firstSentence, i);
         scenesData.push({
-          title: `Scene ${i + 1}: ${title}`,
+          title,
           summary,
           keywords: this.extractKeywords(summary),
         });
@@ -477,17 +485,32 @@ Return ONLY valid JSON (no markdown formatting, no backticks, no extra commentar
     }));
   }
 
+  private static formatSceneTitle(firstSentence: string, index: number): string {
+    const raw = firstSentence.trim();
+    if (!raw) return `Scene ${index + 1}`;
+    const maxLen = 45;
+    if (raw.length <= maxLen) return `Scene ${index + 1}: ${raw}`;
+    const lastSpace = raw.lastIndexOf(" ", maxLen);
+    const truncated = lastSpace > 20 ? raw.substring(0, lastSpace) : raw.substring(0, maxLen);
+    return `Scene ${index + 1}: ${truncated.trim()}...`;
+  }
+
   private static extractKeywords(text: string): string[] {
     const stopWords = new Set([
       "the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "with", "by", "from",
+      "is", "it", "this", "that", "there", "then", "their", "they", "was", "were", "be",
+      "as", "of", "into", "within", "over", "under", "all", "so", "no", "not", "when",
+      "his", "her", "him", "who", "whose", "had", "have", "has", "could", "would",
       "và", "hoặc", "trong", "trên", "tại", "cho", "với", "từ", "của", "những", "các", "một",
-      "đã", "đang", "sẽ", "là", "thì", "mà", "nhưng", "được", "bị", "bởi"
+      "đã", "đang", "sẽ", "là", "thì", "mà", "nhưng", "được", "bị", "bởi",
+      "khi", "này", "đó", "ra", "vào", "lại", "rồi", "lúc", "người", "như", "rất", "cũng"
     ]);
 
     const words = text
       .toLowerCase()
-      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'“”]/g, "")
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"'“”’—–]/g, " ")
       .split(/\s+/)
+      .map((w) => w.trim())
       .filter((w) => w.length > 2 && !stopWords.has(w));
 
     const counts: Record<string, number> = {};

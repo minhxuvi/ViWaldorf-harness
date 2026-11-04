@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useApp } from "@/lib/store";
-import { DemoBanner, PageHeader } from "@/components/PageHeader";
+import { PageHeader } from "@/components/PageHeader";
 import {
   BookOpen,
   Mic,
@@ -38,8 +38,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <DemoBanner />
-
       <PageHeader
         title={t.dashboard.welcomeTitle}
         subtitle={t.dashboard.welcomeSubtitle}

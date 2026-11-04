@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useApp } from "@/lib/store";
-import { DemoBanner, PageHeader } from "@/components/PageHeader";
+import { PageHeader } from "@/components/PageHeader";
 import { DocumentType, JournalEntry } from "@/lib/types";
 import { DocumentGenerator } from "@/lib/documents/documentGenerator";
 import {
@@ -81,8 +81,6 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-6">
-      <DemoBanner />
-
       <PageHeader
         title={t.documents.title}
         subtitle={t.documents.subtitle}

@@ -1,18 +1,9 @@
 "use client";
 
 import React from "react";
-import { useApp } from "@/lib/store";
-import { Sparkles } from "lucide-react";
 
 export function DemoBanner() {
-  const { t } = useApp();
-
-  return (
-    <div className="flex items-center gap-2 py-1.5 px-3 mb-4 rounded-lg bg-[#F7ECD8] border border-[#E7DCC4] text-[12.5px] text-[#51624F] font-medium w-fit">
-      <Sparkles className="w-3.5 h-3.5 text-[#C45C4A]" />
-      <span>{t.common.demoBadge}</span>
-    </div>
-  );
+  return null;
 }
 
 export function PageHeader({
