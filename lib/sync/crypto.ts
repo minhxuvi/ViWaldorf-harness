@@ -4,7 +4,10 @@
  */
 
 export class SyncCrypto {
-  private static async deriveKey(passkey: string, salt: Uint8Array): Promise<CryptoKey> {
+  private static async deriveKey(
+    passkey: string,
+    salt: Uint8Array<ArrayBuffer>
+  ): Promise<CryptoKey> {
     const encoder = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
       "raw",
@@ -17,7 +20,7 @@ export class SyncCrypto {
     return crypto.subtle.deriveKey(
       {
         name: "PBKDF2",
-        salt: salt as any,
+        salt,
         iterations: 100000,
         hash: "SHA-256",
       },
@@ -30,14 +33,14 @@ export class SyncCrypto {
 
   public static async encrypt(plainJson: string, passkey: string): Promise<string> {
     const encoder = new TextEncoder();
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const salt: Uint8Array<ArrayBuffer> = crypto.getRandomValues(new Uint8Array(16));
+    const iv: Uint8Array<ArrayBuffer> = crypto.getRandomValues(new Uint8Array(12));
     const key = await this.deriveKey(passkey, salt);
 
     const ciphertext = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv: iv as any },
+      { name: "AES-GCM", iv },
       key,
-      encoder.encode(plainJson) as any
+      encoder.encode(plainJson)
     );
 
     const combined = new Uint8Array(salt.length + iv.length + ciphertext.byteLength);
@@ -50,6 +53,12 @@ export class SyncCrypto {
 
   public static async decrypt(encryptedBase64: string, passkey: string): Promise<string> {
     const combined = this.base64ToBytes(encryptedBase64);
+    if (combined.byteLength < 44) {
+      throw new Error(
+        "Invalid encrypted payload: expected at least 44 bytes (salt, IV, and auth tag)."
+      );
+    }
+
     const salt = combined.slice(0, 16);
     const iv = combined.slice(16, 28);
     const ciphertext = combined.slice(28);
@@ -57,9 +66,9 @@ export class SyncCrypto {
     const key = await this.deriveKey(passkey, salt);
 
     const decrypted = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: iv as any },
+      { name: "AES-GCM", iv },
       key,
-      ciphertext as any
+      ciphertext
     );
 
     const decoder = new TextDecoder();
@@ -74,15 +83,19 @@ export class SyncCrypto {
   }
 
   private static bytesToBase64(bytes: Uint8Array): string {
+    const CHUNK_SIZE = 8192;
     let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
+    for (let i = 0; i < bytes.byteLength; i += CHUNK_SIZE) {
+      const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.byteLength));
+      binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
     }
     return btoa(binary);
   }
 
   private static base64ToBytes(base64: string): Uint8Array {
-    const binary = atob(base64);
+    const clean = base64.trim();
+    if (!clean) return new Uint8Array(0);
+    const binary = atob(clean);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
       bytes[i] = binary.charCodeAt(i);

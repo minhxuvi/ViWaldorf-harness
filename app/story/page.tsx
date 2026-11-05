@@ -723,6 +723,20 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
           const metrics = WavAnalyzer.analyzeAudioBuffer(audioBuffer, currentSpokenText);
           setAudioMetrics(metrics);
 
+          // Apply stored regional dialect rules to spoken transcript
+          const dialectAdaptation = DialectAdaptationEngine.apply(
+            currentSpokenText,
+            data.dialectRules
+          );
+
+          if (dialectAdaptation.appliedRules.length > 0) {
+            setTranscript(dialectAdaptation.adapted);
+            setDialectNotice(
+              `Applied ${dialectAdaptation.appliedRules.length} regional dialect rule(s)`
+            );
+            setTimeout(() => setDialectNotice(""), 4000);
+          }
+
           const recTelemetry: AIContextTelemetry = {
             kind: "audio-analysis",
             title: `Voice Retelling Telemetry & Feedback: "${selectedStory?.title || "Story"}"`,
@@ -736,7 +750,7 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
               storyAge: selectedStory?.ageRange,
               storyGoal: selectedStory?.goal,
               practiceMode,
-              appliedDialectRules: [],
+              appliedDialectRules: dialectAdaptation.appliedRules,
               governance: "DAO.md (Life First, Truthfulness, Privacy, Learnability)",
             },
             metrics: {
@@ -767,9 +781,9 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
               storyId: selectedStory.id,
               mode: practiceMode,
               rawTranscript: currentSpokenText,
-              transcript: currentSpokenText,
+              transcript: dialectAdaptation.adapted,
               audioMetrics: metrics,
-              appliedDialectRules: [],
+              appliedDialectRules: dialectAdaptation.appliedRules,
               storySnapshot: selectedStory.sourceText,
               createdAt: new Date().toISOString(),
               contextInfo: recTelemetry,
@@ -816,9 +830,9 @@ Evaluate spoken storytelling delivery focusing on breath pauses, pace rhythm, an
 
   // Save Transcript Correction & Extract Dialect Rule
   const handleSaveCorrectionAndDialect = () => {
-    if (!transcript) return;
+    if (!transcript.trim()) return;
     const rule = DialectAdaptationEngine.extractCandidateRule(
-      rawTranscript || selectedStory?.sourceText || "",
+      rawTranscript || transcript,
       transcript,
       "Learned from oral retelling"
     );

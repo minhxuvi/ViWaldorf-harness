@@ -1,4 +1,5 @@
 import { WaldorfArtStyle, StoryScene, AIProvider, AIContextTelemetry } from "../types";
+import { ProceduralIllustrator } from "../art/proceduralIllustrator";
 
 export interface GenerateImageOptions {
   scene: StoryScene;
@@ -61,20 +62,40 @@ export class ModelGateway {
   }
 
   /**
-   * Generates artwork for a given scene via Meta AI (muse-image-1.0).
+   * Generates artwork for a given scene via Meta AI (muse-image-1.0) or
+   * authentic local Goethean procedural SVG when offline or in local mode.
    */
   public static async generateSceneArtwork(
     options: GenerateImageOptions
   ): Promise<ImageGenerationResult> {
-    const { scene, style, metaApiKey } = options;
+    const { scene, style, provider, metaApiKey } = options;
     const prompt = this.buildWaldorfPrompt(scene.summary || scene.title, style);
 
-    if (!metaApiKey || !metaApiKey.trim()) {
+    // 1. If provider is local or Meta API key is not configured, generate local Goethean SVG artwork
+    if (provider === "local" || !metaApiKey || !metaApiKey.trim()) {
+      const svgUrl = ProceduralIllustrator.generateArtSVG(scene, style);
+      const localContext: AIContextTelemetry = {
+        kind: "image-generation",
+        title: `Artwork: ${scene.title} (${style})`,
+        prompt: `Local procedural Goethean SVG generation for ${style}`,
+        styleInstruction: `Authentic Waldorf pedagogical medium: ${style}`,
+        model: "ProceduralIllustrator (Local SVG)",
+        provider: "local",
+        injectedContext: {
+          sceneTitle: scene.title,
+          sceneSummary: scene.summary,
+          artStyle: style,
+          keywords: scene.keywords,
+        },
+        latencyMs: 5,
+        timestamp: new Date().toISOString(),
+      };
+
       return {
-        imageUrl: null,
-        sourceLabel: "Chưa cấu hình API Key",
+        imageUrl: svgUrl,
+        sourceLabel: `Minh họa thủ tục (${style})`,
         isAiGenerated: false,
-        error: "Chưa cấu hình Meta API Key. Vui lòng vào Cài đặt để nhập META_API_KEY.",
+        contextInfo: localContext,
       };
     }
 
@@ -105,17 +126,19 @@ export class ModelGateway {
         };
       } else {
         const errorMsg = data.error || `Lỗi máy chủ HTTP ${res.status}`;
+        const fallbackSvg = ProceduralIllustrator.generateArtSVG(scene, style);
         return {
-          imageUrl: null,
-          sourceLabel: "Lỗi tạo ảnh AI",
+          imageUrl: fallbackSvg,
+          sourceLabel: `Minh họa thủ tục (${style} - Dự phòng)`,
           isAiGenerated: false,
           error: errorMsg,
         };
       }
     } catch (err: any) {
+      const fallbackSvg = ProceduralIllustrator.generateArtSVG(scene, style);
       return {
-        imageUrl: null,
-        sourceLabel: "Lỗi kết nối",
+        imageUrl: fallbackSvg,
+        sourceLabel: `Minh họa thủ tục (${style} - Ngoại tuyến)`,
         isAiGenerated: false,
         error: `Không thể kết nối tới dịch vụ AI: ${err.message || String(err)}`,
       };
@@ -262,14 +285,17 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "p
     storyTitle: string,
     artStyle: WaldorfArtStyle
   ): StoryScene[] {
+    const clean = (storyText || "").trim();
+    if (!clean) return [];
+
     // 1. Break text into discrete sentences using punctuation boundaries
-    const rawSentences = storyText
+    const rawSentences = clean
       .replace(/\r\n/g, "\n")
       .split(/(?<=[.?!;:\u2026])\s+|\n{2,}/)
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
-    const sentences = rawSentences.length > 0 ? rawSentences : [storyText.trim()];
+    const sentences = rawSentences.length > 0 ? rawSentences : [clean];
 
     // Narrative transition clues in Vietnamese and English
     const transitionRegex = /^(ngày xửa|ngày xưa|thuở xưa|một hôm|sáng hôm|chiều nọ|khi ấy|bỗng nhiên|thế rồi|đến khi|về sau|cuối cùng|từ đó|once upon|long ago|one day|one morning|one evening|as they|suddenly|then|later|when the|finally|in the end|from that day)/i;
@@ -282,8 +308,11 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "p
       }
     });
 
-    // If no explicit transitions detected or too few/many, segment based on narrative arc (3 to 5 scenes)
-    const targetSceneCount = Math.min(5, Math.max(3, Math.ceil(sentences.length / 3)));
+    // If no explicit transitions detected or too few/many, segment based on narrative arc (up to 5 scenes)
+    const targetSceneCount = Math.min(
+      sentences.length,
+      Math.min(5, Math.max(3, Math.ceil(sentences.length / 3)))
+    );
     const scenesData: { title: string; summary: string; passage: string; keywords: string[] }[] = [];
 
     if (breakIndices.length >= 3 && breakIndices.length <= 6) {
@@ -302,12 +331,11 @@ Return valid JSON with format: {"scenes": [{"title": "...", "summary": "...", "p
         });
       }
     } else {
-      // Chunk sentences evenly into targetSceneCount
-      const chunkSize = Math.ceil(sentences.length / targetSceneCount);
+      // Partition sentences evenly into targetSceneCount without dropping remaining chunks
       for (let i = 0; i < targetSceneCount; i++) {
-        const start = i * chunkSize;
-        const end = Math.min(sentences.length, (i + 1) * chunkSize);
-        if (start >= sentences.length) break;
+        const start = Math.floor((i * sentences.length) / targetSceneCount);
+        const end = Math.floor(((i + 1) * sentences.length) / targetSceneCount);
+        if (start >= end) continue;
 
         const sceneSentences = sentences.slice(start, end);
         const summary = sceneSentences.join(" ");

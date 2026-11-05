@@ -12,6 +12,19 @@ export class WavAnalyzer {
     const sampleRate = audioBuffer.sampleRate;
     const duration = audioBuffer.duration;
 
+    if (!rawData || rawData.length === 0 || duration <= 0) {
+      return {
+        durationSeconds: 0,
+        sampleRate: sampleRate || 24000,
+        rmsDecibels: -60,
+        dynamicRangeDb: 0,
+        pauseRatio: 0,
+        pauseCount: 0,
+        estimatedPaceWPM: 0,
+        deliverySummary: "No audio signal detected.",
+      };
+    }
+
     // Calculate RMS Loudness
     let sumSquares = 0;
     const windowSize = Math.floor(sampleRate * 0.05); // 50ms windows

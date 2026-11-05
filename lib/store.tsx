@@ -153,12 +153,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIsLocalFolderLinked(true);
         return true;
       }
+
+      if (!LocalFileBridge.isConnected()) {
+        setIsLocalFolderLinked(false);
+        return false;
+      }
+
       // If empty or newly created, write our current state to disk
-      await LocalFileBridge.writeFile(data);
-      setIsLocalFolderLinked(true);
-      return true;
+      const writeOk = await LocalFileBridge.writeFile(data);
+      if (writeOk) {
+        setIsLocalFolderLinked(true);
+        return true;
+      }
+      setIsLocalFolderLinked(false);
+      return false;
     } catch (err: any) {
       console.error("Failed to connect local macOS folder:", err);
+      setIsLocalFolderLinked(false);
       return false;
     }
   };

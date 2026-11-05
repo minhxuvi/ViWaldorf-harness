@@ -18,9 +18,9 @@ export class DialectAdaptationEngine {
 
     for (const rule of rules) {
       if (!rule.rawPhrase || !rule.correctedPhrase) continue;
-      // Case-insensitive regex match with word boundaries if possible
+      // Unicode-aware word boundary matching supporting Vietnamese accents
       const escapedRaw = rule.rawPhrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const regex = new RegExp(`\\b${escapedRaw}\\b`, "gi");
+      const regex = new RegExp(`(?<![\\p{L}\\p{N}])${escapedRaw}(?![\\p{L}\\p{N}])`, "giu");
 
       if (regex.test(result)) {
         result = result.replace(regex, rule.correctedPhrase);
@@ -42,36 +42,50 @@ export class DialectAdaptationEngine {
     correctedText: string,
     regionNote: string = "Vietnamese Regional Dialect"
   ): DialectCorrectionRule | null {
-    const rawWords = rawText.trim().split(/\s+/);
-    const corrWords = correctedText.trim().split(/\s+/);
+    const rawWords = rawText.trim().split(/\s+/).filter(Boolean);
+    const corrWords = correctedText.trim().split(/\s+/).filter(Boolean);
 
-    if (rawWords.length !== corrWords.length) {
-      // General phrase replacement
-      if (rawText.trim() !== correctedText.trim()) {
-        return {
-          id: `rule-${Date.now()}`,
-          rawPhrase: rawText.trim().toLowerCase(),
-          correctedPhrase: correctedText.trim().toLowerCase(),
-          regionNote,
-          occurrences: 1,
-          updatedAt: new Date().toISOString().split("T")[0],
-        };
-      }
-      return null;
+    if (rawWords.length === 0 || corrWords.length === 0) return null;
+    if (rawText.trim() === correctedText.trim()) return null;
+
+    // Isolate the differing contiguous segment via common prefix and suffix trimming
+    let start = 0;
+    while (
+      start < rawWords.length &&
+      start < corrWords.length &&
+      rawWords[start].toLowerCase() === corrWords[start].toLowerCase()
+    ) {
+      start++;
     }
 
-    // Find first differing single-word or short phrase
-    for (let i = 0; i < rawWords.length; i++) {
-      if (rawWords[i].toLowerCase() !== corrWords[i].toLowerCase()) {
-        return {
-          id: `rule-${Date.now()}-${i}`,
-          rawPhrase: rawWords[i].toLowerCase(),
-          correctedPhrase: corrWords[i].toLowerCase(),
-          regionNote,
-          occurrences: 1,
-          updatedAt: new Date().toISOString().split("T")[0],
-        };
-      }
+    let rawEnd = rawWords.length - 1;
+    let corrEnd = corrWords.length - 1;
+    while (
+      rawEnd >= start &&
+      corrEnd >= start &&
+      rawWords[rawEnd].toLowerCase() === corrWords[corrEnd].toLowerCase()
+    ) {
+      rawEnd--;
+      corrEnd--;
+    }
+
+    const diffRaw = rawWords.slice(start, rawEnd + 1).join(" ");
+    const diffCorr = corrWords.slice(start, corrEnd + 1).join(" ");
+
+    if (
+      diffRaw &&
+      diffCorr &&
+      diffRaw.split(/\s+/).length <= 5 &&
+      diffCorr.split(/\s+/).length <= 5
+    ) {
+      return {
+        id: `rule-${Date.now()}`,
+        rawPhrase: diffRaw.toLowerCase(),
+        correctedPhrase: diffCorr.toLowerCase(),
+        regionNote,
+        occurrences: 1,
+        updatedAt: new Date().toISOString().split("T")[0],
+      };
     }
 
     return null;

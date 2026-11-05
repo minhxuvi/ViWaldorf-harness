@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// In-memory serverless cache for fast response (can be backed by Vercel KV or Upstash)
+// In-memory serverless cache with capacity boundary (can be backed by Vercel KV or Upstash)
+const MAX_SYNC_ENTRIES = 500;
 const syncStore = new Map<string, { payload: string; updatedAt: string; version: number }>();
+
+function isValidToken(token: string): boolean {
+  return /^[a-zA-Z0-9_-]{16,128}$/.test(token);
+}
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization") || "";
@@ -13,6 +18,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { error: "Missing sync token in authorization header or query parameter." },
       { status: 401 }
+    );
+  }
+
+  if (!isValidToken(token)) {
+    return NextResponse.json(
+      { error: "Invalid sync token format. Expected 16-128 alphanumeric characters." },
+      { status: 400 }
     );
   }
 
@@ -47,11 +59,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!body.payload) {
+    if (!isValidToken(token)) {
       return NextResponse.json(
-        { error: "Missing sync payload in request body." },
+        { error: "Invalid sync token format." },
         { status: 400 }
       );
+    }
+
+    if (!body.payload || typeof body.payload !== "string") {
+      return NextResponse.json(
+        { error: "Missing or invalid sync payload in request body." },
+        { status: 400 }
+      );
+    }
+
+    // Reject payloads larger than 5MB
+    if (body.payload.length > 5 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: "Payload exceeds 5MB size limit." },
+        { status: 413 }
+      );
+    }
+
+    // Evict oldest entry if capacity limit reached to prevent memory leak
+    if (syncStore.size >= MAX_SYNC_ENTRIES && !syncStore.has(token)) {
+      const oldestKey = syncStore.keys().next().value;
+      if (oldestKey) syncStore.delete(oldestKey);
     }
 
     const current = syncStore.get(token);
