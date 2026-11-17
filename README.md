@@ -34,7 +34,7 @@
 | **DAO** | Hiến chương bất khả xâm phạm | [DAO.md](DAO.md) |
 | **Đặc tả Hệ thống** | Kiến trúc client-side & plugin Waldorf | [harness/specs/](harness/specs/README.md), [plugins/waldorf/specs/](plugins/waldorf/specs/00_master_prompt.md) |
 | **Giao diện chính** | Không gian Luyện kể chuyện 5 cấp độ + Thu âm/Nghe lại | [app/page.tsx](app/page.tsx), [components/Shell.tsx](components/Shell.tsx) |
-| **Dữ liệu & Tranh** | Mô hình 5 level, kho truyện mẫu, tranh SVG thuần hình ảnh | [lib/types.ts](lib/types.ts), [lib/seedData.ts](lib/seedData.ts), [lib/art/proceduralIllustrator.ts](lib/art/proceduralIllustrator.ts) |
+| **Dữ liệu & Tranh** | Mô hình 5 level, bộ tải trực tiếp repo `xuvivn/from-genesis-to-nativity` theo folder path (5 Quyển · 28 phân cảnh), tranh SVG thuần hình ảnh dự phòng | [lib/types.ts](lib/types.ts), [lib/repoStoryLoader.ts](lib/repoStoryLoader.ts), [lib/seedData.ts](lib/seedData.ts), [lib/art/proceduralIllustrator.ts](lib/art/proceduralIllustrator.ts) |
 | **Kiểm thử & Đánh giá** | Bộ kiểm thử tự động & báo cáo chất lượng | [tests/](tests/), [benchmarker/](benchmarker/specs/01-overall-benchmark.md) |
 
 ---

@@ -5,8 +5,9 @@ export const translations = {
     brand: "ViWaldorf",
     tagline: "Không gian Luyện Kể Chuyện Sư Phạm",
     header: {
-      resetSeedBtn: "Khôi phục truyện mẫu",
-      resetConfirm: "Khôi phục lại 3 truyện mẫu ban đầu? Các truyện tự thêm sẽ bị xóa.",
+      resetSeedBtn: "Khôi phục thư viện gốc",
+      resetConfirm:
+        "Khôi phục lại truyện gốc từ repo GitHub (xuvivn/from-genesis-to-nativity)? Các truyện tự thêm sẽ bị xóa.",
       languageLabel: "Ngôn ngữ",
     },
     story: {
@@ -29,6 +30,31 @@ export const translations = {
       fieldMetaphor: "Thông điệp ẩn dụ theo lứa tuổi (tùy chọn cho Level 0)",
       fieldFullText: "Toàn văn câu chuyện",
       saveStoryBtn: "Lưu & Tạo 5 Level luyện tập",
+      repo: {
+        syncBtn: "Đồng bộ từ Repo",
+        syncing: "Đang tải trực tiếp từ GitHub...",
+        syncedLabel: "Đọc trực tiếp từ repo theo folder path",
+        folderPathLabel: "Folder/File path đang hiển thị",
+        openOnGitHub: "Mở trên GitHub",
+        bookFilterLabel: "Chọn Quyển",
+        allBooksOption: "Tất cả các Quyển",
+        ageVariantLabel: "Biến thể lứa tuổi",
+        ageVariants: {
+          "3-5": "3–5 tuổi · Mầm non",
+          "6-10": "6–10 tuổi · Chuẩn",
+          "11+": "11+ · Thiếu niên & Người lớn",
+        },
+        ancientBooksTitle: "Thư viện Văn bản cổ đọc thêm",
+        ancientBooksSubtitle:
+          "Đọc trực tiếp từ thư mục level-0-khong-gian-boi-canh/van-ban-co/",
+        ancientBookLoading: "Đang tải văn bản cổ trực tiếp từ repo...",
+        closeAncientBook: "Đóng văn bản",
+        categories: {
+          "cuu-uoc": "Kinh Cựu Ước",
+          "tan-uoc": "Kinh Tân Ước",
+          "co-thu": "Cổ Thư & Sử Truyền",
+        },
+      },
       levels: {
         0: {
           badge: "Level 0",
@@ -75,13 +101,13 @@ export const translations = {
       },
       level1: {
         viewByScene: "Xem theo từng phân cảnh",
-        viewFullFlow: "Xem liền mạch toàn truyện",
+        viewFullFlow: "Xem liền mạch các phân cảnh",
         voiceNoteLabel: "Lưu ý giọng kể",
       },
       level2: {
-        charactersLabel: "Nhân vật trong phân cảnh",
-        localizedDetailsLabel: "Chi tiết bản địa hóa & Giác quan",
-        emotionalRhythmLabel: "Nhịp cảm xúc theo lứa tuổi",
+        charactersLabel: "Nhân vật & Hình tượng trong phân cảnh",
+        localizedDetailsLabel: "Chi tiết bản địa hóa & Nhịp dẫn",
+        emotionalRhythmLabel: "Điểm nhấn & Nhịp cảm xúc theo lứa tuổi",
         beatsLabel: "Diễn biến chi tiết cần giữ",
       },
       level3: {
@@ -90,13 +116,14 @@ export const translations = {
         jumpToSceneHint: "Nhấp vào phân cảnh để đánh dấu vị trí đang kể",
       },
       level4: {
-        artStyleLabel: "Chất liệu vẽ tay",
+        artStyleLabel: "Chất liệu vẽ tay (dự phòng)",
         styleWetOnWet: "Màu nước ướt-trên-ướt",
         styleCrayon: "Màu sáp ong",
         styleChalkboard: "Phấn bảng đen",
         uploadCustomImageBtn: "Chọn tranh vẽ tay từ máy",
-        resetProceduralBtn: "Dùng tranh vẽ minh họa mặc định",
-        swipeHint: "Dùng nút Trước/Sau, phím mũi tên ← / → hoặc vuốt ngang để chuyển phân cảnh",
+        resetProceduralBtn: "Quay lại tranh từ Repo / mặc định",
+        swipeHint:
+          "Dùng nút Trước/Sau, phím mũi tên ← / → hoặc vuốt ngang để chuyển phân cảnh",
       },
       nav: {
         sceneLabel: "Phân cảnh",
@@ -126,8 +153,9 @@ export const translations = {
     brand: "ViWaldorf",
     tagline: "Pedagogical Storytelling Practice Space",
     header: {
-      resetSeedBtn: "Reset Sample Stories",
-      resetConfirm: "Restore the 3 original sample stories? Custom stories will be removed.",
+      resetSeedBtn: "Reset Default Story",
+      resetConfirm:
+        "Reset to the GitHub repo story (xuvivn/from-genesis-to-nativity)? Custom added stories will be removed.",
       languageLabel: "Language",
     },
     story: {
@@ -150,6 +178,31 @@ export const translations = {
       fieldMetaphor: "Age-Appropriate Metaphor (optional for Level 0)",
       fieldFullText: "Full Story Text",
       saveStoryBtn: "Save & Build 5 Practice Levels",
+      repo: {
+        syncBtn: "Sync from Repo",
+        syncing: "Syncing live from GitHub...",
+        syncedLabel: "Loaded directly from repo folder paths",
+        folderPathLabel: "Active Repo Folder/File Path",
+        openOnGitHub: "View on GitHub",
+        bookFilterLabel: "Select Book",
+        allBooksOption: "All Books",
+        ageVariantLabel: "Age Variant",
+        ageVariants: {
+          "3-5": "Ages 3–5 · Early Childhood",
+          "6-10": "Ages 6–10 · Standard",
+          "11+": "Ages 11+ · Youth & Adults",
+        },
+        ancientBooksTitle: "Ancient Reference Texts",
+        ancientBooksSubtitle:
+          "Loaded live from level-0-khong-gian-boi-canh/van-ban-co/",
+        ancientBookLoading: "Loading ancient text from repo...",
+        closeAncientBook: "Close Text",
+        categories: {
+          "cuu-uoc": "Old Testament",
+          "tan-uoc": "New Testament",
+          "co-thu": "Ancient & Traditional Texts",
+        },
+      },
       levels: {
         0: {
           badge: "Level 0",
@@ -200,7 +253,7 @@ export const translations = {
         voiceNoteLabel: "Vocal Delivery Note",
       },
       level2: {
-        charactersLabel: "Characters in Scene",
+        charactersLabel: "Characters & Motifs in Scene",
         localizedDetailsLabel: "Localized & Sensory Details",
         emotionalRhythmLabel: "Age-Appropriate Emotional Rhythm",
         beatsLabel: "Detailed Story Beats",
@@ -211,13 +264,14 @@ export const translations = {
         jumpToSceneHint: "Click any scene to mark where you are telling",
       },
       level4: {
-        artStyleLabel: "Traditional Medium",
+        artStyleLabel: "Fallback Medium",
         styleWetOnWet: "Wet-on-Wet Watercolor",
         styleCrayon: "Beeswax Crayon",
         styleChalkboard: "Pastel Chalkboard",
         uploadCustomImageBtn: "Upload Hand-Drawn Image",
-        resetProceduralBtn: "Use Default Illustration",
-        swipeHint: "Use Prev/Next, arrow keys ← / →, or swipe horizontally to switch scenes",
+        resetProceduralBtn: "Use Repo / Default Illustration",
+        swipeHint:
+          "Use Prev/Next, arrow keys ← / →, or swipe horizontally to switch scenes",
       },
       nav: {
         sceneLabel: "Scene",

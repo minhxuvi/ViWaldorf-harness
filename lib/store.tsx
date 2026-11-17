@@ -1,9 +1,17 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from "react";
 import { WaldorfData, WaldorfStory } from "./types";
 import { getSeedData } from "./seedData";
 import { translations, Language } from "./i18n";
+import { fetchGenesisStoryFromRepo, GENESIS_STORY_ID } from "./repoStoryLoader";
 
 interface AppContextType {
   data: WaldorfData;
@@ -15,24 +23,30 @@ interface AppContextType {
   setSelectedStoryId: (id: string) => void;
   selectedStory: WaldorfStory | undefined;
   resetToSeed: () => void;
+  isSyncingRepo: boolean;
+  syncError: string;
+  syncFromRepo: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const STORAGE_KEY = "viwaldorf_storytelling_v2";
+const STORAGE_KEY = "viwaldorf_storytelling_v3_genesis";
+const LEGACY_STORAGE_KEYS = ["viwaldorf_storytelling_v2", "viwaldorf_storytelling_v1"];
 const LANG_STORAGE_KEY = "viwaldorf_lang_v2";
 
-function isValidStoryV2(story: any): story is WaldorfStory {
+function isValidStoryV3(story: unknown): story is WaldorfStory {
+  if (!story || typeof story !== "object") return false;
+  const s = story as Partial<WaldorfStory>;
   return (
-    Boolean(story) &&
-    typeof story.id === "string" &&
-    typeof story.title === "string" &&
-    Boolean(story.soul) &&
-    typeof story.soul.culturalSpirit === "string" &&
-    Array.isArray(story.scenes) &&
-    story.scenes.length > 0 &&
-    story.scenes.every(
-      (sc: any) =>
+    typeof s.id === "string" &&
+    typeof s.title === "string" &&
+    Boolean(s.soul) &&
+    typeof s.soul?.culturalSpirit === "string" &&
+    Array.isArray(s.scenes) &&
+    s.scenes.length > 0 &&
+    s.scenes.every(
+      (sc) =>
+        Boolean(sc) &&
         typeof sc.passage === "string" &&
         typeof sc.voiceNote === "string" &&
         Boolean(sc.detailedOutline) &&
@@ -41,13 +55,74 @@ function isValidStoryV2(story: any): story is WaldorfStory {
   );
 }
 
+function mergeRepoStoryWithLocalPrefs(
+  synced: WaldorfStory,
+  existing?: WaldorfStory
+): WaldorfStory {
+  if (!existing) return synced;
+  const prevById = new Map(existing.scenes.map((sc) => [sc.id, sc]));
+  return {
+    ...synced,
+    scenes: synced.scenes.map((sc) => {
+      const old = prevById.get(sc.id);
+      if (!old) return sc;
+      return {
+        ...sc,
+        artStyle: old.artStyle || sc.artStyle,
+        imagePath: old.imagePath ?? sc.imagePath,
+      };
+    }),
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [data, setInternalData] = useState<WaldorfData>(() => getSeedData());
   const [lang, setLangState] = useState<Language>("vi");
-  const [selectedStoryId, setSelectedStoryId] = useState<string>("story-hoian-money");
+  const [selectedStoryId, setSelectedStoryId] = useState<string>(GENESIS_STORY_ID);
+  const [isSyncingRepo, setIsSyncingRepo] = useState<boolean>(false);
+  const [syncError, setSyncError] = useState<string>("");
+
+  const persist = useCallback((newData: WaldorfData) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+    } catch (err) {
+      console.warn("Local storage write warning:", err);
+    }
+  }, []);
+
+  const syncFromRepo = useCallback(async () => {
+    setIsSyncingRepo(true);
+    setSyncError("");
+    try {
+      const syncedStory = await fetchGenesisStoryFromRepo();
+      setInternalData((prev) => {
+        const existingRepoStory = prev.stories.find((s) => s.id === GENESIS_STORY_ID);
+        const merged = mergeRepoStoryWithLocalPrefs(syncedStory, existingRepoStory);
+        const otherStories = prev.stories.filter((s) => s.id !== GENESIS_STORY_ID);
+        const updated: WaldorfData = {
+          ...prev,
+          stories: [merged, ...otherStories],
+          updatedAt: new Date().toISOString(),
+          version: "3.0-repo-genesis",
+        };
+        persist(updated);
+        return updated;
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Không thể đồng bộ từ GitHub repo.";
+      setSyncError(msg);
+    } finally {
+      setIsSyncingRepo(false);
+    }
+  }, [persist]);
 
   useEffect(() => {
     try {
+      // Xoá hoàn toàn dữ liệu cache truyện mẫu cũ nếu còn tồn tại
+      LEGACY_STORAGE_KEYS.forEach((oldKey) => {
+        localStorage.removeItem(oldKey);
+      });
+
       const savedLang = localStorage.getItem(LANG_STORAGE_KEY) as Language | null;
       if (savedLang === "vi" || savedLang === "en") {
         setLangState(savedLang);
@@ -60,7 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           parsed &&
           Array.isArray(parsed.stories) &&
           parsed.stories.length > 0 &&
-          parsed.stories.every(isValidStoryV2)
+          parsed.stories.every(isValidStoryV3)
         ) {
           setInternalData(parsed);
           setSelectedStoryId(parsed.stories[0].id);
@@ -69,15 +144,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.warn("Local storage load warning:", err);
     }
-  }, []);
 
-  const persist = (newData: WaldorfData) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
-    } catch (err) {
-      console.warn("Local storage write warning:", err);
-    }
-  };
+    // Tự động lấy nội dung mới nhất trực tiếp theo folder path từ GitHub repo
+    void syncFromRepo();
+  }, [syncFromRepo]);
 
   const updateData = (updater: (prev: WaldorfData) => WaldorfData) => {
     setInternalData((prev) => {
@@ -101,7 +171,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const seed = getSeedData();
     setInternalData(seed);
     persist(seed);
-    setSelectedStoryId(seed.stories[0]?.id || "");
+    setSelectedStoryId(seed.stories[0]?.id || GENESIS_STORY_ID);
+    void syncFromRepo();
   };
 
   const t = (translations[lang] || translations.vi) as (typeof translations)["vi"];
@@ -120,6 +191,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSelectedStoryId,
         selectedStory,
         resetToSeed,
+        isSyncingRepo,
+        syncError,
+        syncFromRepo,
       }}
     >
       {children}
