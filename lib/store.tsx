@@ -26,32 +26,35 @@ interface AppContextType {
   lang: Language;
   setLang: (lang: Language) => void;
   t: (typeof translations)["vi"];
-  selectedStoryId: string;
-  setSelectedStoryId: (id: string) => void;
   selectedStory: WaldorfStory | undefined;
-  resetToSeed: () => void;
   isSyncingRepo: boolean;
   syncError: string;
   syncNotice: string;
-  syncFromRepo: (options?: { force?: boolean }) => Promise<void>;
+  syncFromRepo: (options?: { force?: boolean }) => Promise<WaldorfStory | null>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const STORAGE_KEY = "viwaldorf_storytelling_v3_genesis";
-const LEGACY_STORAGE_KEYS = ["viwaldorf_storytelling_v2", "viwaldorf_storytelling_v1"];
+const STORAGE_KEY = "viwaldorf_storytelling_v4_genesis_180";
+const LEGACY_STORAGE_KEYS = [
+  "viwaldorf_storytelling_v3_genesis",
+  "viwaldorf_storytelling_v2",
+  "viwaldorf_storytelling_v1",
+];
 const LANG_STORAGE_KEY = "viwaldorf_lang_v2";
 
-function isValidStoryV3(story: unknown): story is WaldorfStory {
+function isValidStoryV4(story: unknown): story is WaldorfStory {
   if (!story || typeof story !== "object") return false;
   const s = story as Partial<WaldorfStory>;
   return (
-    typeof s.id === "string" &&
+    s.id === GENESIS_STORY_ID &&
     typeof s.title === "string" &&
     Boolean(s.soul) &&
     typeof s.soul?.culturalSpirit === "string" &&
+    Array.isArray(s.illustrations) &&
+    s.illustrations.length === 28 &&
     Array.isArray(s.scenes) &&
-    s.scenes.length > 0 &&
+    s.scenes.length === 180 &&
     s.scenes.every(
       (sc) =>
         Boolean(sc) &&
@@ -68,11 +71,22 @@ function mergeRepoStoryWithLocalPrefs(
   existing?: WaldorfStory
 ): WaldorfStory {
   if (!existing) return synced;
-  const prevById = new Map(existing.scenes.map((sc) => [sc.id, sc]));
+  const prevScenesById = new Map(existing.scenes.map((sc) => [sc.id, sc]));
+  const prevIllById = new Map((existing.illustrations || []).map((il) => [il.id, il]));
+
   return {
     ...synced,
+    illustrations: synced.illustrations.map((il) => {
+      const old = prevIllById.get(il.id);
+      if (!old) return il;
+      return {
+        ...il,
+        artStyle: old.artStyle || il.artStyle,
+        imagePath: old.imagePath ?? il.imagePath,
+      };
+    }),
     scenes: synced.scenes.map((sc) => {
-      const old = prevById.get(sc.id);
+      const old = prevScenesById.get(sc.id);
       if (!old) return sc;
       return {
         ...sc,
@@ -86,12 +100,12 @@ function mergeRepoStoryWithLocalPrefs(
 export function AppProvider({ children }: { children: ReactNode }) {
   const [data, setInternalData] = useState<WaldorfData>(() => getSeedData());
   const [lang, setLangState] = useState<Language>("vi");
-  const [selectedStoryId, setSelectedStoryId] = useState<string>(GENESIS_STORY_ID);
   const [isSyncingRepo, setIsSyncingRepo] = useState<boolean>(false);
   const [syncError, setSyncError] = useState<string>("");
   const [syncNotice, setSyncNotice] = useState<string>("");
 
   const isSyncingInFlightRef = useRef<boolean>(false);
+  const activeSyncPromiseRef = useRef<Promise<WaldorfStory | null> | null>(null);
   const lastSyncAttemptRef = useRef<number>(0);
 
   const persist = useCallback((newData: WaldorfData) => {
@@ -103,8 +117,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const syncFromRepo = useCallback(
-    async (options?: { force?: boolean }) => {
-      if (isSyncingInFlightRef.current) return;
+    async (options?: { force?: boolean }): Promise<WaldorfStory | null> => {
+      if (isSyncingInFlightRef.current && activeSyncPromiseRef.current) {
+        return activeSyncPromiseRef.current;
+      }
 
       const now = Date.now();
       if (
@@ -122,38 +138,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ? `Recently synced — please wait ${waitSec}s before syncing again.`
             : `Vừa đồng bộ xong — vui lòng chờ ${waitSec} giây trước khi tải lại để tránh giới hạn truy cập.`
         );
-        return;
+        return null;
       }
 
       isSyncingInFlightRef.current = true;
       setIsSyncingRepo(true);
       setSyncError("");
       setSyncNotice("");
-      try {
-        const syncedStory = await fetchGenesisStoryFromRepo(GENESIS_JSDELIVR_BASE_URL, {
-          preferFresh: Boolean(options?.force),
-        });
-        lastSyncAttemptRef.current = Date.now();
-        setInternalData((prev) => {
-          const existingRepoStory = prev.stories.find((s) => s.id === GENESIS_STORY_ID);
-          const merged = mergeRepoStoryWithLocalPrefs(syncedStory, existingRepoStory);
-          const otherStories = prev.stories.filter((s) => s.id !== GENESIS_STORY_ID);
-          const updated: WaldorfData = {
-            ...prev,
-            stories: [merged, ...otherStories],
-            updatedAt: new Date().toISOString(),
-            version: "3.0-repo-genesis",
-          };
-          persist(updated);
-          return updated;
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Không thể đồng bộ từ GitHub repo.";
-        setSyncError(msg);
-      } finally {
-        isSyncingInFlightRef.current = false;
-        setIsSyncingRepo(false);
-      }
+
+      const runPromise = (async (): Promise<WaldorfStory | null> => {
+        try {
+          const syncedStory = await fetchGenesisStoryFromRepo(GENESIS_JSDELIVR_BASE_URL, {
+            preferFresh: Boolean(options?.force),
+          });
+          lastSyncAttemptRef.current = Date.now();
+          let resolvedStory: WaldorfStory = syncedStory;
+          setInternalData((prev) => {
+            const existingRepoStory = prev.stories.find((s) => s.id === GENESIS_STORY_ID);
+            const merged = mergeRepoStoryWithLocalPrefs(syncedStory, existingRepoStory);
+            resolvedStory = merged;
+            const updated: WaldorfData = {
+              ...prev,
+              stories: [merged],
+              updatedAt: new Date().toISOString(),
+              version: "4.0-genesis-180",
+            };
+            persist(updated);
+            return updated;
+          });
+          return resolvedStory;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Không thể đồng bộ từ GitHub repo.";
+          setSyncError(msg);
+          return null;
+        } finally {
+          isSyncingInFlightRef.current = false;
+          activeSyncPromiseRef.current = null;
+          setIsSyncingRepo(false);
+        }
+      })();
+
+      activeSyncPromiseRef.current = runPromise;
+      return runPromise;
     },
     [lang, persist]
   );
@@ -163,7 +189,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let hasRepoStoryInCache = false;
 
     try {
-      // Xoá hoàn toàn dữ liệu cache truyện mẫu cũ nếu còn tồn tại
       LEGACY_STORAGE_KEYS.forEach((oldKey) => {
         localStorage.removeItem(oldKey);
       });
@@ -180,22 +205,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
           parsed &&
           Array.isArray(parsed.stories) &&
           parsed.stories.length > 0 &&
-          parsed.stories.every(isValidStoryV3)
+          isValidStoryV4(parsed.stories[0])
         ) {
-          setInternalData(parsed);
-          setSelectedStoryId(parsed.stories[0].id);
-          const cachedRepoStory = parsed.stories.find((s) => s.id === GENESIS_STORY_ID);
-          if (cachedRepoStory) {
-            hasRepoStoryInCache = true;
-            repoLastSyncedAt = cachedRepoStory.lastSyncedAt;
-          }
+          setInternalData({ ...parsed, stories: [parsed.stories[0]] });
+          hasRepoStoryInCache = true;
+          repoLastSyncedAt = parsed.stories[0].lastSyncedAt;
         }
       }
     } catch (err) {
       console.warn("Local storage load warning:", err);
     }
 
-    // Chỉ tự động đồng bộ qua CDN khi cache chưa có hoặc đã quá hạn TTL (6 giờ)
     if (!hasRepoStoryInCache || shouldAutoSyncRepo(repoLastSyncedAt)) {
       void syncFromRepo();
     } else if (repoLastSyncedAt) {
@@ -225,18 +245,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {}
   };
 
-  const resetToSeed = () => {
-    lastSyncAttemptRef.current = 0;
-    const seed = getSeedData();
-    setInternalData(seed);
-    persist(seed);
-    setSelectedStoryId(seed.stories[0]?.id || GENESIS_STORY_ID);
-    void syncFromRepo({ force: true });
-  };
-
   const t = (translations[lang] || translations.vi) as (typeof translations)["vi"];
-  const selectedStory =
-    data.stories.find((s) => s.id === selectedStoryId) || data.stories[0];
+  const selectedStory = data.stories[0];
 
   return (
     <AppContext.Provider
@@ -246,10 +256,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         lang,
         setLang,
         t,
-        selectedStoryId,
-        setSelectedStoryId,
         selectedStory,
-        resetToSeed,
         isSyncingRepo,
         syncError,
         syncNotice,

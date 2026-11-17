@@ -1,6 +1,5 @@
 export type WaldorfArtStyle = "wet-on-wet" | "crayon" | "chalkboard";
-export type PracticeLevel = 0 | 1 | 2 | 3 | 4;
-export type AgeVariantId = "6-10" | "3-5" | "11+";
+export type PracticeLevel = 1 | 2 | 3 | 4;
 
 export interface PronunciationGuideItem {
   term: string;
@@ -23,15 +22,17 @@ export interface StoryBookMeta {
   subtitle: string;
   isEpilogue: boolean;
   illustrationStyle: string;
+  totalChapters: number;
   level0File: string;
+  level1File: string;
+  level2File: string;
 }
 
-/** Level 0: Không gian bối cảnh & Linh hồn câu chuyện */
+/** Mục đọc thêm: Bối cảnh & Linh hồn câu chuyện (level-0-khong-gian-boi-canh/) */
 export interface StorySoulContext {
   culturalSpirit: string;
   storytellingRhythm: string;
   ageMetaphor: string;
-  ageMetaphors?: Partial<Record<AgeVariantId, string>>;
   pronunciations: PronunciationGuideItem[];
   overviewMarkdown?: string;
   overviewPath?: string;
@@ -39,7 +40,7 @@ export interface StorySoulContext {
   ancientBooks?: AncientBookItem[];
 }
 
-/** Level 2: Dàn ý chi tiết theo phân cảnh */
+/** Level 2: Dàn ý chi tiết theo chương */
 export interface SceneDetailedOutline {
   characters: string[];
   localizedDetails: string[];
@@ -47,39 +48,48 @@ export interface SceneDetailedOutline {
   beats: string[];
 }
 
-export interface SceneVariantContent {
-  passage: string;
-  voiceNote: string;
-  detailedOutline: SceneDetailedOutline;
-}
-
 export interface SceneLevelPaths {
   level0Overview: string;
   level0Book: string;
-  level1: Record<AgeVariantId, string>;
-  level2: Record<AgeVariantId, string>;
+  level1: string;
+  level2: string;
   level3: string;
   level4Gallery: string;
   level4Image: string;
   level4PromptSpec: string;
 }
 
+/** Level 4: 28 bức tranh gợi nhớ theo Cụm Chương */
+export interface StoryIllustration {
+  id: string; // "tranh-01" .. "tranh-28"
+  ord: number; // 1 .. 28
+  bookId: string; // "quyen-1" .. "quyen-5"
+  chaptersRef: string; // vd: "Chương 1–2"
+  title: string;
+  artStyle: WaldorfArtStyle;
+  repoImage: string;
+  imageGenerated: boolean;
+  imagePath?: string | null;
+}
+
+/** Đại diện cho từng Chương trong 180 Chương của bộ sử thi */
 export interface StoryScene {
   id: string;
-  ord: number;
+  ord: number; // global_number 1..180
+  chapterNumber: number; // chapter_number trong từng Quyển
+  bookId: string;
+  section?: string;
+  illustrationId?: string;
   slug?: string;
-  bookId?: string;
   isEpilogue?: boolean;
   title: string;
-  /** Level 1: Toàn văn đọc thành tiếng cho phân cảnh (mặc định 6–10 tuổi) */
+  /** Level 1: Toàn văn đọc thành tiếng cho chương */
   passage: string;
-  /** Level 1: Lưu ý giọng kể riêng của phân cảnh */
+  /** Level 1: Lưu ý giọng kể riêng của chương */
   voiceNote: string;
   /** Level 2: Dàn ý chi tiết */
   detailedOutline: SceneDetailedOutline;
-  /** Nội dung theo từng biến thể lứa tuổi từ repo (3–5, 6–10, 11+) */
-  variants?: Partial<Record<AgeVariantId, SceneVariantContent>>;
-  /** Level 3: 4–6 ý khung xương bám sát cốt truyện gốc */
+  /** Level 3: Các ý khung xương bám sát cốt truyện gốc */
   summaryPoints: string[];
   /** Level 4: Chất liệu tranh vẽ tay truyền thống (thuần hình ảnh, không chữ) */
   artStyle: WaldorfArtStyle;
@@ -89,7 +99,7 @@ export interface StoryScene {
   imageGenerated?: boolean;
   /** Ảnh vẽ tay tùy chọn do người dùng tải lên (nếu có) */
   imagePath?: string | null;
-  /** Đường dẫn thư mục/tệp tương ứng từng cấp độ trên repo nguồn */
+  /** Đường dẫn thư mục/tệp tương ứng trên repo nguồn */
   levelPaths?: SceneLevelPaths;
 }
 
@@ -98,16 +108,19 @@ export interface WaldorfStory {
   title: string;
   titleEn?: string;
   sourceInfo: string;
-  ageRange: string;
+  targetAge: string;
+  styleReference?: string;
   goal: string;
   defaultArtStyle: WaldorfArtStyle;
   repoUrl?: string;
   rawBaseUrl?: string;
   lastSyncedAt?: string;
   books?: StoryBookMeta[];
-  /** Level 0 */
+  /** Mục đọc thêm: Bối cảnh & Linh hồn câu chuyện */
   soul: StorySoulContext;
-  /** Danh sách phân cảnh (28 phân cảnh từ repo hoặc 3–6+ phân cảnh truyện tự thêm) */
+  /** Level 4: 28 bức tranh minh họa theo Cụm Chương */
+  illustrations: StoryIllustration[];
+  /** Level 1–3: Danh sách 180 Chương */
   scenes: StoryScene[];
 }
 

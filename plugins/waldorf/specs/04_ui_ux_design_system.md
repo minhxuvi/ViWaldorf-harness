@@ -26,16 +26,16 @@ The interface reproduces the warmth, texture, and organic serenity of hand-craft
 - **Body**: Clean system sans-serif with unitless `line-height: 1.6` and `text-wrap: pretty` on narrative blocks — high legibility across desktop and mobile without orphaned lines.
 - **Accessibility & Tactile Feedback**: Clear `:focus-visible` forest outline rings (≥3:1 contrast) and gentle press scaling (`scale: 0.98`) on interactive controls.
 - **Cards**: Rounded 14px–16px corners with subtle warm shadows (`rgba(60, 50, 20, 0.05)`).
-- **Navigation**: Minimal top header bar (brand title, language toggle VI/EN, seed reset) leading straight into the single-page Storytelling Practice Studio.
+- **Navigation**: Minimal top header bar (brand title, language toggle VI/EN) leading straight into the single-story Storytelling Practice Studio.
 
-## 3. Single-Page Storytelling Studio & Voice Playback Dock
+## 3. Single-Story Storytelling Studio & Voice Playback Dock
 
-- **Story, Book & Age Segmented Controls**: Book filter pills (`All` + `Book I–V`), tactile segmented pills for Age Variants (`3–5`, `6–10`, `11+`), compact offline-ready sync status, and subtle GitHub folder-path chip.
-- **5-Level Tactile Switcher**: Responsive step tabs (`Level 0` → `Level 4`, 2+2+1 balanced mobile layout → 5-column desktop) with bottom Previous/Next level progression bars.
+- **Focused Epic Header Card**: Displays *Từ Sáng Thế Đến Giáng Sinh* (`5 Quyển · 180 Chương · 28 Tranh minh họa`), book filter pills (`All` + `Book I–V`), offline-ready sync status, **Read More: Background & Story Soul** toggle, **Download Full Story PDF (with Level 4 Art)** button, and GitHub source chip. Zero story switcher, zero age-group selector, and zero story upload forms.
+- **Background & Story Soul Reading Drawer (`level-0`)**: Dedicated expandable reading section with collapsible epic overview (`00-tong-quan-linh-hon-su-thi.md`), book-level Soul cards, pronunciation guide, and categorized Ancient Reference Library (`Tất cả`, `Kinh Cựu Ước`, `Kinh Tân Ước`, `Cổ Thư & Sử Truyền`).
+- **4-Level Tactile Switcher**: Responsive step tabs (`Level 1` → `Level 4`, 2×2 mobile layout → 4-column desktop) defaulting to **Level 1**, with bottom Previous/Next level progression bars.
 - **Level-Specific Ergonomics**:
-  - **Level 0**: Collapsible epic overview (`00-tong-quan-linh-hon-su-thi.md`), book-level Soul cards, pronunciation guide, and categorized Ancient Reference Library (`Tất cả`, `Kinh Cựu Ước`, `Kinh Tân Ước`, `Cổ Thư & Sử Truyền`) with cleaned Markdown reading view.
-  - **Level 1**: Vocal delivery note positioned before the passage to establish breath before reading, selectable reading text size (`S` / `M` / `L`), and top+bottom scene navigation.
-  - **Level 2**: Structured scene outline with bottom scene navigation and direct transition to Level 3.
-  - **Level 3**: Toggle between **Focused Current Scene** and **All Scenes Skeleton**, with one-click jump to **Level 4 Pure Visual Art** for that scene.
-  - **Level 4 Pure Canvas**: Displays a single scene artwork at a time (16:10 standard or expanded **Stage Mode**) navigable via Prev/Next buttons, keyboard `←`/`→`, stepper dots, and touch swipe—completely free of text overlays. Loads repo PNG only when `imageGenerated === true`, otherwise immediately renders wordless 12+ motif SVG art (`ProceduralIllustrator`).
-- **Persistent Voice Recording & Playback Dock**: Fixed at `bottom-4` with backdrop blur, record/stop button, live timer (`MM:SS`), inline `<audio controls>` playback, persistent session-takes drawer toggle (highlighting takes matching the active scene), and `pb-32` page spacing to prevent overlap.
+  - **Level 1**: Vocal delivery note positioned before the chapter prose, selectable reading text size (`S` / `M` / `L`), chapter navigation (`1..180` or filtered by book), and quick link to the chapter's Level 4 cluster illustration + PDF export action.
+  - **Level 2**: Structured chapter outline (`1..180`) with bottom chapter navigation and direct transition to Level 3.
+  - **Level 3**: Toggle between **Focused Current Chapter** and **All Chapters Skeleton**, with one-click jump to **Level 4 Pure Visual Art** for that chapter's illustration cluster.
+  - **Level 4 Pure Canvas**: Displays one cluster illustration at a time (`1..28`, or filtered by book), navigable via Prev/Next buttons, keyboard `←`/`→`, stepper controls, and touch swipe—completely free of text overlays. Loads repo PNG only when `imageGenerated === true`, otherwise immediately renders wordless SVG art (`ProceduralIllustrator`).
+- **Persistent Voice Recording & Playback Dock**: Fixed at `bottom-4` with backdrop blur, record/stop button, live timer (`MM:SS`), inline `<audio controls>` playback, persistent session-takes drawer toggle (highlighting takes matching the active chapter/illustration), and `pb-32` page spacing to prevent overlap.

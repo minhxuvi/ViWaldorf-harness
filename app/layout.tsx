@@ -4,9 +4,9 @@ import { AppProvider } from "@/lib/store";
 import { Shell } from "@/components/Shell";
 
 export const metadata: Metadata = {
-  title: "ViWaldorf — Luyện Kể Chuyện Sư Phạm",
+  title: "ViWaldorf — Từ Sáng Thế Đến Giáng Sinh",
   description:
-    "Ứng dụng luyện kể chuyện 5 cấp độ theo tinh thần sư phạm Waldorf tại Việt Nam với thu âm và nghe lại cục bộ, không sử dụng AI.",
+    "Không gian luyện kể chuyện sử thi Từ Sáng Thế Đến Giáng Sinh (5 Quyển · 180 Chương · 28 Tranh gợi nhớ) theo 4 cấp độ, kèm mục đọc thêm bối cảnh, xuất PDF toàn văn và thu âm cục bộ.",
 };
 
 export default function RootLayout({

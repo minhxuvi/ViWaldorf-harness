@@ -1,11 +1,10 @@
 import {
-  AgeVariantId,
   AncientBookItem,
   PronunciationGuideItem,
   SceneDetailedOutline,
   SceneLevelPaths,
-  SceneVariantContent,
   StoryBookMeta,
+  StoryIllustration,
   StoryScene,
   StorySoulContext,
   WaldorfArtStyle,
@@ -61,8 +60,20 @@ export function getCandidateRepoBaseUrls(preferredBaseUrl?: string): string[] {
 }
 
 interface RepoIndexLevel0 {
+  level?: number;
   overview_file?: string;
   ancient_books?: AncientBookItem[];
+}
+
+interface RepoIndexLevel3 {
+  level?: number;
+  file?: string;
+}
+
+interface RepoIndexLevel4 {
+  level?: number;
+  gallery_file?: string;
+  prompt_spec_file?: string;
 }
 
 interface RepoIndexBook {
@@ -73,29 +84,44 @@ interface RepoIndexBook {
   subtitle: string;
   is_epilogue: boolean;
   illustration_style: string;
+  total_chapters: number;
+  level_0_file: string;
+  level_1_file: string;
+  level_2_file: string;
 }
 
-interface RepoIndexScene {
+interface RepoIndexIllustration {
   id: string;
   number: number;
-  slug: string;
-  title: string;
   book_id: string;
-  is_epilogue: boolean;
+  chapters_ref: string;
+  title: string;
   image: string;
   image_generated: boolean;
+}
+
+interface RepoIndexChapter {
+  id: string;
+  global_number: number;
+  book_id: string;
+  chapter_number: number;
+  section?: string;
+  title: string;
+  is_epilogue: boolean;
+  illustration_id: string;
+  image: string;
   levels: {
-    level_0: {
-      overview: string;
-      book: string;
+    level_0?: {
+      overview?: string;
+      book?: string;
     };
-    level_1: Record<AgeVariantId, string>;
-    level_2: Record<AgeVariantId, string>;
-    level_3: string;
-    level_4: {
-      gallery: string;
-      image: string;
-      prompt_spec: string;
+    level_1?: string;
+    level_2?: string;
+    level_3?: string;
+    level_4?: {
+      gallery?: string;
+      image?: string;
+      prompt_spec?: string;
     };
   };
 }
@@ -103,15 +129,19 @@ interface RepoIndexScene {
 export interface RepoStoryIndex {
   title: string;
   language: string;
+  target_age?: string;
+  style_reference?: string;
   total_books: number;
-  total_scenes: number;
-  levels: [RepoIndexLevel0, ...unknown[]];
+  total_chapters: number;
+  total_illustrations: number;
+  levels?: [RepoIndexLevel0?, unknown?, unknown?, RepoIndexLevel3?, RepoIndexLevel4?];
   books: RepoIndexBook[];
-  scenes: RepoIndexScene[];
+  illustrations: RepoIndexIllustration[];
+  chapters: RepoIndexChapter[];
 }
 
-export interface ParsedLevel1Scene {
-  slug: string;
+export interface ParsedLevel1Chapter {
+  chapterNumber: number;
   title: string;
   passage: string;
   voiceNote: string;
@@ -157,19 +187,20 @@ function splitTopLevelCommas(text: string): string[] {
   return result;
 }
 
-function splitBySceneHeader(markdown: string, headingPrefix: "##" | "###") {
+function splitByChapterHeader(markdown: string) {
   const normalized = markdown.replace(/\r\n/g, "\n");
-  const escaped = headingPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const headerRegex = new RegExp(
-    `^${escaped}\\s+Phân cảnh\\s+\\d+\\s*\\(\`([^\`]+)\`\\):\\s*(.+)$`,
-    "gm"
-  );
+  const headerRegex = /^###\s+Chương\s+(\d+):\s*(.+)$/gm;
 
-  const matches: Array<{ slug: string; title: string; start: number; bodyStart: number }> = [];
+  const matches: Array<{
+    chapterNumber: number;
+    title: string;
+    start: number;
+    bodyStart: number;
+  }> = [];
   let m: RegExpExecArray | null;
   while ((m = headerRegex.exec(normalized)) !== null) {
     matches.push({
-      slug: m[1].trim(),
+      chapterNumber: Number(m[1]),
       title: m[2].trim(),
       start: m.index,
       bodyStart: m.index + m[0].length,
@@ -179,12 +210,12 @@ function splitBySceneHeader(markdown: string, headingPrefix: "##" | "###") {
   return matches.map((entry, idx) => {
     const nextStart = idx + 1 < matches.length ? matches[idx + 1].start : normalized.length;
     const rawBody = normalized.slice(entry.bodyStart, nextStart);
-    // Cắt phần tiêu đề Quyển (# Quyển ...) nếu nằm cuối block trước scene tiếp theo
-    const withoutNextBookHeader = rawBody.replace(/\n+#\s+Quyển\s+[^\n]+[\s\S]*$/m, "");
+    // Loại bỏ tiêu đề Phần/Cụm (## ...) của cụm chương tiếp theo nếu nằm cuối block
+    const withoutNextSectionHeader = rawBody.replace(/\n+##\s+[^\n]+[\s\S]*$/m, "");
     return {
-      slug: entry.slug,
+      chapterNumber: entry.chapterNumber,
       title: entry.title,
-      body: stripTrailingRule(withoutNextBookHeader),
+      body: stripTrailingRule(withoutNextSectionHeader),
     };
   });
 }
@@ -196,7 +227,6 @@ export function parseLevel0BookMarkdown(markdown: string): StorySoulContext {
   let culturalSpirit = "";
   let storytellingRhythm = "";
   let ageMetaphor = "";
-  const ageMetaphors: Partial<Record<AgeVariantId, string>> = {};
   const pronunciations: PronunciationGuideItem[] = [];
 
   for (const sec of sections) {
@@ -215,31 +245,12 @@ export function parseLevel0BookMarkdown(markdown: string): StorySoulContext {
           .join("\n")
       );
     } else if (/^3\./.test(heading)) {
-      const subBlocks = content.split(/^###\s+/m).filter((b) => b.trim().length > 0);
-      for (const sub of subBlocks) {
-        const subNl = sub.indexOf("\n");
-        if (subNl === -1) continue;
-        const subHeading = sub.slice(0, subNl).trim();
-        const subBody = cleanInlineMarkdown(
-          sub
-            .slice(subNl + 1)
-            .split("\n")
-            .map((line) => line.replace(/^-\s+/, "• "))
-            .join("\n")
-        );
-        if (subHeading.includes("3–5") || subHeading.includes("3-5")) {
-          ageMetaphors["3-5"] = subBody;
-        } else if (subHeading.includes("6–10") || subHeading.includes("6-10")) {
-          ageMetaphors["6-10"] = subBody;
-        } else if (subHeading.includes("11+")) {
-          ageMetaphors["11+"] = subBody;
-        }
-      }
-      ageMetaphor =
-        ageMetaphors["6-10"] ||
-        ageMetaphors["3-5"] ||
-        ageMetaphors["11+"] ||
-        cleanInlineMarkdown(content);
+      ageMetaphor = cleanInlineMarkdown(
+        content
+          .split("\n")
+          .map((line) => line.replace(/^-\s+/, "• "))
+          .join("\n")
+      );
     } else if (/^4\./.test(heading)) {
       const lines = content.split("\n");
       for (const line of lines) {
@@ -263,27 +274,22 @@ export function parseLevel0BookMarkdown(markdown: string): StorySoulContext {
 
   return {
     culturalSpirit: culturalSpirit || "Đang đồng bộ tinh thần văn hóa từ kho sử thi.",
-    storytellingRhythm: storytellingRhythm || "Nhịp kể khoan thai, lắng sâu theo từng phân cảnh.",
+    storytellingRhythm: storytellingRhythm || "Nhịp kể khoan thai, lắng sâu theo từng chương.",
     ageMetaphor: ageMetaphor || "Thông điệp ẩn dụ nuôi dưỡng tâm hồn trẻ thơ.",
-    ageMetaphors,
     pronunciations,
   };
 }
 
-export function parseLevel1Markdown(markdown: string): Record<string, ParsedLevel1Scene> {
-  const blocks = splitBySceneHeader(markdown, "##");
-  const result: Record<string, ParsedLevel1Scene> = {};
+export function parseLevel1Markdown(markdown: string): Record<number, ParsedLevel1Chapter> {
+  const blocks = splitByChapterHeader(markdown);
+  const result: Record<number, ParsedLevel1Chapter> = {};
 
   for (const block of blocks) {
-    const voiceSplit = block.body.split(/^###\s+Lưu ý giọng kể[^\n]*$/m);
+    const voiceSplit = block.body.split(/^#{3,4}\s+Lưu ý giọng kể[^\n]*$/m);
     const rawPassage = stripTrailingRule(voiceSplit[0] || "");
     const rawVoiceNote = stripTrailingRule(voiceSplit[1] || "");
 
-    const passage = rawPassage
-      .replace(/\*\*([^*]+)\*\*/g, "$1")
-      .replace(/\*([^*]+)\*/g, "$1")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
+    const passage = cleanInlineMarkdown(rawPassage);
 
     const voiceNote = cleanInlineMarkdown(
       rawVoiceNote
@@ -292,8 +298,8 @@ export function parseLevel1Markdown(markdown: string): Record<string, ParsedLeve
         .join("\n")
     );
 
-    result[block.slug] = {
-      slug: block.slug,
+    result[block.chapterNumber] = {
+      chapterNumber: block.chapterNumber,
       title: block.title,
       passage: passage || block.title,
       voiceNote:
@@ -304,9 +310,9 @@ export function parseLevel1Markdown(markdown: string): Record<string, ParsedLeve
   return result;
 }
 
-export function parseLevel2Markdown(markdown: string): Record<string, SceneDetailedOutline> {
-  const blocks = splitBySceneHeader(markdown, "##");
-  const result: Record<string, SceneDetailedOutline> = {};
+export function parseLevel2Markdown(markdown: string): Record<number, SceneDetailedOutline> {
+  const blocks = splitByChapterHeader(markdown);
+  const result: Record<number, SceneDetailedOutline> = {};
 
   for (const block of blocks) {
     const lines = block.body.split("\n");
@@ -368,7 +374,6 @@ export function parseLevel2Markdown(markdown: string): Record<string, SceneDetai
     }
 
     if (characters.length === 0) {
-      // Thử trích tên nhân vật được in nghiêng (*Michael*, *Adam*...) từ nội dung
       const italicNames = Array.from(block.body.matchAll(/\*([A-ZÀ-Ỹ][^*]{1,28})\*/g)).map((m) =>
         m[1].trim()
       );
@@ -378,25 +383,16 @@ export function parseLevel2Markdown(markdown: string): Record<string, SceneDetai
       }
     }
 
-    if (localizedDetails.length === 0) {
-      if (characters.length > 0) {
-        localizedDetails.push(...characters.slice(0, 4));
-      }
-      if (emotionalRhythm) {
-        localizedDetails.push(emotionalRhythm);
-      }
-    }
-
     if (!emotionalRhythm) {
       emotionalRhythm =
-        localizedDetails[0] || `Giữ nhịp kể ấm áp, lắng sâu cho phân cảnh "${block.title}".`;
+        localizedDetails[0] || `Giữ nhịp kể ấm áp, lắng sâu cho "${block.title}".`;
     }
 
     if (beats.length === 0) {
       beats.push(cleanInlineMarkdown(block.body));
     }
 
-    result[block.slug] = {
+    result[block.chapterNumber] = {
       characters,
       localizedDetails: localizedDetails.slice(0, 6),
       emotionalRhythm,
@@ -407,18 +403,52 @@ export function parseLevel2Markdown(markdown: string): Record<string, SceneDetai
   return result;
 }
 
+const ROMAN_BOOK_MAP: Record<string, string> = {
+  I: "quyen-1",
+  II: "quyen-2",
+  III: "quyen-3",
+  IV: "quyen-4",
+  V: "quyen-5",
+};
+
+/**
+ * Phân tích tệp Level 3 (`dan-y-tom-tat-cac-chuong.md`).
+ * Trả về map theo `chapterId` dạng `quyen-1-chuong-01` để không bị trùng số chương giữa các Quyển.
+ */
 export function parseLevel3Markdown(markdown: string): Record<string, string[]> {
-  const blocks = splitBySceneHeader(markdown, "###");
+  const normalized = markdown.replace(/\r\n/g, "\n");
+  const lines = normalized.split("\n");
   const result: Record<string, string[]> = {};
 
-  for (const block of blocks) {
-    const points = block.body
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.startsWith("- "))
-      .map((l) => cleanInlineMarkdown(l.slice(2)));
-    if (points.length > 0) {
-      result[block.slug] = points;
+  let currentBookId = "quyen-1";
+  let currentChapterKey = "";
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+
+    const bookMatch = trimmed.match(/^##\s+Quyển\s+([IVX]+)\b/);
+    if (bookMatch) {
+      const mapped = ROMAN_BOOK_MAP[bookMatch[1]];
+      if (mapped) {
+        currentBookId = mapped;
+        currentChapterKey = "";
+      }
+      continue;
+    }
+
+    const chMatch = trimmed.match(/^###\s+Chương\s+(\d+):\s*(.+)$/);
+    if (chMatch) {
+      const chNum = Number(chMatch[1]);
+      currentChapterKey = `${currentBookId}-chuong-${String(chNum).padStart(2, "0")}`;
+      result[currentChapterKey] = [];
+      continue;
+    }
+
+    if (currentChapterKey && trimmed.startsWith("- ")) {
+      const point = cleanInlineMarkdown(trimmed.slice(2));
+      if (point) {
+        result[currentChapterKey].push(point);
+      }
     }
   }
 
@@ -517,9 +547,17 @@ export async function fetchGenesisStoryFromRepo(
         cache: cacheMode,
       });
       if (indexRes.ok) {
-        indexData = (await indexRes.json()) as RepoStoryIndex;
-        activeBaseUrl = base;
-        break;
+        const candidateJson = (await indexRes.json()) as Partial<RepoStoryIndex>;
+        if (
+          Array.isArray(candidateJson.chapters) &&
+          candidateJson.chapters.length > 0 &&
+          Array.isArray(candidateJson.illustrations) &&
+          candidateJson.illustrations.length > 0
+        ) {
+          indexData = candidateJson as RepoStoryIndex;
+          activeBaseUrl = base;
+          break;
+        }
       }
       lastStatus = indexRes.status;
     } catch {
@@ -538,23 +576,23 @@ export async function fetchGenesisStoryFromRepo(
     level0Config.overview_file || "level-0-khong-gian-boi-canh/00-tong-quan-linh-hon-su-thi.md";
   const ancientBooks = level0Config.ancient_books || [];
 
-  // Gom toàn bộ đường dẫn duy nhất từ story-index.json để tải trực tiếp theo folder path
+  const level3File =
+    indexData.levels?.[3]?.file ||
+    indexData.chapters?.[0]?.levels?.level_3 ||
+    "level-3-dan-y-tom-tat/dan-y-tom-tat-cac-chuong.md";
+  const level4Gallery =
+    indexData.levels?.[4]?.gallery_file || "level-4-tranh-goi-nho/bo-tranh-goi-nho.md";
+  const level4PromptSpec =
+    indexData.levels?.[4]?.prompt_spec_file || "level-4-tranh-goi-nho/prompts-28-phan-canh.md";
+
   const level0BookFiles = new Set<string>();
   const level1Files = new Set<string>();
   const level2Files = new Set<string>();
-  let level3File = "level-3-dan-y-tom-tat/dan-y-tom-tat-28-phan-canh.md";
 
-  for (const sc of indexData.scenes) {
-    if (sc.levels?.level_0?.book) level0BookFiles.add(sc.levels.level_0.book);
-    if (sc.levels?.level_1) {
-      Object.values(sc.levels.level_1).forEach((p) => p && level1Files.add(p));
-    }
-    if (sc.levels?.level_2) {
-      Object.values(sc.levels.level_2).forEach((p) => p && level2Files.add(p));
-    }
-    if (sc.levels?.level_3) {
-      level3File = sc.levels.level_3;
-    }
+  for (const bk of indexData.books || []) {
+    if (bk.level_0_file) level0BookFiles.add(bk.level_0_file);
+    if (bk.level_1_file) level1Files.add(bk.level_1_file);
+    if (bk.level_2_file) level2Files.add(bk.level_2_file);
   }
 
   const allPaths = Array.from(
@@ -571,10 +609,10 @@ export async function fetchGenesisStoryFromRepo(
   });
 
   const bookSouls: Record<string, StorySoulContext> = {};
-  const booksMeta: StoryBookMeta[] = indexData.books.map((bk) => {
-    const sampleSceneForBook = indexData.scenes.find((s) => s.book_id === bk.id);
-    const level0File =
-      sampleSceneForBook?.levels?.level_0?.book || `level-0-khong-gian-boi-canh/${bk.slug}.md`;
+  const booksMeta: StoryBookMeta[] = (indexData.books || []).map((bk) => {
+    const level0File = bk.level_0_file || `level-0-khong-gian-boi-canh/${bk.slug}.md`;
+    const level1File = bk.level_1_file || `level-1-toan-van/${bk.slug}.md`;
+    const level2File = bk.level_2_file || `level-2-dan-y-chi-tiet/${bk.slug}.md`;
     if (fileCache[level0File]) {
       bookSouls[bk.id] = parseLevel0BookMarkdown(fileCache[level0File]);
     }
@@ -583,127 +621,123 @@ export async function fetchGenesisStoryFromRepo(
       number: bk.number,
       slug: bk.slug,
       title: bk.title,
-      subtitle: bk.subtitle,
+      subtitle: cleanInlineMarkdown(bk.subtitle || ""),
       isEpilogue: Boolean(bk.is_epilogue),
       illustrationStyle: bk.illustration_style,
+      totalChapters: bk.total_chapters,
       level0File,
+      level1File,
+      level2File,
     };
   });
 
-  // Phân tích Level 1 & Level 2 theo từng đường dẫn đã tải
-  const parsedL1ByFile: Record<string, Record<string, ParsedLevel1Scene>> = {};
+  const bookMap = new Map(booksMeta.map((b) => [b.id, b]));
+
+  const parsedL1ByFile: Record<string, Record<number, ParsedLevel1Chapter>> = {};
   for (const p of level1Files) {
     if (fileCache[p]) parsedL1ByFile[p] = parseLevel1Markdown(fileCache[p]);
   }
 
-  const parsedL2ByFile: Record<string, Record<string, SceneDetailedOutline>> = {};
+  const parsedL2ByFile: Record<string, Record<number, SceneDetailedOutline>> = {};
   for (const p of level2Files) {
     if (fileCache[p]) parsedL2ByFile[p] = parseLevel2Markdown(fileCache[p]);
   }
 
   const level3Map = fileCache[level3File] ? parseLevel3Markdown(fileCache[level3File]) : {};
 
-  const variantsOrder: AgeVariantId[] = ["6-10", "3-5", "11+"];
-  const scenes: StoryScene[] = indexData.scenes.map((sc) => {
-    const bookMeta = booksMeta.find((b) => b.id === sc.book_id);
-    const variants: Partial<Record<AgeVariantId, SceneVariantContent>> = {};
+  const illustrations: StoryIllustration[] = (indexData.illustrations || []).map((ill) => {
+    const bk = bookMap.get(ill.book_id);
+    return {
+      id: ill.id,
+      ord: ill.number,
+      bookId: ill.book_id,
+      chaptersRef: ill.chapters_ref,
+      title: ill.title,
+      artStyle: mapIllustrationStyle(bk?.illustrationStyle || "", bk?.number || 1),
+      repoImage: ill.image,
+      imageGenerated: Boolean(ill.image_generated),
+    };
+  });
 
-    for (const v of variantsOrder) {
-      const l1Path = sc.levels?.level_1?.[v];
-      const l2Path = sc.levels?.level_2?.[v];
-      const l1Scene = l1Path ? parsedL1ByFile[l1Path]?.[sc.slug] : undefined;
-      const l2Outline = l2Path ? parsedL2ByFile[l2Path]?.[sc.slug] : undefined;
+  const illustrationMap = new Map(illustrations.map((il) => [il.id, il]));
 
-      if (l1Scene || l2Outline) {
-        variants[v] = {
-          passage: l1Scene?.passage || sc.title,
-          voiceNote:
-            l1Scene?.voiceNote ||
-            "Giữ nhịp kể ấm áp, rõ ràng và tạm dừng nhẹ giữa các hình ảnh chính.",
-          detailedOutline: l2Outline || {
-            characters: [sc.title],
-            localizedDetails: [bookMeta?.subtitle || sc.title],
-            emotionalRhythm: "Khoan thai, trang trọng và giàu hình ảnh sống động.",
-            beats: level3Map[sc.slug] || [sc.title],
-          },
-        };
-      }
-    }
+  const scenes: StoryScene[] = (indexData.chapters || []).map((ch) => {
+    const bookMeta = bookMap.get(ch.book_id);
+    const illMeta = illustrationMap.get(ch.illustration_id);
 
-    const defaultVariant = variants["6-10"] || variants["3-5"] || variants["11+"];
+    const l1Path = ch.levels?.level_1 || bookMeta?.level1File || "";
+    const l2Path = ch.levels?.level_2 || bookMeta?.level2File || "";
+
+    const l1Chapter = l1Path ? parsedL1ByFile[l1Path]?.[ch.chapter_number] : undefined;
+    const l2Outline = l2Path ? parsedL2ByFile[l2Path]?.[ch.chapter_number] : undefined;
+    const l3Points = level3Map[ch.id];
+
     const summaryPoints =
-      level3Map[sc.slug] ||
-      defaultVariant?.detailedOutline.beats.slice(0, 5) || [
-        `Mở đầu phân cảnh ${sc.number}: ${sc.title}.`,
-      ];
+      l3Points && l3Points.length > 0
+        ? l3Points
+        : l2Outline?.beats.slice(0, 5) || [`Chương ${ch.chapter_number}: ${ch.title}.`];
 
     const levelPaths: SceneLevelPaths = {
-      level0Overview: sc.levels?.level_0?.overview || overviewPath,
-      level0Book: sc.levels?.level_0?.book || bookMeta?.level0File || "",
-      level1: {
-        "6-10": sc.levels?.level_1?.["6-10"] || "",
-        "3-5": sc.levels?.level_1?.["3-5"] || "",
-        "11+": sc.levels?.level_1?.["11+"] || "",
-      },
-      level2: {
-        "6-10": sc.levels?.level_2?.["6-10"] || "",
-        "3-5": sc.levels?.level_2?.["3-5"] || "",
-        "11+": sc.levels?.level_2?.["11+"] || "",
-      },
-      level3: sc.levels?.level_3 || level3File,
-      level4Gallery: sc.levels?.level_4?.gallery || "level-4-tranh-goi-nho/bo-tranh-goi-nho.md",
-      level4Image: sc.levels?.level_4?.image || sc.image,
-      level4PromptSpec:
-        sc.levels?.level_4?.prompt_spec || "level-4-tranh-goi-nho/prompts-28-phan-canh.md",
+      level0Overview: ch.levels?.level_0?.overview || overviewPath,
+      level0Book: ch.levels?.level_0?.book || bookMeta?.level0File || "",
+      level1: l1Path,
+      level2: l2Path,
+      level3: ch.levels?.level_3 || level3File,
+      level4Gallery: ch.levels?.level_4?.gallery || level4Gallery,
+      level4Image: ch.levels?.level_4?.image || ch.image || illMeta?.repoImage || "",
+      level4PromptSpec: ch.levels?.level_4?.prompt_spec || level4PromptSpec,
     };
 
     return {
-      id: sc.id,
-      ord: sc.number,
-      slug: sc.slug,
-      bookId: sc.book_id,
-      isEpilogue: sc.is_epilogue,
-      title: `Phân cảnh ${sc.number.toString().padStart(2, "0")}: ${sc.title}`,
-      passage: defaultVariant?.passage || sc.title,
+      id: ch.id,
+      ord: ch.global_number,
+      chapterNumber: ch.chapter_number,
+      bookId: ch.book_id,
+      section: ch.section,
+      illustrationId: ch.illustration_id,
+      slug: illMeta?.repoImage?.split("/").pop()?.replace(/\.png$/, "") || ch.id,
+      isEpilogue: Boolean(ch.is_epilogue),
+      title: `Chương ${ch.chapter_number}: ${ch.title}`,
+      passage: l1Chapter?.passage || ch.title,
       voiceNote:
-        defaultVariant?.voiceNote ||
-        "Giữ nhịp kể ấm áp, rõ ràng và tạm dừng nhẹ giữa các hình ảnh.",
-      detailedOutline: defaultVariant?.detailedOutline || {
-        characters: [sc.title],
-        localizedDetails: [bookMeta?.subtitle || sc.title],
-        emotionalRhythm: "Khoan thai, giàu hình ảnh.",
+        l1Chapter?.voiceNote ||
+        "Giữ giọng kể ấm áp, tự nhiên, ngắt nhịp vừa phải theo từng hình ảnh.",
+      detailedOutline: l2Outline || {
+        characters: [ch.title],
+        localizedDetails: [],
+        emotionalRhythm: "Khoan thai, trang trọng và giàu hình ảnh sống động.",
         beats: summaryPoints,
       },
-      variants,
       summaryPoints,
-      artStyle: mapIllustrationStyle(bookMeta?.illustrationStyle || "", bookMeta?.number || 1),
-      repoImage: sc.image,
-      imageGenerated: Boolean(sc.image_generated),
+      artStyle: illMeta?.artStyle || mapIllustrationStyle(bookMeta?.illustrationStyle || "", bookMeta?.number || 1),
+      repoImage: ch.image || illMeta?.repoImage,
+      imageGenerated: illMeta ? illMeta.imageGenerated : false,
       levelPaths,
     };
   });
 
   const primarySoul = bookSouls["quyen-1"] || Object.values(bookSouls)[0] || {
     culturalSpirit:
-      "Đại sử thi 5 Quyển (28 phân cảnh) kết nối từ Khởi Nguyên Sáng Thế đến Đêm Giáng Sinh và Ngoại truyện Ông già Noel.",
+      "Đại sử thi 5 Quyển (180 Chương · 28 Tranh minh họa) kết nối từ Khởi Nguyên Sáng Thế đến Đêm Giáng Sinh và Ngoại truyện Ông già Noel.",
     storytellingRhythm:
-      "Nhịp kể mở rộng theo hơi thở lứa tuổi: nhẹ nhàng như lời ru (3–5), giàu hình tượng bản địa hóa (6–10) và sâu lắng triết lý (11+).",
+      "Giọng kể tự nhiên, ấm áp và giàu hình ảnh trực quan cho trẻ 9–10 tuổi theo tinh thần Jakob Streit.",
     ageMetaphor:
       "Hành trình tìm ánh sáng nội tâm, lòng kiên trung và tình thương trao đi không vụ lợi.",
     pronunciations: [
-      { term: "Michael", pronunciation: "Mi-kha-en", meaning: "Tổng lãnh thiên thần ánh sáng" },
-      { term: "Adam", pronunciation: "A-đam", meaning: "Con người đầu tiên từ đất ấm" },
-      { term: "Noah", pronunciation: "Nô-ê", meaning: "Người đóng Con Tàu giao ước" },
+      { term: "Michael", pronunciation: "Mi-kha-en", meaning: "Tổng lãnh thiên thần cầm gươm ánh sáng" },
+      { term: "Adam – Eve", pronunciation: "A-đam – Ê-va", meaning: "Hai con người đầu tiên trong Vườn Địa Đàng" },
+      { term: "Noah", pronunciation: "Nô-a", meaning: "Người đóng Con Tàu gỗ tuyết tùng" },
     ],
   };
 
   return {
     id: GENESIS_STORY_ID,
-    title: indexData.title || "Từ Sáng Thế Đến Giáng Sinh — Bộ Sử Thi Luyện Kể Chuyện 5 Cấp Độ",
-    titleEn: "From Genesis to Nativity — 5-Level Storytelling Epic",
-    sourceInfo: `Nguồn trực tiếp từ repo xuvivn/from-genesis-to-nativity · ${indexData.total_books} Quyển · ${indexData.total_scenes} phân cảnh`,
-    ageRange: "3–5, 6–10 & 11+ tuổi",
-    goal: "Luyện kể trọn mạch sử thi 5 Quyển (28 phân cảnh) trực tiếp theo folder path Level 0 → Level 4.",
+    title: indexData.title || "Từ Sáng Thế Đến Giáng Sinh — Bộ Sử Thi Luyện Kể Chuyện",
+    titleEn: "From Genesis to Nativity — Epic Storytelling Practice",
+    sourceInfo: `Nguồn từ repo xuvivn/from-genesis-to-nativity · ${indexData.total_books} Quyển · ${indexData.total_chapters} Chương · ${indexData.total_illustrations} Tranh`,
+    targetAge: indexData.target_age || "9–10 tuổi",
+    styleReference: indexData.style_reference || "Jakob Streit",
+    goal: "Đọc hiểu bối cảnh & luyện kể trọn vẹn 180 Chương theo 4 cấp độ từ toàn văn đến 28 tranh thuần hình ảnh.",
     defaultArtStyle: "chalkboard",
     repoUrl: GENESIS_REPO_URL,
     rawBaseUrl: activeBaseUrl,
@@ -716,6 +750,7 @@ export async function fetchGenesisStoryFromRepo(
       bookSouls,
       ancientBooks,
     },
+    illustrations,
     scenes,
   };
 }

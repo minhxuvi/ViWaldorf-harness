@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getSeedData, segmentStoryLocally } from "../lib/seedData";
+import { getSeedData } from "../lib/seedData";
 import { ProceduralIllustrator } from "../lib/art/proceduralIllustrator";
+import { buildFullStoryPrintableHtml } from "../lib/pdfExporter";
 import {
   GENESIS_JSDELIVR_BASE_URL,
   GENESIS_RAW_BASE_URL,
@@ -18,27 +19,34 @@ import {
 } from "../lib/repoStoryLoader";
 import { WaldorfArtStyle } from "../lib/types";
 
-test("Default seed removes legacy sample stories and mounts xuvivn/from-genesis-to-nativity as first story", () => {
+test("Default seed serves exclusively xuvivn/from-genesis-to-nativity (5 Books, 180 Chapters, 28 Illustrations)", () => {
   const seed = getSeedData();
-  assert.equal(seed.stories.length, 1, "Default library should contain only the repo story");
+  assert.equal(seed.stories.length, 1, "Library must contain only the single epic story");
 
   const story = seed.stories[0];
   assert.equal(story.id, GENESIS_STORY_ID);
   assert.equal(story.repoUrl, GENESIS_REPO_URL);
-  assert.ok(!seed.stories.some((s) => s.id === "story-hoian-money"));
-  assert.ok(!seed.stories.some((s) => s.id === "story-abraham-stars"));
-  assert.ok(!seed.stories.some((s) => s.id === "story-cloud-seed"));
-
+  assert.equal(story.targetAge, "9–10 tuổi");
   assert.equal(story.books?.length, 5, "Expected 5 books in epic");
-  assert.equal(story.scenes.length, 28, "Expected 28 scenes in epic");
+  assert.equal(story.scenes.length, 180, "Expected 180 chapters in epic");
+  assert.equal(story.illustrations.length, 28, "Expected 28 cluster illustrations in epic");
   assert.equal(story.soul.ancientBooks?.length, 25, "Expected 25 ancient reference books");
+
+  const chapterCountByBook = new Map<string, number>();
+  for (const sc of story.scenes) {
+    chapterCountByBook.set(sc.bookId, (chapterCountByBook.get(sc.bookId) || 0) + 1);
+  }
+  assert.equal(chapterCountByBook.get("quyen-1"), 67);
+  assert.equal(chapterCountByBook.get("quyen-2"), 56);
+  assert.equal(chapterCountByBook.get("quyen-3"), 32);
+  assert.equal(chapterCountByBook.get("quyen-4"), 15);
+  assert.equal(chapterCountByBook.get("quyen-5"), 10);
 });
 
-test("Level 0–3: All 28 seed scenes contain complete 5-level structures and exact repo folder paths", () => {
+test("Background & Practice levels: All 5 books, 180 chapters, and 28 illustrations have valid repo paths", () => {
   const seed = getSeedData();
   const story = seed.stories[0];
 
-  // Level 0: Soul per book
   for (const bk of story.books || []) {
     const bookSoul = story.soul.bookSouls?.[bk.id];
     assert.ok(bookSoul, `Missing bookSoul for ${bk.id}`);
@@ -46,115 +54,131 @@ test("Level 0–3: All 28 seed scenes contain complete 5-level structures and ex
     assert.ok(bookSoul.storytellingRhythm.trim().length > 20, `${bk.id}: missing storytellingRhythm`);
     assert.ok(bookSoul.ageMetaphor.trim().length > 20, `${bk.id}: missing ageMetaphor`);
     assert.ok(bookSoul.pronunciations.length >= 3, `${bk.id}: must have pronunciation guides`);
+    assert.ok(bk.level0File.startsWith("level-0-khong-gian-boi-canh/"));
+    assert.ok(bk.level1File.startsWith("level-1-toan-van/"));
+    assert.ok(bk.level2File.startsWith("level-2-dan-y-chi-tiet/"));
   }
 
   for (const sc of story.scenes) {
-    assert.ok(sc.passage.trim().length > 40, `${sc.id}: missing read-aloud passage`);
+    assert.ok(sc.passage.trim().length > 20, `${sc.id}: missing passage`);
     assert.ok(sc.voiceNote.trim().length > 20, `${sc.id}: missing voiceNote`);
     assert.ok(sc.detailedOutline.characters.length >= 1, `${sc.id}: missing characters`);
-    assert.ok(sc.detailedOutline.localizedDetails.length >= 2, `${sc.id}: missing localizedDetails`);
     assert.ok(sc.detailedOutline.emotionalRhythm.trim().length > 10, `${sc.id}: missing emotionalRhythm`);
-    assert.ok(sc.detailedOutline.beats.length >= 3, `${sc.id}: missing detailed beats`);
-    assert.ok(
-      sc.summaryPoints.length >= 4 && sc.summaryPoints.length <= 6,
-      `${sc.id}: expected 4–6 summaryPoints, got ${sc.summaryPoints.length}`
-    );
-
+    assert.ok(sc.detailedOutline.beats.length >= 3, `${sc.id}: missing beats`);
+    assert.ok(sc.summaryPoints.length >= 3, `${sc.id}: missing summaryPoints`);
     assert.ok(sc.levelPaths, `${sc.id}: missing levelPaths`);
     assert.ok(sc.levelPaths.level0Book.startsWith("level-0-khong-gian-boi-canh/"));
-    assert.ok(sc.levelPaths.level1["6-10"].startsWith("level-1-toan-van/6-10-tuoi-chuan/"));
-    assert.ok(sc.levelPaths.level1["3-5"].startsWith("level-1-toan-van/3-5-tuoi-mam-non/"));
-    assert.ok(
-      sc.levelPaths.level1["11+"].startsWith("level-1-toan-van/11-cong-thieu-nien-nguoi-lon/")
-    );
-    assert.ok(sc.levelPaths.level3 === "level-3-dan-y-tom-tat/dan-y-tom-tat-28-phan-canh.md");
+    assert.ok(sc.levelPaths.level1.startsWith("level-1-toan-van/"));
+    assert.ok(sc.levelPaths.level2.startsWith("level-2-dan-y-chi-tiet/"));
+    assert.equal(sc.levelPaths.level3, "level-3-dan-y-tom-tat/dan-y-tom-tat-cac-chuong.md");
     assert.ok(sc.repoImage?.startsWith("level-4-tranh-goi-nho/images/"));
   }
+
+  const generatedCount = story.illustrations.filter((il) => il.imageGenerated).length;
+  assert.equal(generatedCount, 21, "Expected tranh-01..tranh-21 to have imageGenerated=true");
 });
 
-test("Repo Markdown parsers parse Level 0, Level 1, Level 2 (3-5/6-10/11+), and Level 3 cleanly", () => {
+test("Repo Markdown parsers parse updated 180-chapter formats (Level 0, Level 1, Level 2, Level 3)", () => {
   const sampleL0 = `# Level 0 — Quyển V
-## 1. Vì Sao Phần Này Đặt Làm Ngoại Truyện?
+## 1. Bối Cảnh Văn Hóa & Tinh Thần Cốt Lõi
 Phần ngoại truyện nối ánh sáng Giáng sinh sang thế kỷ IV tại thành cảng Myra.
-## 2. Nhịp Điệu Kể Chuyện Đặc Trưng
+## 2. Nhịp Điệu Kể Chuyện Đặc Trưng (Độ Tuổi 9–10)
 - Giọng mở nối dịu dàng bên bếp lửa.
-## 3. Thông Điệp Ẩn Dụ Theo Lứa Tuổi
-### Lứa tuổi 3–5 (Mầm non)
-Chiếc tất nhỏ nhắc bé biết chia sẻ niềm vui.
-### Lứa tuổi 6–10 (Tiểu học)
-Sự tử tế đích thực giữ phẩm giá cho người nhận.
-### Lứa tuổi 11+ (Thiếu niên & Người lớn)
-Hạt giống tình thương đi qua mười bảy thế kỷ.
-## 4. Hướng Dẫn Phát Âm Tên Riêng & Địa Danh Cổ (Quyển V)
+## 3. Điểm Chạm & Ẩn Dụ Cho Trẻ 9–10 Tuổi
+- **Điểm chạm:** Niềm vui cho đi âm thầm giữ trọn phẩm giá cho người nhận.
+- **Ẩn dụ cốt lõi:** Hạt giống tình thương đi qua mười bảy thế kỷ.
+## 4. Hướng Dẫn Phát Âm Tên Riêng & Địa Danh Cổ
 | Tên trong văn bản | Cách đọc tự nhiên khi kể (Tiếng Việt) | Ngữ cảnh xuất hiện |
 | :--- | :--- | :--- |
-| **Nicholas** | *Ni-cô-la* | Giám mục thành Myra (Cảnh 28) |
+| **Nicholas** | *Ni-cô-la* | Giám mục thành Myra (Chương 1–9) |
 `;
   const parsedL0 = parseLevel0BookMarkdown(sampleL0);
   assert.ok(parsedL0.culturalSpirit.includes("Myra"));
-  assert.ok(parsedL0.ageMetaphors?.["3-5"]?.includes("Chiếc tất nhỏ"));
-  assert.ok(parsedL0.ageMetaphors?.["6-10"]?.includes("Sự tử tế"));
-  assert.ok(parsedL0.ageMetaphors?.["11+"]?.includes("mười bảy thế kỷ"));
+  assert.ok(parsedL0.storytellingRhythm.includes("bếp lửa"));
+  assert.ok(parsedL0.ageMetaphor.includes("mười bảy thế kỷ"));
   assert.equal(parsedL0.pronunciations.length, 1);
   assert.equal(parsedL0.pronunciations[0].term, "Nicholas");
   assert.equal(parsedL0.pronunciations[0].pronunciation, "Ni-cô-la");
 
-  const sampleL1 = `# Quyển I
-## Phân cảnh 01 (\`canh-01-khoi-nguyen-va-cuoc-chien-anh-sang\`): Khởi Nguyên Thế Giới
-Ngày xửa ngày xưa, bầu trời rực ánh sáng ban đầu.
+  const sampleL1 = `# Quyển I: Khởi Nguyên Và Ánh Sáng Đầu Tiên
 
-Michael vung gươm ánh sáng bảo vệ thiên đàng.
+## Phần I: Bảy Ngày Sáng Thế
 
-### Lưu ý giọng kể & Điểm nhấn chiều sâu
-- Giọng mở đầu chậm rãi, trang trọng.
+### Chương 1: Khởi Nguyên Của Thế Giới
+
+Ngày xưa thật xưa, khi ấy chưa có mặt đất.
+
+> *"Ánh sáng tỏa rạng khắp tầng không."*
+
+#### Lưu ý giọng kể
+- **Nhịp mở màn:** Khoan thai, vang rộng để cảm nhận không gian thiên đàng.
+
 ---
+
+### Chương 2: Michael Và Con Rồng
+
+Dưới vực sâu tối tăm lạnh lẽo, các ác linh bàn nhau chế tạo con rồng.
+
+#### Lưu ý giọng kể
+- **Tạo kịch tính:** Giọng Michael sáng rõ, dứt khoát.
+
+## Phần II: Con Cháu Của Cain
 `;
   const parsedL1 = parseLevel1Markdown(sampleL1);
-  const s1 = parsedL1["canh-01-khoi-nguyen-va-cuoc-chien-anh-sang"];
-  assert.ok(s1);
-  assert.ok(s1.passage.includes("Ngày xửa ngày xưa"));
-  assert.ok(s1.voiceNote.includes("Giọng mở đầu chậm rãi"));
+  assert.ok(parsedL1[1]);
+  assert.ok(parsedL1[1].passage.includes("Ngày xưa thật xưa"));
+  assert.ok(parsedL1[1].passage.includes("Ánh sáng tỏa rạng"));
+  assert.ok(!parsedL1[1].passage.includes("Lưu ý giọng kể"));
+  assert.ok(parsedL1[1].voiceNote.includes("Khoan thai"));
+  assert.ok(parsedL1[2]);
+  assert.ok(!parsedL1[2].voiceNote.includes("Phần II"));
 
   const sampleL2 = `# Level 2
-## Phân cảnh 01 (\`canh-01-khoi-nguyen-va-cuoc-chien-anh-sang\`): Khởi Nguyên
-- **Nhân vật & Hình tượng trung tâm:** Đấng Tạo Hóa, *Michael*, *Lucifer* (đám mây xám), Con Rồng.
+## Phần I: Bảy Ngày Sáng Thế
+
+### Chương 1: Khởi Nguyên Của Thế Giới
+- **Nhân vật & Hình tượng trung tâm:** Đấng Tạo Hóa, *Lucifer*, *Michael*, thanh gươm sấm sét.
 - **Diễn biến chi tiết:**
-  - **Thế giới thiên đàng:** Khắp nơi vang tiếng sáo trúc.
-  - **Cuộc chiến ánh sáng:** Michael đẩy lùi bóng tối.
-- **Ý nghĩa / Điểm nhấn kể chuyện:** Mở đầu sử thi bằng chiến thắng của ánh sáng.
+  - Thuở ban đầu chưa có trái đất.
+  - *Michael* vung gươm sấm sét đẩy lùi phe *Lucifer*.
+- **Ý nghĩa / Điểm nhấn kể chuyện:** Giải thích nguồn gốc ánh sáng và bóng tối bằng hình tượng trực quan.
 `;
   const parsedL2 = parseLevel2Markdown(sampleL2);
-  const o1 = parsedL2["canh-01-khoi-nguyen-va-cuoc-chien-anh-sang"];
-  assert.ok(o1);
-  assert.equal(o1.characters.length, 4);
-  assert.equal(o1.beats.length, 2);
-  assert.ok(o1.emotionalRhythm.includes("chiến thắng của ánh sáng"));
+  assert.ok(parsedL2[1]);
+  assert.equal(parsedL2[1].characters.length, 4);
+  assert.equal(parsedL2[1].beats.length, 2);
+  assert.ok(parsedL2[1].emotionalRhythm.includes("hình tượng trực quan"));
 
   const sampleL3 = `# Level 3
-### Phân cảnh 28 (\`canh-28-ngoai-truyen-thanh-nicholas-va-ong-gia-noel\`): Ngoại Truyện
-- Ý thứ nhất tại thành cảng Patara.
-- Ý thứ hai thả ba túi vàng qua cửa sổ.
-- Ý thứ ba cứu đói thành Myra.
-- Ý thứ tư hóa thành Ông già Noel.
+## Quyển I: Khởi Nguyên Và Ánh Sáng Đầu Tiên (67 Chương)
+### Chương 1: Khởi Nguyên Của Thế Giới
+- Thuở ban đầu chưa có trái đất.
+- Michael đẩy lùi phe Lucifer.
+
+## Quyển V (Ngoại Truyện): Hạt Giống Yêu Thương Đêm Đông (10 Chương)
+### Chương 1: Cậu Bé Thành Patara Và Tiếng Chuông Buổi Sáng
+- Cậu bé Nicholas lớn lên tại thành cảng Patara.
+- Lặng lẽ giúp đỡ người nghèo khó.
 `;
   const parsedL3 = parseLevel3Markdown(sampleL3);
-  assert.equal(parsedL3["canh-28-ngoai-truyen-thanh-nicholas-va-ong-gia-noel"].length, 4);
+  assert.equal(parsedL3["quyen-1-chuong-01"].length, 2);
+  assert.equal(parsedL3["quyen-5-chuong-01"].length, 2);
+  assert.ok(parsedL3["quyen-5-chuong-01"][0].includes("Patara"));
 });
 
-test("Level 4: ProceduralIllustrator renders diverse pure visual SVGs with zero <text> hints across all 28 scenes and 3 styles", () => {
+test("Level 4: ProceduralIllustrator renders diverse pure visual SVGs with zero <text> hints across all 28 illustrations and 3 styles", () => {
   const seed = getSeedData();
   const styles: WaldorfArtStyle[] = ["wet-on-wet", "crayon", "chalkboard"];
   const distinctSvgs = new Set<string>();
 
-  for (const scene of seed.stories[0].scenes) {
+  for (const ill of seed.stories[0].illustrations) {
     for (const style of styles) {
-      const dataUrl = ProceduralIllustrator.generateArtSVG(scene, style);
+      const dataUrl = ProceduralIllustrator.generateArtSVG(ill, style);
       assert.ok(
         dataUrl.startsWith("data:image/svg+xml;utf8,"),
-        `Expected SVG data URL for ${scene.id} (${style})`
+        `Expected SVG data URL for ${ill.id} (${style})`
       );
       if (style === "wet-on-wet") {
-        // Strip scene-specific uid numbers to verify distinct visual motif artwork shapes
         distinctSvgs.add(dataUrl.replace(/wet-\d+-/g, "wet-x-"));
       }
 
@@ -163,15 +187,55 @@ test("Level 4: ProceduralIllustrator renders diverse pure visual SVGs with zero 
       assert.ok(decodedSvg.includes("</svg>"), "SVG must contain closing </svg> tag");
       assert.ok(
         !/<text[\s>]/i.test(decodedSvg),
-        `Level 4 artwork for ${scene.id} (${style}) must NOT contain <text> elements`
+        `Level 4 artwork for ${ill.id} (${style}) must NOT contain <text> elements`
       );
     }
   }
 
   assert.ok(
-    distinctSvgs.size >= 8,
-    `Expected at least 8 distinct epic visual motifs across 28 scenes, got ${distinctSvgs.size}`
+    distinctSvgs.size >= 10,
+    `Expected at least 10 distinct epic visual motifs across 28 illustrations, got ${distinctSvgs.size}`
   );
+});
+
+test("PDF Exporter: buildFullStoryPrintableHtml includes all 180 chapters and embeds all 28 Level 4 illustrations", () => {
+  const seed = getSeedData();
+  const story = seed.stories[0];
+
+  const html = buildFullStoryPrintableHtml(story);
+  assert.ok(html.includes(story.title));
+  assert.ok(html.includes("Mục Lục Toàn Văn"));
+
+  for (const ill of story.illustrations) {
+    assert.ok(
+      html.includes(`data-illustration-id="${ill.id}"`),
+      `PDF HTML missing Level 4 illustration ${ill.id}`
+    );
+    const occurrences = html.split(`data-illustration-id="${ill.id}"`).length - 1;
+    assert.equal(
+      occurrences,
+      1,
+      `Illustration ${ill.id} should be embedded exactly once, found ${occurrences}`
+    );
+  }
+
+  // Generated illustrations (1..21) use CDN PNG with SVG fallback; ungenerated (22..28) use SVG data URL
+  assert.ok(html.includes(`${GENESIS_JSDELIVR_BASE_URL}/level-4-tranh-goi-nho/images/canh-01`));
+  assert.ok(html.includes("data:image/svg+xml;utf8,"));
+
+  // Check chapter coverage in PDF
+  assert.ok(html.includes("Chương 1: Khởi Nguyên Của Thế Giới"));
+  assert.ok(html.includes("Chương 67: Sem Và Các Thiên Thần"));
+  assert.ok(html.includes("Chương 10: Từ Chiếc Áo Choàng Đỏ Thành Myra Đến Ông Già Noel Đêm Giáng Sinh"));
+
+  // Book filter option
+  const book4Html = buildFullStoryPrintableHtml(story, {
+    bookId: "quyen-4",
+    preferProceduralArt: true,
+  });
+  assert.ok(book4Html.includes("data-illustration-id=\"tranh-23\""));
+  assert.ok(!book4Html.includes("data-illustration-id=\"tranh-01\""));
+  assert.ok(!book4Html.includes(GENESIS_JSDELIVR_BASE_URL));
 });
 
 test("Rate-limit-safe repo sync: TTL guard, multi-CDN fallback order, and bounded concurrency", async () => {
@@ -220,37 +284,4 @@ test("Rate-limit-safe repo sync: TTL guard, multi-CDN fallback order, and bounde
 test("ProceduralIllustrator.escapeXml: safely escapes XML metacharacters", () => {
   const escaped = ProceduralIllustrator.escapeXml(`<script>alert("XSS")</script> & 'test'`);
   assert.equal(escaped, "&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt; &amp; &apos;test&apos;");
-});
-
-test("segmentStoryLocally: builds complete Level 0–4 structure from raw user story text", () => {
-  const rawMultiPara = `Ngày xưa bên dãy núi Trường Sơn có một bản làng nhỏ bình yên quanh năm nghe tiếng suối reo.
-
-Một buổi sáng mùa thu, cậu bé Páo theo cha lên rừng tìm những cây tre thẳng đẹp để đan gùi.
-
-Khi cơn mưa rừng bất ngờ ập xuống, hai cha con trú dưới gốc cây cổ thụ và chia nhau nắm cơm nếp thơm.
-
-Chiều tà nắng hửng lên, Páo mang những ống tre vàng óng về tặng bà làm sáo trúc ngân vang khắp bản.`;
-
-  const story = segmentStoryLocally({
-    title: "Tiếng sáo trúc bản nhỏ",
-    ageRange: "7–9 tuổi",
-    artStyle: "crayon",
-    rawText: rawMultiPara,
-  });
-
-  assert.equal(story.title, "Tiếng sáo trúc bản nhỏ");
-  assert.equal(story.defaultArtStyle, "crayon");
-  assert.equal(story.scenes.length, 4);
-  assert.ok(story.soul.culturalSpirit.length > 0);
-  assert.ok(story.soul.pronunciations.length >= 1);
-
-  for (const sc of story.scenes) {
-    assert.ok(sc.passage.length > 0);
-    assert.ok(sc.voiceNote.length > 0);
-    assert.ok(sc.detailedOutline.beats.length >= 1);
-    assert.ok(
-      sc.summaryPoints.length >= 4 && sc.summaryPoints.length <= 6,
-      `Expected 4–6 summary points, got ${sc.summaryPoints.length}`
-    );
-  }
 });

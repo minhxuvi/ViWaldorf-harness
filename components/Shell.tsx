@@ -2,16 +2,10 @@
 
 import React from "react";
 import { useApp } from "@/lib/store";
-import { BookOpen, Languages, RotateCcw } from "lucide-react";
+import { BookOpen, Languages } from "lucide-react";
 
 export function Shell({ children }: { children: React.ReactNode }) {
-  const { lang, setLang, t, resetToSeed } = useApp();
-
-  const handleResetSeed = () => {
-    if (window.confirm(t.header.resetConfirm)) {
-      resetToSeed();
-    }
-  };
+  const { lang, setLang, t } = useApp();
 
   return (
     <div className="min-h-screen bg-paper text-ink flex flex-col">
@@ -32,15 +26,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={handleResetSeed}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#254A2E] hover:bg-[#2F5D3A] text-xs font-medium text-onDark transition"
-              title={t.header.resetSeedBtn}
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-[#E9C46A]" />
-              <span className="hidden sm:inline">{t.header.resetSeedBtn}</span>
-            </button>
-
             <button
               onClick={() => setLang(lang === "vi" ? "en" : "vi")}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#254A2E] hover:bg-[#2F5D3A] text-xs font-semibold text-onDark transition"

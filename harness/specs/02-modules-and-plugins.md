@@ -20,7 +20,9 @@ plugins/<name>/
 
 ## 3. The `waldorf` Plugin
 
-The `waldorf` plugin focuses exclusively on **Storytelling Practice (Luyện kể chuyện)**:
-- **5 Progressive Practice Levels (Level 0–4)** for internalizing stories organically.
+The `waldorf` plugin focuses exclusively on **Storytelling Practice (Luyện kể chuyện)** for *Từ Sáng Thế Đến Giáng Sinh*:
+- **Background & Story Soul Reading Drawer (`level-0-khong-gian-boi-canh/`)** for cultural context, breathing rhythm, pronunciation, and ancient reference texts.
+- **4 Progressive Practice Levels (Level 1–4)** for internalizing the 180 chapters and 28 cluster illustrations organically.
+- **Full-Text Printable PDF Export** embedding all 180 chapters (Level 1) and all 28 Level 4 illustrations.
 - **3 Pure-Visual Waldorf Art Styles** (Wet-on-Wet watercolor, Beeswax crayon, Chalkboard pastel) with zero text overlays.
 - **In-Browser Voice Recording & Playback** without AI scoring or evaluation.

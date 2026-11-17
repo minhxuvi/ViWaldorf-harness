@@ -1,4 +1,13 @@
-import { WaldorfArtStyle, StoryScene } from "../types";
+import { WaldorfArtStyle } from "../types";
+
+export interface VisualArtSubject {
+  ord: number;
+  title: string;
+  slug?: string;
+  repoImage?: string;
+  passage?: string;
+  summaryPoints?: string[];
+}
 
 type SceneMotif =
   | "creation-light"
@@ -37,29 +46,35 @@ const NIGHT_MOTIFS = new Set<SceneMotif>([
  * TUYỆT ĐỐI KHÔNG chứa chữ (<text>) để người kể tự do cảm nhận hình ảnh và tuôn chảy ngôn ngữ sống.
  */
 export class ProceduralIllustrator {
-  public static generateArtSVG(scene: StoryScene, style: WaldorfArtStyle): string {
+  public static generateArtSVG(subject: VisualArtSubject, style: WaldorfArtStyle): string {
     const width = 640;
     const height = 400;
-    const headText = `${scene.slug || ""} ${scene.title}`.toLowerCase();
-    const corpus = `${headText} ${scene.passage} ${scene.summaryPoints.join(" ")}`.toLowerCase();
-    const motif = this.detectMotif(headText, corpus, scene.ord);
+    const headText = `${subject.slug || ""} ${subject.repoImage || ""} ${subject.title}`.toLowerCase();
+    const corpus = `${headText} ${subject.passage || ""} ${(subject.summaryPoints || []).join(" ")}`.toLowerCase();
+    const motif = this.detectMotif(headText, corpus, subject.ord);
 
     switch (style) {
       case "wet-on-wet":
-        return this.renderWetOnWetSVG(width, height, scene.ord, motif);
+        return this.renderWetOnWetSVG(width, height, subject.ord, motif);
       case "crayon":
-        return this.renderCrayonSVG(width, height, scene.ord, motif);
+        return this.renderCrayonSVG(width, height, subject.ord, motif);
       case "chalkboard":
-        return this.renderChalkboardSVG(width, height, scene.ord, motif);
+        return this.renderChalkboardSVG(width, height, subject.ord, motif);
     }
   }
 
   private static detectMotif(headText: string, text: string, ord: number): SceneMotif {
-    // 1. Mạch sử thi 28 phân cảnh (ưu tiên đối chiếu tiêu đề & slug phân cảnh để tránh trùng từ khóa dẫn truyện chung)
+    // 1. Mạch sử thi 28 tranh minh họa (ưu tiên đối chiếu tiêu đề & slug tranh để tránh trùng từ khóa dẫn truyện chung)
     if (headText.includes("nicholas") || headText.includes("ông già noel") || headText.includes("áo choàng đỏ") || headText.includes("myra")) {
       return "nicholas-winter";
     }
-    if (headText.includes("nhà thông thái") || headText.includes("mục đồng") || headText.includes("nazareth") || headText.includes("báo tin") || headText.includes("giáng sinh") || headText.includes("sông jordan")) {
+    if (headText.includes("thợ mộc") || headText.includes("xưởng mộc") || headText.includes("xưởng gỗ")) {
+      return "carpenter-bench";
+    }
+    if (headText.includes("sông jordan") || headText.includes("phep-rua")) {
+      return "green-valley";
+    }
+    if (headText.includes("nhà thông thái") || headText.includes("mục đồng") || headText.includes("nazareth") || headText.includes("báo tin") || headText.includes("giáng sinh")) {
       return "nativity-manger";
     }
     if (headText.includes("jonah") || headText.includes("giô-na") || headText.includes("bụng cá") || headText.includes("cá khổng lồ")) {

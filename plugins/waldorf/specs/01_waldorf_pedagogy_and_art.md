@@ -9,17 +9,17 @@ Waldorf oral storytelling nurtures the threefold child through living spoken lan
 - **Feeling (Heart)**: Warmth, breathing pauses, and emotional resonance carried by the storyteller's voice.
 - **Willing (Hands)**: Grounded connection to cultural crafts, nature rhythms, and seasonal life.
 
-### Five Practice Levels (Level 0 – Level 4)
+### Background Reading & Four Practice Levels (Level 1 – Level 4)
 
-The storyteller moves step by step from spiritual preparation and read-aloud mastery to pure visual recall:
+The storyteller grounds themselves in the optional **Background & Story Soul** reading drawer, then moves step by step across the **4 practice levels**:
 
-| Level | Name | Displayed Content |
+| Stage | Name | Displayed Content |
 |---|---|---|
-| **Level 0** | **Không gian bối cảnh & Linh hồn câu chuyện** (Context & Soul) | Cultural spirit, storytelling breathing rhythm, age-appropriate metaphor, and pronunciation guide for ancient/regional names. |
-| **Level 1** | **Toàn văn câu chuyện** (Full Story) | Complete read-aloud passage per scene with rich imagery and *Lưu ý giọng kể* (vocal delivery notes). |
-| **Level 2** | **Dàn ý chi tiết** (Detailed Outline) | Full text hidden; shows characters, localized sensory details, age-appropriate emotional rhythm, and narrative beats per scene. |
-| **Level 3** | **Dàn ý tóm tắt** (Summary Skeleton) | **One unified skeleton outline** closely following the original plot, with **4–6 concise points per scene**. |
-| **Level 4** | **Tranh gợi nhớ thuần hình ảnh** (Pure Visual Recall) | **One traditional hand-drawn illustration per scene** (`wet-on-wet`, `crayon`, or `chalkboard`) with **zero text hints** (no titles, no keywords, no `<text>` elements in SVG). |
+| **Đọc thêm (`level-0`)** | **Bối cảnh & Linh hồn câu chuyện** (Background & Story Soul) | Optional deep reading: epic overview, cultural spirit, storytelling breathing rhythm, metaphor & touchpoints, pronunciation guide for ancient names, and 25 ancient reference texts. |
+| **Level 1** | **Toàn văn câu chuyện** (Full Story) | Complete read-aloud narrative across 180 chapters with *Lưu ý giọng kể* (vocal delivery notes) and **Full-Text PDF Export with Level 4 Illustrations**. |
+| **Level 2** | **Dàn ý chi tiết** (Detailed Outline) | Full text hidden; shows characters/motifs, detailed narrative beats, and storytelling significance per chapter. |
+| **Level 3** | **Dàn ý tóm tắt** (Summary Skeleton) | **One unified skeleton outline** closely following all 180 chapters of the original plot. |
+| **Level 4** | **Tranh gợi nhớ thuần hình ảnh** (Pure Visual Recall) | **28 traditional hand-drawn cluster illustrations** (`wet-on-wet`, `crayon`, or `chalkboard`) with **zero text hints** (no titles, no keywords, no `<text>` elements in SVG). |
 
 ---
 
