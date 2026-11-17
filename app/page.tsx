@@ -16,9 +16,11 @@ import { ProceduralIllustrator } from "@/lib/art/proceduralIllustrator";
 import {
   buildGitHubBlobUrl,
   buildRepoFileUrl,
+  cleanInlineMarkdown,
   fetchAncientBookMarkdown,
-  GENESIS_RAW_BASE_URL,
+  GENESIS_JSDELIVR_BASE_URL,
   GENESIS_REPO_URL,
+  getCandidateRepoBaseUrls,
 } from "@/lib/repoStoryLoader";
 import {
   BookOpen,
@@ -36,6 +38,7 @@ import {
   MapPin,
   ListChecks,
   Image as ImageIcon,
+  ArrowLeft,
   ArrowRight,
   Download,
   Trash2,
@@ -45,16 +48,49 @@ import {
   FolderGit2,
   ExternalLink,
   ScrollText,
+  CheckCircle2,
+  Maximize2,
+  Minimize2,
+  Type,
   X,
 } from "lucide-react";
 
 const PRACTICE_LEVELS: PracticeLevel[] = [0, 1, 2, 3, 4];
 const AGE_VARIANTS: AgeVariantId[] = ["3-5", "6-10", "11+"];
+const ANCIENT_CATEGORIES = ["all", "cuu-uoc", "tan-uoc", "co-thu"] as const;
+type AncientCategoryFilter = (typeof ANCIENT_CATEGORIES)[number];
+type Level1TextSize = "sm" | "md" | "lg";
 
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function formatLastSynced(iso?: string, lang?: string): string {
+  if (!iso) return "";
+  const ts = Date.parse(iso);
+  if (Number.isNaN(ts)) return "";
+  try {
+    return new Date(ts).toLocaleString(lang === "en" ? "en-US" : "vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "2-digit",
+      month: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
+function formatMarkdownForReading(markdown: string): string {
+  return cleanInlineMarkdown(
+    markdown
+      .replace(/\r\n/g, "\n")
+      .replace(/^#{1,6}\s+(.+)$/gm, "$1")
+      .replace(/^---+\s*$/gm, "")
+      .replace(/^\s*[-*]\s+/gm, "• ")
+  );
 }
 
 function getActiveRepoPath(params: {
@@ -91,6 +127,7 @@ export default function StorytellingPracticePage() {
     lang,
     isSyncingRepo,
     syncError,
+    syncNotice,
     syncFromRepo,
   } = useApp();
 
@@ -98,10 +135,15 @@ export default function StorytellingPracticePage() {
   const [activeLevel, setActiveLevel] = useState<PracticeLevel>(0);
   const [activeSceneIndex, setActiveSceneIndex] = useState<number>(0);
   const [level1FlowMode, setLevel1FlowMode] = useState<"scene" | "full">("scene");
+  const [level1TextSize, setLevel1TextSize] = useState<Level1TextSize>("md");
+  const [level3Scope, setLevel3Scope] = useState<"all" | "current">("all");
+  const [isLevel4StageMode, setIsLevel4StageMode] = useState<boolean>(false);
   const [selectedBookId, setSelectedBookId] = useState<string>("all");
   const [selectedAgeVariant, setSelectedAgeVariant] = useState<AgeVariantId>("6-10");
 
-  // Level 0: Văn bản cổ đọc thêm tải trực tiếp từ repo
+  // Level 0: Tổng quan sử thi & Văn bản cổ đọc thêm tải qua CDN theo nhu cầu
+  const [showEpicOverview, setShowEpicOverview] = useState<boolean>(false);
+  const [ancientCategory, setAncientCategory] = useState<AncientCategoryFilter>("all");
   const [activeAncientBook, setActiveAncientBook] = useState<AncientBookItem | null>(null);
   const [ancientBookContent, setAncientBookContent] = useState<string>("");
   const [ancientBookLoading, setAncientBookLoading] = useState<boolean>(false);
@@ -162,6 +204,8 @@ export default function StorytellingPracticePage() {
   useEffect(() => {
     setActiveSceneIndex(0);
     setSelectedBookId("all");
+    setShowEpicOverview(false);
+    setAncientCategory("all");
     setActiveAncientBook(null);
     setAncientBookContent("");
     setAncientBookError("");
@@ -235,7 +279,7 @@ export default function StorytellingPracticePage() {
   const handleSyncRepoClick = async () => {
     setFailedRepoImages({});
     ancientCacheRef.current = {};
-    await syncFromRepo();
+    await syncFromRepo({ force: true });
   };
 
   const handleOpenAncientBook = async (book: AncientBookItem) => {
@@ -257,7 +301,7 @@ export default function StorytellingPracticePage() {
     try {
       const md = await fetchAncientBookMarkdown(
         book.file,
-        selectedStory?.rawBaseUrl || GENESIS_RAW_BASE_URL
+        selectedStory?.rawBaseUrl || GENESIS_JSDELIVR_BASE_URL
       );
       ancientCacheRef.current[book.file] = md;
       setAncientBookContent(md);
@@ -521,15 +565,23 @@ export default function StorytellingPracticePage() {
     (currentScene && getSceneVariant(currentScene)?.detailedOutline) ||
     currentScene?.detailedOutline;
 
-  // Xác định đường dẫn ảnh Level 4 trực tiếp theo folder path trên repo
-  const rawBaseUrl = selectedStory?.rawBaseUrl || GENESIS_RAW_BASE_URL;
-  const repoImgUrl =
-    currentScene?.repoImage && !preferProceduralArt
-      ? buildRepoFileUrl(currentScene.repoImage, rawBaseUrl)
-      : "";
-  const shouldShowRepoImg = Boolean(
-    !currentScene?.imagePath && repoImgUrl && !failedRepoImages[repoImgUrl]
-  );
+  // Xác định đường dẫn ảnh Level 4 qua CDN (chỉ tải khi story-index xác nhận imageGenerated = true)
+  const repoImageCandidates = useMemo(() => {
+    if (
+      !currentScene?.imageGenerated ||
+      !currentScene?.repoImage ||
+      preferProceduralArt ||
+      currentScene?.imagePath
+    ) {
+      return [];
+    }
+    return getCandidateRepoBaseUrls(selectedStory?.rawBaseUrl).map((base) =>
+      buildRepoFileUrl(currentScene.repoImage!, base)
+    );
+  }, [currentScene, preferProceduralArt, selectedStory?.rawBaseUrl]);
+
+  const repoImgUrl = repoImageCandidates.find((u) => !failedRepoImages[u]) || "";
+  const shouldShowRepoImg = Boolean(!currentScene?.imagePath && repoImgUrl);
   const level4ImgSrc = currentScene
     ? currentScene.imagePath
       ? currentScene.imagePath
@@ -547,20 +599,29 @@ export default function StorytellingPracticePage() {
   });
 
   const ancientBooks = selectedStory?.soul.ancientBooks || [];
+  const filteredAncientBooks = useMemo(() => {
+    if (ancientCategory === "all") return ancientBooks;
+    return ancientBooks.filter((ab) => ab.category === ancientCategory);
+  }, [ancientBooks, ancientCategory]);
+  const lastSyncedText = formatLastSynced(selectedStory?.lastSyncedAt, lang);
 
   return (
     <div className="space-y-6 pb-32">
       <PageHeader title={t.story.pageTitle} subtitle={t.story.pageSubtitle} />
 
-      {/* Thanh chọn truyện, kết nối trực tiếp Repo & tải lên */}
-      <section className="garden-card space-y-3">
+      {/* Thanh chọn truyện, kết nối CDN an toàn & tải lên */}
+      <section className="garden-card space-y-3.5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5">
-            <span className="text-sm font-semibold text-forestDark flex items-center gap-1.5">
+            <label
+              htmlFor="story-selector"
+              className="text-sm font-semibold text-forestDark flex items-center gap-1.5"
+            >
               <BookOpen className="w-4 h-4 text-forest" />
-              {t.story.selectStory}:
-            </span>
+              <span>{t.story.selectStory}:</span>
+            </label>
             <select
+              id="story-selector"
               value={selectedStory?.id || ""}
               onChange={(e) => setSelectedStoryId(e.target.value)}
               className="px-3 py-2 rounded-xl border border-line bg-white text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-forest/40 max-w-full"
@@ -577,6 +638,7 @@ export default function StorytellingPracticePage() {
           <div className="flex flex-wrap items-center gap-2">
             {selectedStory?.repoUrl && (
               <button
+                type="button"
                 onClick={handleSyncRepoClick}
                 disabled={isSyncingRepo}
                 className="btn-ghost text-xs py-2 px-3 border-forest/30"
@@ -600,6 +662,7 @@ export default function StorytellingPracticePage() {
               className="hidden"
             />
             <button
+              type="button"
               onClick={() => storyFileInputRef.current?.click()}
               className="btn-ghost text-xs py-2 px-3"
             >
@@ -607,6 +670,7 @@ export default function StorytellingPracticePage() {
               <span>{t.story.uploadFileBtn}</span>
             </button>
             <button
+              type="button"
               onClick={() => setShowAddForm(!showAddForm)}
               className="btn-primary text-xs py-2 px-3"
             >
@@ -618,26 +682,51 @@ export default function StorytellingPracticePage() {
 
         {/* Thanh thông tin Repo & Bộ lọc Quyển / Lứa tuổi */}
         {selectedStory && (
-          <div className="space-y-2.5 pt-2 border-t border-line/60">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-inkSoft">
-              <span className="badge-leaf">{selectedStory.ageRange}</span>
-              <span className="badge-sand">
-                {selectedStory.scenes.length} {t.story.scenesCountSuffix}
-              </span>
-              {selectedStory.repoUrl && (
+          <div className="space-y-3 pt-2.5 border-t border-line/60">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-inkSoft">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="badge-leaf">{selectedStory.ageRange}</span>
+                <span className="badge-sand">
+                  {selectedStory.scenes.length} {t.story.scenesCountSuffix}
+                </span>
+                {selectedStory.repoUrl && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#E3EFE0]/85 text-forestDark font-medium">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-forest" />
+                    <span>{t.story.repo.syncedLabel}</span>
+                    {lastSyncedText && (
+                      <span className="text-[11px] text-inkSoft font-normal">
+                        · {t.story.repo.lastSyncedPrefix}: {lastSyncedText}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+
+              {activeRepoPath && selectedStory.repoUrl && (
                 <a
-                  href={selectedStory.repoUrl}
+                  href={buildGitHubBlobUrl(
+                    activeRepoPath,
+                    selectedStory.repoUrl || GENESIS_REPO_URL
+                  )}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#E3EFE0]/80 text-forestDark font-medium hover:underline"
+                  title={`${t.story.repo.folderPathLabel}: ${activeRepoPath}`}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FAF4E8] border border-line text-[11px] text-forestDark hover:border-forest/50 hover:underline max-w-full"
                 >
-                  <FolderGit2 className="w-3.5 h-3.5 text-forest" />
-                  <span>{t.story.repo.syncedLabel}</span>
-                  <ExternalLink className="w-3 h-3" />
+                  <FolderGit2 className="w-3 h-3 text-forest flex-shrink-0" />
+                  <code className="text-terra truncate max-w-[180px] sm:max-w-[260px]">
+                    {activeRepoPath}
+                  </code>
+                  <ExternalLink className="w-3 h-3 text-forest flex-shrink-0" />
                 </a>
               )}
-              <span>{selectedStory.sourceInfo}</span>
             </div>
+
+            {syncNotice && !syncError && (
+              <div className="text-xs text-forestDark bg-[#E3EFE0]/70 border border-forest/25 rounded-lg px-3 py-1.5">
+                {syncNotice}
+              </div>
+            )}
 
             {syncError && (
               <div className="text-xs text-terra bg-[#FDF2F0] border border-terra/30 rounded-lg px-3 py-1.5">
@@ -647,16 +736,18 @@ export default function StorytellingPracticePage() {
 
             {/* Chọn Quyển (Quyển I – V) & Biến thể Lứa tuổi (3–5, 6–10, 11+) */}
             {books.length > 0 && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
-                <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
+                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t.story.repo.bookFilterLabel}>
                   <span className="text-xs font-semibold text-forestDark mr-1">
                     {t.story.repo.bookFilterLabel}:
                   </span>
                   <button
+                    type="button"
+                    aria-pressed={selectedBookId === "all"}
                     onClick={() => handleBookSelect("all")}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition ${
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
                       selectedBookId === "all"
-                        ? "bg-forest text-white border-forest"
+                        ? "bg-forest text-white border-forest shadow-sm"
                         : "bg-white text-ink border-line hover:bg-[#FAF3E3]"
                     }`}
                   >
@@ -664,60 +755,58 @@ export default function StorytellingPracticePage() {
                   </button>
                   {books.map((bk) => (
                     <button
+                      type="button"
                       key={bk.id}
+                      aria-pressed={selectedBookId === bk.id}
                       onClick={() => handleBookSelect(bk.id)}
                       title={bk.title}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition ${
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
                         selectedBookId === bk.id
-                          ? "bg-forest text-white border-forest"
+                          ? "bg-forest text-white border-forest shadow-sm"
                           : "bg-white text-ink border-line hover:bg-[#FAF3E3]"
                       }`}
                     >
-                      {bk.isEpilogue ? "Quyển V · Ngoại truyện" : `Quyển ${bk.number}`}
+                      {bk.isEpilogue
+                        ? lang === "en"
+                          ? "Book V · Epilogue"
+                          : "Quyển V · Ngoại truyện"
+                        : lang === "en"
+                        ? `Book ${bk.number}`
+                        : `Quyển ${bk.number}`}
                     </button>
                   ))}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-semibold text-forestDark whitespace-nowrap">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-forestDark whitespace-nowrap">
                     {t.story.repo.ageVariantLabel}:
-                  </label>
-                  <select
-                    value={selectedAgeVariant}
-                    onChange={(e) => setSelectedAgeVariant(e.target.value as AgeVariantId)}
-                    className="px-2.5 py-1.5 rounded-lg border border-line bg-white text-xs font-medium text-ink"
-                  >
-                    {AGE_VARIANTS.map((v) => (
-                      <option key={v} value={v}>
-                        {t.story.repo.ageVariants[v]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {/* Hiển thị folder/file path đang tải trực tiếp từ Repo */}
-            {activeRepoPath && selectedStory.repoUrl && (
-              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] bg-[#FAF4E8] border border-line rounded-xl px-3 py-1.5 text-inkSoft">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="font-semibold text-forestDark flex-shrink-0">
-                    {t.story.repo.folderPathLabel}:
                   </span>
-                  <code className="text-terra truncate">{activeRepoPath}</code>
+                  <div
+                    className="inline-flex rounded-xl bg-[#F3E9D4] p-1 border border-line"
+                    role="group"
+                    aria-label={t.story.repo.ageVariantLabel}
+                  >
+                    {AGE_VARIANTS.map((v) => {
+                      const active = selectedAgeVariant === v;
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setSelectedAgeVariant(v)}
+                          title={t.story.repo.ageVariants[v]}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                            active
+                              ? "bg-forest text-white shadow-sm"
+                              : "text-forestDark hover:bg-white/75"
+                          }`}
+                        >
+                          {t.story.repo.ageVariantsShort[v]}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <a
-                  href={buildGitHubBlobUrl(
-                    activeRepoPath,
-                    selectedStory.repoUrl || GENESIS_REPO_URL
-                  )}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-forest font-semibold hover:underline flex-shrink-0"
-                >
-                  <span>{t.story.repo.openOnGitHub}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
               </div>
             )}
           </div>
@@ -824,6 +913,7 @@ export default function StorytellingPracticePage() {
           </div>
 
           <button
+            type="button"
             onClick={handleSaveNewStory}
             disabled={!newText.trim()}
             className="btn-primary text-sm"
@@ -837,15 +927,20 @@ export default function StorytellingPracticePage() {
       {/* Thanh chọn 5 Level luyện tập */}
       {selectedStory && (
         <section className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2" role="tablist" aria-label={t.story.pageTitle}>
             {PRACTICE_LEVELS.map((lvl) => {
               const meta = t.story.levels[lvl];
               const isActive = activeLevel === lvl;
               return (
                 <button
                   key={lvl}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
                   onClick={() => setActiveLevel(lvl)}
                   className={`text-left p-3 rounded-xl border transition-all ${
+                    lvl === 4 ? "col-span-2 sm:col-span-1" : ""
+                  } ${
                     isActive
                       ? "bg-forest text-white border-forest shadow-md"
                       : "bg-card text-ink border-line hover:border-forest/50 hover:bg-[#FAF3E3]"
@@ -890,13 +985,57 @@ export default function StorytellingPracticePage() {
           {/* ============================================================== */}
           {activeLevel === 0 && activeSoul && (
             <div className="space-y-4">
-              {books.length > 0 && (
-                <div className="text-xs font-serif font-semibold text-forestDark bg-[#FFFDF8] px-4 py-2 rounded-xl border border-line">
-                  {books.find((b) => b.id === activeBookIdForSoul)?.title || books[0]?.title} —{" "}
-                  <span className="font-normal text-inkSoft">
-                    {books.find((b) => b.id === activeBookIdForSoul)?.subtitle ||
-                      books[0]?.subtitle}
-                  </span>
+              {(books.length > 0 || selectedStory.soul.overviewMarkdown) && (
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#FFFDF8] px-4 py-2.5 rounded-xl border border-line">
+                  {books.length > 0 ? (
+                    <div className="text-xs font-serif font-semibold text-forestDark">
+                      {books.find((b) => b.id === activeBookIdForSoul)?.title || books[0]?.title} —{" "}
+                      <span className="font-normal text-inkSoft">
+                        {books.find((b) => b.id === activeBookIdForSoul)?.subtitle ||
+                          books[0]?.subtitle}
+                      </span>
+                    </div>
+                  ) : (
+                    <span />
+                  )}
+
+                  {selectedStory.soul.overviewMarkdown && (
+                    <button
+                      type="button"
+                      onClick={() => setShowEpicOverview((v) => !v)}
+                      aria-expanded={showEpicOverview}
+                      className="btn-ghost text-xs py-1 px-2.5"
+                    >
+                      <ScrollText className="w-3.5 h-3.5 text-forest" />
+                      <span>
+                        {showEpicOverview
+                          ? t.story.level0.epicOverviewToggleClose
+                          : t.story.level0.epicOverviewToggleOpen}
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {showEpicOverview && selectedStory.soul.overviewMarkdown && (
+                <div className="garden-card bg-[#FFFDF9] border-forest/30 space-y-2">
+                  <div className="flex items-center justify-between gap-2 border-b border-line pb-2">
+                    <h3 className="font-serif text-base font-bold text-forestDark flex items-center gap-2">
+                      <ScrollText className="w-4 h-4 text-forest" />
+                      <span>{t.story.level0.epicOverviewToggleOpen}</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowEpicOverview(false)}
+                      className="btn-ghost text-xs py-1 px-2"
+                      aria-label={t.story.level0.epicOverviewToggleClose}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="max-h-96 overflow-y-auto text-sm text-ink leading-relaxed whitespace-pre-line pr-2 font-serif">
+                    {formatMarkdownForReading(selectedStory.soul.overviewMarkdown)}
+                  </div>
                 </div>
               )}
 
@@ -978,6 +1117,7 @@ export default function StorytellingPracticePage() {
                     </div>
                     {activeAncientBook && (
                       <button
+                        type="button"
                         onClick={() => setActiveAncientBook(null)}
                         className="btn-ghost text-xs py-1 px-2.5"
                       >
@@ -987,12 +1127,45 @@ export default function StorytellingPracticePage() {
                     )}
                   </div>
 
+                  {/* Bộ lọc danh mục văn bản cổ */}
+                  <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t.story.repo.ancientBooksTitle}>
+                    {ANCIENT_CATEGORIES.map((cat) => {
+                      const count =
+                        cat === "all"
+                          ? ancientBooks.length
+                          : ancientBooks.filter((ab) => ab.category === cat).length;
+                      if (cat !== "all" && count === 0) return null;
+                      const label =
+                        cat === "all"
+                          ? t.story.repo.allCategoriesOption
+                          : t.story.repo.categories[cat];
+                      const active = ancientCategory === cat;
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setAncientCategory(cat)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
+                            active
+                              ? "bg-forest text-white border-forest"
+                              : "bg-white text-inkSoft border-line hover:bg-[#FAF3E3]"
+                          }`}
+                        >
+                          {label} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
                   <div className="flex flex-wrap gap-2">
-                    {ancientBooks.map((ab) => {
+                    {filteredAncientBooks.map((ab) => {
                       const isOpen = activeAncientBook?.id === ab.id;
                       return (
                         <button
                           key={ab.id}
+                          type="button"
+                          aria-pressed={isOpen}
                           onClick={() => handleOpenAncientBook(ab)}
                           className={`px-2.5 py-1.5 rounded-lg text-xs border transition text-left ${
                             isOpen
@@ -1039,7 +1212,7 @@ export default function StorytellingPracticePage() {
                       )}
                       {ancientBookContent && (
                         <div className="max-h-96 overflow-y-auto text-sm text-ink leading-relaxed whitespace-pre-line pr-2 font-serif">
-                          {ancientBookContent}
+                          {formatMarkdownForReading(ancientBookContent)}
                         </div>
                       )}
                     </div>
@@ -1048,7 +1221,7 @@ export default function StorytellingPracticePage() {
               )}
 
               <div className="flex justify-end">
-                <button onClick={() => setActiveLevel(1)} className="btn-primary text-sm">
+                <button type="button" onClick={() => setActiveLevel(1)} className="btn-primary text-sm">
                   <span>{t.story.level0.nextLevelBtn}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
@@ -1061,29 +1234,63 @@ export default function StorytellingPracticePage() {
           {/* ============================================================== */}
           {activeLevel === 1 && (
             <div className="garden-card space-y-5">
-              {/* Chuyển đổi Xem từng phân cảnh / Liền mạch */}
+              {/* Chuyển đổi Xem từng phân cảnh / Liền mạch + Cỡ chữ */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-                <div className="flex rounded-xl bg-[#F7ECD8]/70 p-1 border border-line">
-                  <button
-                    onClick={() => setLevel1FlowMode("scene")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                      level1FlowMode === "scene"
-                        ? "bg-forest text-white shadow-sm"
-                        : "text-forestDark hover:bg-white/60"
-                    }`}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex rounded-xl bg-[#F7ECD8]/70 p-1 border border-line">
+                    <button
+                      type="button"
+                      onClick={() => setLevel1FlowMode("scene")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        level1FlowMode === "scene"
+                          ? "bg-forest text-white shadow-sm"
+                          : "text-forestDark hover:bg-white/60"
+                      }`}
+                    >
+                      {t.story.level1.viewByScene}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLevel1FlowMode("full")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        level1FlowMode === "full"
+                          ? "bg-forest text-white shadow-sm"
+                          : "text-forestDark hover:bg-white/60"
+                      }`}
+                    >
+                      {t.story.level1.viewFullFlow}
+                    </button>
+                  </div>
+
+                  {/* Bộ chọn cỡ chữ đọc thành tiếng */}
+                  <div
+                    className="inline-flex items-center gap-1 rounded-xl bg-[#F7ECD8]/50 p-1 border border-line"
+                    role="group"
+                    aria-label={t.story.level1.textSizeLabel}
                   >
-                    {t.story.level1.viewByScene}
-                  </button>
-                  <button
-                    onClick={() => setLevel1FlowMode("full")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                      level1FlowMode === "full"
-                        ? "bg-forest text-white shadow-sm"
-                        : "text-forestDark hover:bg-white/60"
-                    }`}
-                  >
-                    {t.story.level1.viewFullFlow}
-                  </button>
+                    <Type className="w-3.5 h-3.5 text-forest ml-1.5 mr-0.5" />
+                    {(
+                      [
+                        { id: "sm", label: t.story.level1.textSizeSmall },
+                        { id: "md", label: t.story.level1.textSizeMedium },
+                        { id: "lg", label: t.story.level1.textSizeLarge },
+                      ] as const
+                    ).map((sz) => (
+                      <button
+                        key={sz.id}
+                        type="button"
+                        aria-pressed={level1TextSize === sz.id}
+                        onClick={() => setLevel1TextSize(sz.id)}
+                        className={`px-2 py-1 rounded-lg text-xs font-semibold transition ${
+                          level1TextSize === sz.id
+                            ? "bg-forest text-white shadow-sm"
+                            : "text-forestDark hover:bg-white/70"
+                        }`}
+                      >
+                        {sz.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {level1FlowMode === "scene" && (
@@ -1103,7 +1310,7 @@ export default function StorytellingPracticePage() {
 
               {level1FlowMode === "scene" && currentScene ? (
                 <div
-                  className="space-y-4 max-w-3xl mx-auto py-2"
+                  className="space-y-4 max-w-[68ch] mx-auto py-2"
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
@@ -1112,10 +1319,7 @@ export default function StorytellingPracticePage() {
                     {currentScene.title}
                   </h3>
 
-                  <p className="font-serif text-base sm:text-lg leading-[1.85] text-ink whitespace-pre-line bg-[#FFFDF9] p-5 sm:p-6 rounded-2xl border border-line shadow-sm">
-                    {currentPassage}
-                  </p>
-
+                  {/* Đặt Lưu ý giọng kể lên đầu để người kể lấy hơi & tông giọng trước khi đọc */}
                   <div className="p-4 rounded-xl bg-[#E3EFE0]/70 border border-[#C5DEC0] space-y-1">
                     <div className="text-xs font-bold uppercase tracking-wider text-forest flex items-center gap-1.5">
                       <Volume2 className="w-4 h-4" />
@@ -1125,9 +1329,35 @@ export default function StorytellingPracticePage() {
                       {currentVoiceNote}
                     </p>
                   </div>
+
+                  <p
+                    className={`font-serif text-ink whitespace-pre-line bg-[#FFFDF9] p-5 sm:p-6 rounded-2xl border border-line shadow-sm ${
+                      level1TextSize === "sm"
+                        ? "text-sm sm:text-base leading-[1.8]"
+                        : level1TextSize === "lg"
+                        ? "text-lg sm:text-xl leading-[1.9]"
+                        : "text-base sm:text-lg leading-[1.85]"
+                    }`}
+                  >
+                    {currentPassage}
+                  </p>
+
+                  <div className="flex justify-center pt-1">
+                    <SceneNavControls
+                      activeIndex={safeSceneIndex}
+                      total={totalScenes}
+                      scenes={visibleScenes}
+                      onPrev={handlePrevScene}
+                      onNext={handleNextScene}
+                      onSelect={setActiveSceneIndex}
+                      sceneLabel={t.story.nav.sceneLabel}
+                      prevLabel={t.story.nav.prevScene}
+                      nextLabel={t.story.nav.nextScene}
+                    />
+                  </div>
                 </div>
               ) : (
-                <div className="space-y-6 max-w-3xl mx-auto py-2">
+                <div className="space-y-6 max-w-[68ch] mx-auto py-2">
                   {visibleScenes.map((sc, idx) => {
                     const variant = getSceneVariant(sc);
                     const scPassage = variant?.passage || sc.passage;
@@ -1145,9 +1375,6 @@ export default function StorytellingPracticePage() {
                             {idx + 1}/{totalScenes}
                           </span>
                         </div>
-                        <p className="font-serif text-base leading-[1.8] text-ink whitespace-pre-line">
-                          {scPassage}
-                        </p>
                         <div className="p-3 rounded-xl bg-[#E3EFE0]/60 border border-[#C5DEC0] text-xs text-forestDark italic flex items-start gap-2">
                           <Volume2 className="w-4 h-4 text-forest flex-shrink-0 mt-0.5" />
                           <div>
@@ -1157,11 +1384,29 @@ export default function StorytellingPracticePage() {
                             <span className="whitespace-pre-line">{scVoiceNote}</span>
                           </div>
                         </div>
+                        <p
+                          className={`font-serif text-ink whitespace-pre-line ${
+                            level1TextSize === "sm"
+                              ? "text-sm leading-[1.75]"
+                              : level1TextSize === "lg"
+                              ? "text-lg leading-[1.9]"
+                              : "text-base leading-[1.8]"
+                          }`}
+                        >
+                          {scPassage}
+                        </p>
                       </div>
                     );
                   })}
                 </div>
               )}
+
+              <LevelStepFooter
+                activeLevel={activeLevel}
+                onSelectLevel={setActiveLevel}
+                prevPrefix={t.story.nav.prevLevelBtn}
+                nextPrefix={t.story.nav.nextLevelShortBtn}
+              />
             </div>
           )}
 
@@ -1252,6 +1497,27 @@ export default function StorytellingPracticePage() {
                   ))}
                 </ol>
               </div>
+
+              <div className="flex justify-center pt-1">
+                <SceneNavControls
+                  activeIndex={safeSceneIndex}
+                  total={totalScenes}
+                  scenes={visibleScenes}
+                  onPrev={handlePrevScene}
+                  onNext={handleNextScene}
+                  onSelect={setActiveSceneIndex}
+                  sceneLabel={t.story.nav.sceneLabel}
+                  prevLabel={t.story.nav.prevScene}
+                  nextLabel={t.story.nav.nextScene}
+                />
+              </div>
+
+              <LevelStepFooter
+                activeLevel={activeLevel}
+                onSelectLevel={setActiveLevel}
+                prevPrefix={t.story.nav.prevLevelBtn}
+                nextPrefix={t.story.nav.nextLevelShortBtn}
+              />
             </div>
           )}
 
@@ -1260,21 +1526,69 @@ export default function StorytellingPracticePage() {
           {/* ============================================================== */}
           {activeLevel === 3 && (
             <div className="garden-card space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
                 <div className="flex items-center gap-2">
                   <ListChecks className="w-5 h-5 text-forest" />
-                  <h3 className="font-serif text-lg font-bold text-forestDark">
-                    {t.story.level3.skeletonHeader}: {displayTitle}
-                  </h3>
+                  <div>
+                    <h3 className="font-serif text-lg font-bold text-forestDark">
+                      {t.story.level3.skeletonHeader}: {displayTitle}
+                    </h3>
+                    <p className="text-xs text-inkSoft italic">
+                      {t.story.level3.jumpToSceneHint}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs text-inkSoft italic">
-                  {t.story.level3.jumpToSceneHint}
-                </span>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex rounded-xl bg-[#F7ECD8]/70 p-1 border border-line">
+                    <button
+                      type="button"
+                      aria-pressed={level3Scope === "all"}
+                      onClick={() => setLevel3Scope("all")}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                        level3Scope === "all"
+                          ? "bg-forest text-white shadow-sm"
+                          : "text-forestDark hover:bg-white/60"
+                      }`}
+                    >
+                      {t.story.level3.filterAllScenes} ({visibleScenes.length})
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={level3Scope === "current"}
+                      onClick={() => setLevel3Scope("current")}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                        level3Scope === "current"
+                          ? "bg-forest text-white shadow-sm"
+                          : "text-forestDark hover:bg-white/60"
+                      }`}
+                    >
+                      {t.story.level3.filterCurrentScene}
+                    </button>
+                  </div>
+
+                  {level3Scope === "current" && (
+                    <SceneNavControls
+                      activeIndex={safeSceneIndex}
+                      total={totalScenes}
+                      scenes={visibleScenes}
+                      onPrev={handlePrevScene}
+                      onNext={handleNextScene}
+                      onSelect={setActiveSceneIndex}
+                      sceneLabel={t.story.nav.sceneLabel}
+                      prevLabel={t.story.nav.prevScene}
+                      nextLabel={t.story.nav.nextScene}
+                    />
+                  )}
+                </div>
               </div>
 
               {/* 1 bản khung xương duy nhất trải suốt các phân cảnh đang chọn */}
               <div className="space-y-4">
-                {visibleScenes.map((sc, idx) => {
+                {(level3Scope === "current" && currentScene
+                  ? [{ sc: currentScene, idx: safeSceneIndex }]
+                  : visibleScenes.map((sc, idx) => ({ sc, idx }))
+                ).map(({ sc, idx }) => {
                   const isFocused = idx === safeSceneIndex;
                   return (
                     <div
@@ -1290,9 +1604,25 @@ export default function StorytellingPracticePage() {
                         <h4 className="font-serif font-bold text-base text-forestDark">
                           {sc.title}
                         </h4>
-                        <span className="badge-sand text-[11px]">
-                          {sc.summaryPoints.length} {t.story.level3.pointsBadge}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="badge-sand text-[11px]">
+                            {sc.summaryPoints.length} {t.story.level3.pointsBadge}
+                          </span>
+                          {isFocused && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveSceneIndex(idx);
+                                setActiveLevel(4);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-forest text-white text-xs font-semibold hover:bg-forestDark transition"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5" />
+                              <span>{t.story.level3.openInLevel4Btn}</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <ul className="space-y-1.5 text-sm text-ink">
@@ -1307,6 +1637,13 @@ export default function StorytellingPracticePage() {
                   );
                 })}
               </div>
+
+              <LevelStepFooter
+                activeLevel={activeLevel}
+                onSelectLevel={setActiveLevel}
+                prevPrefix={t.story.nav.prevLevelBtn}
+                nextPrefix={t.story.nav.nextLevelShortBtn}
+              />
             </div>
           )}
 
@@ -1322,24 +1659,35 @@ export default function StorytellingPracticePage() {
             >
               {/* Thanh công cụ tối giản — không hiển thị tiêu đề hay chữ gợi ý cốt truyện */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-                <SceneNavControls
-                  activeIndex={safeSceneIndex}
-                  total={totalScenes}
-                  scenes={visibleScenes}
-                  onPrev={handlePrevScene}
-                  onNext={handleNextScene}
-                  onSelect={setActiveSceneIndex}
-                  sceneLabel={t.story.nav.sceneLabel}
-                  prevLabel={t.story.nav.prevScene}
-                  nextLabel={t.story.nav.nextScene}
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <SceneNavControls
+                    activeIndex={safeSceneIndex}
+                    total={totalScenes}
+                    scenes={visibleScenes}
+                    onPrev={handlePrevScene}
+                    onNext={handleNextScene}
+                    onSelect={setActiveSceneIndex}
+                    sceneLabel={t.story.nav.sceneLabel}
+                    prevLabel={t.story.nav.prevScene}
+                    nextLabel={t.story.nav.nextScene}
+                  />
+                  <span className="badge-sand text-[11px]">
+                    {shouldShowRepoImg || currentScene.imagePath
+                      ? t.story.level4.artModeRepoBadge
+                      : t.story.level4.artModeProceduralBadge}
+                  </span>
+                </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-xs font-semibold text-forestDark flex items-center gap-1.5">
+                  <label
+                    htmlFor="level4-art-style"
+                    className="text-xs font-semibold text-forestDark flex items-center gap-1.5"
+                  >
                     <ImageIcon className="w-3.5 h-3.5 text-forest" />
                     <span>{t.story.level4.artStyleLabel}:</span>
                   </label>
                   <select
+                    id="level4-art-style"
                     value={currentScene.artStyle}
                     onChange={(e) => {
                       setPreferProceduralArt(true);
@@ -1360,6 +1708,7 @@ export default function StorytellingPracticePage() {
                     className="hidden"
                   />
                   <button
+                    type="button"
                     onClick={() => customImageInputRef.current?.click()}
                     className="btn-ghost text-xs py-1.5 px-2.5"
                     title={t.story.level4.uploadCustomImageBtn}
@@ -1370,8 +1719,34 @@ export default function StorytellingPracticePage() {
                     </span>
                   </button>
 
+                  <button
+                    type="button"
+                    aria-pressed={isLevel4StageMode}
+                    onClick={() => setIsLevel4StageMode((v) => !v)}
+                    className={`btn-ghost text-xs py-1.5 px-2.5 ${
+                      isLevel4StageMode ? "bg-[#E3EFE0] border-forest" : ""
+                    }`}
+                    title={
+                      isLevel4StageMode
+                        ? t.story.level4.stageModeExit
+                        : t.story.level4.stageModeEnter
+                    }
+                  >
+                    {isLevel4StageMode ? (
+                      <Minimize2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    )}
+                    <span className="hidden md:inline">
+                      {isLevel4StageMode
+                        ? t.story.level4.stageModeExit
+                        : t.story.level4.stageModeEnter}
+                    </span>
+                  </button>
+
                   {(currentScene.imagePath || preferProceduralArt) && (
                     <button
+                      type="button"
                       onClick={() => {
                         setPreferProceduralArt(false);
                         handleResetSceneImage();
@@ -1386,7 +1761,11 @@ export default function StorytellingPracticePage() {
               </div>
 
               {/* Khung tranh thuần hình ảnh — tuyệt đối không chữ gợi ý */}
-              <div className="relative w-full max-w-3xl mx-auto aspect-[16/10] rounded-2xl overflow-hidden border-2 border-line bg-[#FAF6EC] shadow-md group">
+              <div
+                className={`relative w-full mx-auto aspect-[16/10] rounded-2xl overflow-hidden border-2 border-line bg-[#FAF6EC] shadow-md group transition-all ${
+                  isLevel4StageMode ? "max-w-5xl" : "max-w-3xl"
+                }`}
+              >
                 <img
                   src={level4ImgSrc}
                   alt=""
@@ -1405,6 +1784,7 @@ export default function StorytellingPracticePage() {
 
                 {safeSceneIndex > 0 && (
                   <button
+                    type="button"
                     onClick={handlePrevScene}
                     className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-75 group-hover:opacity-100"
                     aria-label={t.story.nav.prevScene}
@@ -1415,6 +1795,7 @@ export default function StorytellingPracticePage() {
 
                 {safeSceneIndex < totalScenes - 1 && (
                   <button
+                    type="button"
                     onClick={handleNextScene}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-white/85 hover:bg-white text-forestDark shadow-md transition backdrop-blur-sm opacity-75 group-hover:opacity-100"
                     aria-label={t.story.nav.nextScene}
@@ -1427,6 +1808,13 @@ export default function StorytellingPracticePage() {
               <p className="text-center text-xs text-inkSoft italic">
                 {t.story.level4.swipeHint}
               </p>
+
+              <LevelStepFooter
+                activeLevel={activeLevel}
+                onSelectLevel={setActiveLevel}
+                prevPrefix={t.story.nav.prevLevelBtn}
+                nextPrefix={t.story.nav.nextLevelShortBtn}
+              />
             </div>
           )}
         </section>
@@ -1443,43 +1831,56 @@ export default function StorytellingPracticePage() {
           {/* Danh sách các bản thu trong phiên (thu gọn/mở rộng) */}
           {showTakesPanel && recordings.length > 0 && (
             <div className="bg-[#FFFDF7]/98 backdrop-blur-md border border-line rounded-2xl shadow-xl p-3.5 max-h-60 overflow-y-auto space-y-2">
-              {recordings.map((rec) => (
-                <div
-                  key={rec.id}
-                  className={`flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border ${
-                    activeRecording?.id === rec.id
-                      ? "bg-[#E3EFE0]/60 border-forest/40"
-                      : "bg-white border-line"
-                  }`}
-                >
-                  <div className="text-xs font-medium text-forestDark min-w-[130px]">
-                    <div className="font-semibold">{rec.label}</div>
-                    <div className="text-[11px] text-inkSoft">
-                      {formatDuration(rec.durationSeconds)} · {rec.createdAt}
+              {recordings.map((rec) => {
+                const isCurrentSceneTake = Boolean(
+                  currentScene && rec.sceneOrd === currentScene.ord && rec.storyId === selectedStory.id
+                );
+                return (
+                  <div
+                    key={rec.id}
+                    className={`flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border ${
+                      activeRecording?.id === rec.id
+                        ? "bg-[#E3EFE0]/60 border-forest/40"
+                        : "bg-white border-line"
+                    }`}
+                  >
+                    <div className="text-xs font-medium text-forestDark min-w-[140px]">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold">{rec.label}</span>
+                        {isCurrentSceneTake && (
+                          <span className="badge-leaf text-[10px] py-0 px-1.5">
+                            {t.story.recorder.currentSceneBadge}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-inkSoft">
+                        {formatDuration(rec.durationSeconds)} · {rec.createdAt}
+                      </div>
+                    </div>
+
+                    <audio controls src={rec.audioUrl} className="h-8 flex-1 min-w-[180px]" />
+
+                    <div className="flex items-center gap-1">
+                      <a
+                        href={rec.audioUrl}
+                        download={`ke-chuyen-L${rec.level}-c${rec.sceneOrd}.webm`}
+                        className="p-1.5 rounded-lg border border-line text-forest hover:bg-[#F7ECD8] transition"
+                        title={t.story.recorder.downloadTake}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRecording(rec.id)}
+                        className="p-1.5 rounded-lg border border-line text-terra hover:bg-[#F7DDD6]/50 transition"
+                        title={t.story.recorder.deleteTake}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-
-                  <audio controls src={rec.audioUrl} className="h-8 flex-1 min-w-[180px]" />
-
-                  <div className="flex items-center gap-1">
-                    <a
-                      href={rec.audioUrl}
-                      download={`ke-chuyen-L${rec.level}-c${rec.sceneOrd}.webm`}
-                      className="p-1.5 rounded-lg border border-line text-forest hover:bg-[#F7ECD8] transition"
-                      title={t.story.recorder.downloadTake}
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                    </a>
-                    <button
-                      onClick={() => handleDeleteRecording(rec.id)}
-                      className="p-1.5 rounded-lg border border-line text-terra hover:bg-[#F7DDD6]/50 transition"
-                      title={t.story.recorder.deleteTake}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -1497,6 +1898,7 @@ export default function StorytellingPracticePage() {
               {totalScenes > 0 && activeLevel !== 0 && (
                 <div className="flex items-center gap-1">
                   <button
+                    type="button"
                     onClick={handlePrevScene}
                     disabled={safeSceneIndex <= 0}
                     className="p-1 rounded-lg border border-line bg-white text-forestDark hover:bg-[#F7ECD8] disabled:opacity-30 disabled:pointer-events-none"
@@ -1508,6 +1910,7 @@ export default function StorytellingPracticePage() {
                     {currentScene?.ord || safeSceneIndex + 1}/{allScenes.length}
                   </span>
                   <button
+                    type="button"
                     onClick={handleNextScene}
                     disabled={safeSceneIndex >= totalScenes - 1}
                     className="p-1 rounded-lg border border-line bg-white text-forestDark hover:bg-[#F7ECD8] disabled:opacity-30 disabled:pointer-events-none"
@@ -1523,6 +1926,7 @@ export default function StorytellingPracticePage() {
             <div className="flex flex-wrap items-center gap-2.5 flex-1 justify-end">
               {!isRecording ? (
                 <button
+                  type="button"
                   onClick={startRecording}
                   className="px-4 py-2 rounded-xl bg-terra hover:bg-[#a84736] text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-md transition active:scale-95"
                 >
@@ -1531,6 +1935,7 @@ export default function StorytellingPracticePage() {
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={stopRecording}
                   className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-md animate-pulse transition active:scale-95"
                 >
@@ -1543,23 +1948,11 @@ export default function StorytellingPracticePage() {
               )}
 
               {activeRecording && !isRecording ? (
-                <div className="flex items-center gap-2">
-                  <audio
-                    controls
-                    src={activeRecording.audioUrl}
-                    className="h-8 w-44 sm:w-56"
-                  />
-                  {recordings.length > 0 && (
-                    <button
-                      onClick={() => setShowTakesPanel((v) => !v)}
-                      className="btn-ghost text-xs py-1.5 px-2.5"
-                      title={t.story.recorder.showTakesBtn}
-                    >
-                      <ListMusic className="w-3.5 h-3.5" />
-                      <span>{recordings.length}</span>
-                    </button>
-                  )}
-                </div>
+                <audio
+                  controls
+                  src={activeRecording.audioUrl}
+                  className="h-8 w-44 sm:w-56"
+                />
               ) : (
                 !isRecording && (
                   <span className="text-xs text-inkSoft hidden sm:inline">
@@ -1567,9 +1960,69 @@ export default function StorytellingPracticePage() {
                   </span>
                 )
               )}
+
+              {recordings.length > 0 && (
+                <button
+                  type="button"
+                  aria-expanded={showTakesPanel}
+                  onClick={() => setShowTakesPanel((v) => !v)}
+                  className="btn-ghost text-xs py-1.5 px-2.5"
+                  title={t.story.recorder.showTakesBtn}
+                >
+                  <ListMusic className="w-3.5 h-3.5" />
+                  <span>{recordings.length}</span>
+                </button>
+              )}
             </div>
           </div>
         </aside>
+      )}
+    </div>
+  );
+}
+
+function LevelStepFooter({
+  activeLevel,
+  onSelectLevel,
+  prevPrefix,
+  nextPrefix,
+}: {
+  activeLevel: PracticeLevel;
+  onSelectLevel: (level: PracticeLevel) => void;
+  prevPrefix: string;
+  nextPrefix: string;
+}) {
+  const prevLevel = activeLevel > 0 ? ((activeLevel - 1) as PracticeLevel) : null;
+  const nextLevel = activeLevel < 4 ? ((activeLevel + 1) as PracticeLevel) : null;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-line/70">
+      {prevLevel !== null ? (
+        <button
+          type="button"
+          onClick={() => onSelectLevel(prevLevel)}
+          className="btn-ghost text-xs py-1.5 px-3"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>
+            {prevPrefix} {prevLevel}
+          </span>
+        </button>
+      ) : (
+        <span />
+      )}
+
+      {nextLevel !== null && (
+        <button
+          type="button"
+          onClick={() => onSelectLevel(nextLevel)}
+          className="btn-primary text-xs py-1.5 px-3.5"
+        >
+          <span>
+            {nextPrefix} {nextLevel}
+          </span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
       )}
     </div>
   );
@@ -1599,6 +2052,7 @@ function SceneNavControls({
   return (
     <div className="flex items-center gap-2">
       <button
+        type="button"
         onClick={onPrev}
         disabled={activeIndex <= 0}
         className="btn-ghost text-xs py-1 px-2.5 disabled:opacity-30 disabled:pointer-events-none"
@@ -1612,11 +2066,12 @@ function SceneNavControls({
           {Array.from({ length: total }).map((_, idx) => (
             <button
               key={idx}
+              type="button"
               onClick={() => onSelect(idx)}
               className={`transition-all rounded-full ${
                 idx === activeIndex
-                  ? "w-6 h-2 bg-forest"
-                  : "w-2 h-2 bg-[#D5C7B0] hover:bg-forest/60"
+                  ? "w-6 h-2.5 bg-forest"
+                  : "w-2.5 h-2.5 bg-[#D5C7B0] hover:bg-forest/60"
               }`}
               aria-label={`${sceneLabel} ${scenes[idx]?.ord || idx + 1}`}
             />
@@ -1642,6 +2097,7 @@ function SceneNavControls({
       </span>
 
       <button
+        type="button"
         onClick={onNext}
         disabled={activeIndex >= total - 1}
         className="btn-ghost text-xs py-1 px-2.5 disabled:opacity-30 disabled:pointer-events-none"

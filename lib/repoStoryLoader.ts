@@ -17,7 +17,48 @@ export const GENESIS_REPO_NAME = "from-genesis-to-nativity";
 export const GENESIS_REPO_BRANCH = "main";
 export const GENESIS_REPO_URL = `https://github.com/${GENESIS_REPO_OWNER}/${GENESIS_REPO_NAME}`;
 export const GENESIS_RAW_BASE_URL = `https://raw.githubusercontent.com/${GENESIS_REPO_OWNER}/${GENESIS_REPO_NAME}/${GENESIS_REPO_BRANCH}`;
+export const GENESIS_JSDELIVR_BASE_URL = `https://cdn.jsdelivr.net/gh/${GENESIS_REPO_OWNER}/${GENESIS_REPO_NAME}@${GENESIS_REPO_BRANCH}`;
 export const GENESIS_STORY_ID = "story-from-genesis-to-nativity";
+
+export const REPO_SYNC_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+export const REPO_MANUAL_COOLDOWN_MS = 15 * 1000; // 15 seconds
+export const REPO_FETCH_CONCURRENCY = 6;
+
+export function shouldAutoSyncRepo(lastSyncedAt?: string, nowMs = Date.now()): boolean {
+  if (!lastSyncedAt) return true;
+  const parsedMs = Date.parse(lastSyncedAt);
+  if (Number.isNaN(parsedMs)) return true;
+  return nowMs - parsedMs >= REPO_SYNC_TTL_MS;
+}
+
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const safeLimit = Math.max(1, Math.min(items.length, Math.floor(limit)));
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+
+  async function runWorker() {
+    while (cursor < items.length) {
+      const idx = cursor++;
+      results[idx] = await worker(items[idx], idx);
+    }
+  }
+
+  await Promise.all(Array.from({ length: safeLimit }, () => runWorker()));
+  return results;
+}
+
+export function getCandidateRepoBaseUrls(preferredBaseUrl?: string): string[] {
+  const defaults = [GENESIS_JSDELIVR_BASE_URL, GENESIS_RAW_BASE_URL];
+  if (!preferredBaseUrl || preferredBaseUrl === GENESIS_RAW_BASE_URL) {
+    return defaults;
+  }
+  return Array.from(new Set([preferredBaseUrl, ...defaults]));
+}
 
 interface RepoIndexLevel0 {
   overview_file?: string;
@@ -390,9 +431,12 @@ function mapIllustrationStyle(rawStyle: string, bookNumber: number): WaldorfArtS
   return "crayon";
 }
 
-async function fetchTextSafe(url: string): Promise<string | null> {
+async function fetchTextSafe(
+  url: string,
+  cacheMode: RequestCache = "default"
+): Promise<string | null> {
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await fetch(url, { cache: cacheMode });
     if (!res.ok) return null;
     return await res.text();
   } catch {
@@ -400,9 +444,23 @@ async function fetchTextSafe(url: string): Promise<string | null> {
   }
 }
 
+async function fetchTextWithFallback(
+  relativePath: string,
+  baseUrls: readonly string[],
+  cacheMode: RequestCache
+): Promise<string | null> {
+  for (const baseUrl of baseUrls) {
+    const content = await fetchTextSafe(buildRepoFileUrl(relativePath, baseUrl), cacheMode);
+    if (content !== null) {
+      return content;
+    }
+  }
+  return null;
+}
+
 export function buildRepoFileUrl(
   relativePath: string,
-  rawBaseUrl = GENESIS_RAW_BASE_URL
+  rawBaseUrl = GENESIS_JSDELIVR_BASE_URL
 ): string {
   const cleanPath = relativePath.replace(/^\/+/, "");
   return `${rawBaseUrl}/${cleanPath}`;
@@ -419,27 +477,62 @@ export function buildGitHubBlobUrl(
 
 export async function fetchAncientBookMarkdown(
   relativePath: string,
-  rawBaseUrl = GENESIS_RAW_BASE_URL
+  rawBaseUrl = GENESIS_JSDELIVR_BASE_URL,
+  options?: { preferFresh?: boolean }
 ): Promise<string> {
-  const url = buildRepoFileUrl(relativePath, rawBaseUrl);
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Không thể tải tệp văn bản cổ (${res.status}): ${relativePath}`);
+  const cacheMode: RequestCache = options?.preferFresh ? "no-cache" : "default";
+  const candidateBases = getCandidateRepoBaseUrls(rawBaseUrl);
+  let lastStatus = 0;
+
+  for (const base of candidateBases) {
+    try {
+      const res = await fetch(buildRepoFileUrl(relativePath, base), { cache: cacheMode });
+      if (res.ok) {
+        return await res.text();
+      }
+      lastStatus = res.status;
+    } catch {
+      // Thử CDN dự phòng tiếp theo
+    }
   }
-  return await res.text();
+
+  throw new Error(
+    `Không thể tải tệp văn bản cổ${lastStatus ? ` (${lastStatus})` : ""}: ${relativePath}`
+  );
 }
 
 export async function fetchGenesisStoryFromRepo(
-  rawBaseUrl = GENESIS_RAW_BASE_URL
+  rawBaseUrl = GENESIS_JSDELIVR_BASE_URL,
+  options?: { preferFresh?: boolean }
 ): Promise<WaldorfStory> {
-  const indexRes = await fetch(buildRepoFileUrl("story-index.json", rawBaseUrl), {
-    cache: "no-store",
-  });
-  if (!indexRes.ok) {
-    throw new Error(`Không thể đọc story-index.json từ repo (${indexRes.status})`);
+  const cacheMode: RequestCache = options?.preferFresh ? "no-cache" : "default";
+  const candidateBases = getCandidateRepoBaseUrls(rawBaseUrl);
+  let indexData: RepoStoryIndex | null = null;
+  let activeBaseUrl = candidateBases[0];
+  let lastStatus = 0;
+
+  for (const base of candidateBases) {
+    try {
+      const indexRes = await fetch(buildRepoFileUrl("story-index.json", base), {
+        cache: cacheMode,
+      });
+      if (indexRes.ok) {
+        indexData = (await indexRes.json()) as RepoStoryIndex;
+        activeBaseUrl = base;
+        break;
+      }
+      lastStatus = indexRes.status;
+    } catch {
+      // Thử CDN dự phòng tiếp theo
+    }
   }
 
-  const indexData = (await indexRes.json()) as RepoStoryIndex;
+  if (!indexData) {
+    throw new Error(
+      `Không thể đọc story-index.json từ CDN/Repo${lastStatus ? ` (${lastStatus})` : ""}`
+    );
+  }
+
   const level0Config = indexData.levels?.[0] || {};
   const overviewPath =
     level0Config.overview_file || "level-0-khong-gian-boi-canh/00-tong-quan-linh-hon-su-thi.md";
@@ -467,16 +560,15 @@ export async function fetchGenesisStoryFromRepo(
   const allPaths = Array.from(
     new Set([overviewPath, ...level0BookFiles, ...level1Files, ...level2Files, level3File])
   );
+  const orderedBases = [activeBaseUrl, ...candidateBases.filter((b) => b !== activeBaseUrl)];
 
   const fileCache: Record<string, string> = {};
-  await Promise.all(
-    allPaths.map(async (relPath) => {
-      const content = await fetchTextSafe(buildRepoFileUrl(relPath, rawBaseUrl));
-      if (content !== null) {
-        fileCache[relPath] = content;
-      }
-    })
-  );
+  await mapWithConcurrency(allPaths, REPO_FETCH_CONCURRENCY, async (relPath) => {
+    const content = await fetchTextWithFallback(relPath, orderedBases, cacheMode);
+    if (content !== null) {
+      fileCache[relPath] = content;
+    }
+  });
 
   const bookSouls: Record<string, StorySoulContext> = {};
   const booksMeta: StoryBookMeta[] = indexData.books.map((bk) => {
@@ -614,7 +706,7 @@ export async function fetchGenesisStoryFromRepo(
     goal: "Luyện kể trọn mạch sử thi 5 Quyển (28 phân cảnh) trực tiếp theo folder path Level 0 → Level 4.",
     defaultArtStyle: "chalkboard",
     repoUrl: GENESIS_REPO_URL,
-    rawBaseUrl,
+    rawBaseUrl: activeBaseUrl,
     lastSyncedAt: new Date().toISOString(),
     books: booksMeta,
     soul: {

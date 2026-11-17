@@ -3,12 +3,18 @@ import assert from "node:assert/strict";
 import { getSeedData, segmentStoryLocally } from "../lib/seedData";
 import { ProceduralIllustrator } from "../lib/art/proceduralIllustrator";
 import {
+  GENESIS_JSDELIVR_BASE_URL,
+  GENESIS_RAW_BASE_URL,
   GENESIS_REPO_URL,
   GENESIS_STORY_ID,
+  REPO_SYNC_TTL_MS,
+  getCandidateRepoBaseUrls,
+  mapWithConcurrency,
   parseLevel0BookMarkdown,
   parseLevel1Markdown,
   parseLevel2Markdown,
   parseLevel3Markdown,
+  shouldAutoSyncRepo,
 } from "../lib/repoStoryLoader";
 import { WaldorfArtStyle } from "../lib/types";
 
@@ -135,9 +141,10 @@ Michael vung gươm ánh sáng bảo vệ thiên đàng.
   assert.equal(parsedL3["canh-28-ngoai-truyen-thanh-nicholas-va-ong-gia-noel"].length, 4);
 });
 
-test("Level 4: ProceduralIllustrator renders pure visual SVGs with zero <text> hints across all 28 scenes and 3 styles", () => {
+test("Level 4: ProceduralIllustrator renders diverse pure visual SVGs with zero <text> hints across all 28 scenes and 3 styles", () => {
   const seed = getSeedData();
   const styles: WaldorfArtStyle[] = ["wet-on-wet", "crayon", "chalkboard"];
+  const distinctSvgs = new Set<string>();
 
   for (const scene of seed.stories[0].scenes) {
     for (const style of styles) {
@@ -146,6 +153,10 @@ test("Level 4: ProceduralIllustrator renders pure visual SVGs with zero <text> h
         dataUrl.startsWith("data:image/svg+xml;utf8,"),
         `Expected SVG data URL for ${scene.id} (${style})`
       );
+      if (style === "wet-on-wet") {
+        // Strip scene-specific uid numbers to verify distinct visual motif artwork shapes
+        distinctSvgs.add(dataUrl.replace(/wet-\d+-/g, "wet-x-"));
+      }
 
       const decodedSvg = decodeURIComponent(dataUrl.replace("data:image/svg+xml;utf8,", ""));
       assert.ok(decodedSvg.includes("<svg"), "SVG must contain opening <svg tag");
@@ -156,6 +167,54 @@ test("Level 4: ProceduralIllustrator renders pure visual SVGs with zero <text> h
       );
     }
   }
+
+  assert.ok(
+    distinctSvgs.size >= 8,
+    `Expected at least 8 distinct epic visual motifs across 28 scenes, got ${distinctSvgs.size}`
+  );
+});
+
+test("Rate-limit-safe repo sync: TTL guard, multi-CDN fallback order, and bounded concurrency", async () => {
+  assert.equal(
+    GENESIS_JSDELIVR_BASE_URL,
+    "https://cdn.jsdelivr.net/gh/xuvivn/from-genesis-to-nativity@main"
+  );
+
+  const defaultCandidates = getCandidateRepoBaseUrls();
+  assert.deepEqual(defaultCandidates, [GENESIS_JSDELIVR_BASE_URL, GENESIS_RAW_BASE_URL]);
+  assert.deepEqual(getCandidateRepoBaseUrls(GENESIS_RAW_BASE_URL), [
+    GENESIS_JSDELIVR_BASE_URL,
+    GENESIS_RAW_BASE_URL,
+  ]);
+
+  const now = Date.UTC(2026, 10, 17, 12, 0, 0);
+  assert.equal(shouldAutoSyncRepo(undefined, now), true);
+  assert.equal(shouldAutoSyncRepo("not-a-date", now), true);
+  assert.equal(shouldAutoSyncRepo(new Date(now - 60_000).toISOString(), now), false);
+  assert.equal(
+    shouldAutoSyncRepo(new Date(now - REPO_SYNC_TTL_MS + 1000).toISOString(), now),
+    false
+  );
+  assert.equal(shouldAutoSyncRepo(new Date(now - REPO_SYNC_TTL_MS).toISOString(), now), true);
+
+  assert.deepEqual(await mapWithConcurrency([], 6, async (x) => x), []);
+
+  let active = 0;
+  let maxActive = 0;
+  const inputs = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const outputs = await mapWithConcurrency(inputs, 3, async (item) => {
+    active++;
+    maxActive = Math.max(maxActive, active);
+    await new Promise((r) => setTimeout(r, 5));
+    active--;
+    return item * 2;
+  });
+
+  assert.deepEqual(
+    outputs,
+    inputs.map((n) => n * 2)
+  );
+  assert.ok(maxActive <= 3 && maxActive >= 1, `Expected max concurrency <= 3, got ${maxActive}`);
 });
 
 test("ProceduralIllustrator.escapeXml: safely escapes XML metacharacters", () => {

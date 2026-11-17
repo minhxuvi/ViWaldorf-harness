@@ -24,8 +24,10 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background-color: var(--paper);
   color: var(--ink);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  text-align: start;
+  overflow-wrap: break-word;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -33,32 +35,54 @@ h1, h2, h3, h4 {
   font-family: Georgia, "Times New Roman", serif;
   color: var(--forest2);
   line-height: 1.25;
+  text-wrap: balance;
 }
 
-h1 { font-size: 28px; }
-h2 { font-size: 21px; }
-h3 { font-size: 17px; }
+h1 { font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); }
+h2 { font-size: clamp(1.1875rem, 1.05rem + 0.5vw, 1.4375rem); }
+h3 { font-size: clamp(1rem, 0.95rem + 0.25vw, 1.15rem); }
 
-/* Custom button styles matching native macOS buttons */
+p, li, blockquote {
+  text-wrap: pretty;
+}
+
+:where(button, a) {
+  transition: box-shadow 150ms ease-out, scale 150ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out;
+}
+
+:where(button):active:not(:disabled) {
+  scale: 0.98;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--forest);
+  outline-offset: 3px;
+}
+
+header :where(a, button):focus-visible {
+  outline-color: #E9C46A;
+}
+
+/* Custom button styles */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 0.5rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: #ffffff;
   background-color: var(--forest);
   border: 1px solid var(--forest);
-  padding: 8px 16px;
-  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  border-radius: 0.625rem;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background-color: #254a2e;
   border-color: #254a2e;
+  box-shadow: 0 2px 8px rgb(30 64 40 / 0.16);
 }
 
 .btn-primary:disabled {
@@ -70,41 +94,41 @@ h3 { font-size: 17px; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 0.5rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--forest);
-  background-color: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(47, 93, 58, 0.4);
-  padding: 8px 14px;
-  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(47, 93, 58, 0.35);
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.625rem;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-.btn-ghost:hover {
+.btn-ghost:hover:not(:disabled) {
   background-color: #ffffff;
   border-color: var(--forest);
+  box-shadow: 0 2px 6px rgb(30 64 40 / 0.1);
 }
 
 .btn-terra {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 0.5rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: #ffffff;
   background-color: var(--terra);
   border: 1px solid var(--terra);
-  padding: 8px 14px;
-  border-radius: 10px;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.625rem;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
-.btn-terra:hover {
+.btn-terra:hover:not(:disabled) {
   background-color: #a84736;
+  box-shadow: 0 2px 8px rgb(196 92 74 / 0.2);
 }
 
 /* Card Surface */
@@ -112,7 +136,7 @@ h3 { font-size: 17px; }
   background-color: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: 1.25rem;
   box-shadow: 0 1px 3px rgba(60, 50, 20, 0.05);
 }
 
@@ -120,9 +144,9 @@ h3 { font-size: 17px; }
 .badge-leaf {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
+  padding: 0.2rem 0.625rem;
   border-radius: 9999px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   background-color: #e3efe0;
   color: var(--forest2);
@@ -131,9 +155,9 @@ h3 { font-size: 17px; }
 .badge-terra {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
+  padding: 0.2rem 0.625rem;
   border-radius: 9999px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   background-color: #f7ddd6;
   color: #8a3527;
@@ -142,9 +166,9 @@ h3 { font-size: 17px; }
 .badge-sand {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
+  padding: 0.2rem 0.625rem;
   border-radius: 9999px;
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
   background-color: #fdf0e6;
   color: #8a5a27;

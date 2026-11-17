@@ -11,7 +11,7 @@ import {
   WaldorfStory,
 } from "./types";
 import {
-  GENESIS_RAW_BASE_URL,
+  GENESIS_JSDELIVR_BASE_URL,
   GENESIS_REPO_URL,
   GENESIS_STORY_ID,
 } from "./repoStoryLoader";
@@ -675,7 +675,7 @@ export function getSeedData(): WaldorfData {
     goal: "Luyện kể trọn mạch sử thi 5 Quyển (28 phân cảnh) trực tiếp theo folder path Level 0 → Level 4.",
     defaultArtStyle: "chalkboard",
     repoUrl: GENESIS_REPO_URL,
-    rawBaseUrl: GENESIS_RAW_BASE_URL,
+    rawBaseUrl: GENESIS_JSDELIVR_BASE_URL,
     books: GENESIS_BOOKS,
     soul: {
       ...SEED_BOOK_SOULS["quyen-1"],

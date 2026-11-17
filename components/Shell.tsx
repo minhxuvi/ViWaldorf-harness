@@ -22,9 +22,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <BookOpen className="w-5 h-5 text-[#F7ECD8]" />
             </div>
             <div className="min-w-0">
-              <h1 className="font-serif text-lg sm:text-xl font-bold tracking-wide text-paper leading-tight">
+              <span className="block font-serif text-lg sm:text-xl font-bold tracking-wide text-paper leading-tight">
                 {t.brand}
-              </h1>
+              </span>
               <p className="text-[11px] sm:text-xs text-onDarkSoft truncate">
                 {t.tagline}
               </p>
