@@ -4,9 +4,9 @@ import { AppProvider } from "@/lib/store";
 import { Shell } from "@/components/Shell";
 
 export const metadata: Metadata = {
-  title: "ViWaldorf Harness — Waldorf Education & Storytelling in Vietnam",
+  title: "ViWaldorf — Luyện Kể Chuyện Sư Phạm",
   description:
-    "Self-evolving agentic platform for Waldorf-inspired education in Vietnam with storytelling practice, 3 art styles, and multi-device sync.",
+    "Ứng dụng luyện kể chuyện 5 cấp độ theo tinh thần sư phạm Waldorf tại Việt Nam với thu âm và nghe lại cục bộ, không sử dụng AI.",
 };
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <body className="bg-paper text-ink min-h-screen">
         <AppProvider>
           <Shell>{children}</Shell>

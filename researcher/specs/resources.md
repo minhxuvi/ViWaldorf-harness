@@ -1,14 +1,14 @@
 # Architectural Research Resources (Root Researcher)
 
-> Focuses exclusively on Harness runtime, Web Audio API, PWA offline caching, and cross-platform sync architecture.
+> Focuses exclusively on minimalist Next.js runtime, browser MediaRecorder playback, and client-side persistence.
 
 ## Research Verdicts
 
-1. **Next.js 15 App Router on Vercel**: `ADOPT`
-   - Zero-config serverless deployment, edge streaming, optimal performance.
-2. **Web Audio API for In-Browser Acoustic Processing**: `ADOPT`
-   - Client-side extraction of RMS dB loudness, dynamic range, pause ratio, and speech pace. Zero data leak.
-3. **File System Access API for Local macOS Sync**: `ADOPT`
-   - Direct read/write to `~/Library/Application Support/XuViHarness/waldorf.json` on macOS Chromium/Safari browsers. Zero network latency.
-4. **Web Crypto API (AES-GCM 256-bit)**: `ADOPT`
-   - End-to-end zero-knowledge client encryption for remote cloud sync.
+1. **Next.js 15 Single-Page Storytelling Studio**: `ADOPT`
+   - Zero server routes, instant static/client rendering, zero external dependencies.
+2. **Browser MediaRecorder & HTMLAudioElement (`<audio controls>`)**: `ADOPT`
+   - Reliable native voice capture and immediate local playback with zero network transfer and zero AI grading.
+3. **Inline SVG Procedural Illustration (`ProceduralIllustrator`)**: `ADOPT`
+   - Instant, deterministic, wordless Waldorf art rendering in 3 traditional mediums (Wet-on-Wet, Crayon, Chalkboard) without external image APIs.
+4. **Remote AI & Cloud Sync**: `REJECT`
+   - Removed to uphold minimalist single-purpose storytelling focus and 100% offline privacy.

@@ -1,112 +1,56 @@
-# ViWaldorf Harness — Self-Evolving Agentic Platform with DAO Compass
+# ViWaldorf — Ứng dụng Luyện Kể Chuyện Sư Phạm (Zero-AI, 5 Cấp Độ)
 
-> **One-Sentence Purpose:** A self-evolving agentic platform rooted in the living ethos of Waldorf-inspired education applied to Vietnam's rich cultural diversity — delivering a modern, responsive web application deployable to Vercel, seamlessly synchronized with its native macOS sibling (`xuvi-harness`), and guided by an inviolable ethical compass ([DAO.md](DAO.md)).
-
----
-
-## 1. System Map
-
-```mermaid
-flowchart TD
-    DAO["DAO.md — Inviolable Compass<br/>Agents Never Edit"]
-    SPECS["Specs — System Genome<br/>Single Source of Truth"]
-    HARNESS["Harness — Runtime<br/>Everything-is-a-Plugin"]
-    PLUGINS["Plugins — Living Domains<br/>Primary: waldorf"]
-    WEB_APP["ViWaldorf Web Application<br/>Next.js 15, Vercel Ready, Bilingual"]
-    MAC_APP["XuVi Native macOS App<br/>SwiftUI Desktop Client"]
-    BENCH["Benchmarker<br/>G1–G3 Veto Gates & B1–B8 Quality Dimensions"]
-    CRON["cron.md — Evolution Loop<br/>7 Steps, Max 5 Loops per Batch"]
-
-    DAO -->|"Decision Compass"| CRON
-    SPECS --> HARNESS
-    SPECS --> PLUGINS
-    HARNESS --> WEB_APP
-    PLUGINS --> WEB_APP
-    WEB_APP <-->|"Seamless Bi-Directional Sync<br/>(Local File Bridge & /api/sync)"| MAC_APP
-    WEB_APP -->|"Evaluated By"| BENCH
-    BENCH -->|"Only Keeps Better Changes"| CRON
-    CRON -->|"Refactor & Evolve"| SPECS
-```
-
-| Component | Metaphor | Role | Location |
-|---|---|---|---|
-| **DAO** | Constitution / Compass | Answers *"What is worth doing, and what must never be traded away"* | [DAO.md](DAO.md) |
-| **Specs** | Genome / Long-Term Memory | Defines *what the system must be*; real evolution happens here | `*/specs/**` |
-| **Harness** | Nervous System | Pluggable runtime where capabilities and tools are isolated | [harness/specs/](harness/specs/README.md) |
-| **Waldorf Plugin** | Living Domain | Storytelling practice, 3 Waldorf painting styles, dialect learning, 6 curriculum documents | [plugins/waldorf/specs/](plugins/waldorf/specs/00_master_prompt.md) |
-| **Web App** | Accessible Living Body | Responsive Next.js 15 app on Vercel with bilingual (EN/VI) support | `app/`, `components/`, `lib/` |
-| **macOS Native** | Desktop Twin | High-performance SwiftUI native client in `xuvi-harness` | `xuvi-harness/app` |
-| **Benchmarker** | Conscience & Evidence | Evaluates veto gates (`G1–G3`) and quality dimensions (`B1–B8`) | [benchmarker/specs/](benchmarker/specs/README.md) |
-| **Evolution Loop** | Heartbeat | 7-step autonomous cycle for refactoring, testing, and verifying | [cron.md](cron.md) |
+> **Mục tiêu cốt lõi:** Ứng dụng web gọn nhẹ, hoạt động 100% cục bộ trên trình duyệt, tập trung duy nhất vào **Luyện kể chuyện** theo tinh thần sư phạm Waldorf tại Việt Nam — với **5 cấp độ rèn luyện (Level 0–4)** và tính năng **Thu âm & Nghe lại** thuần túy, không sử dụng AI. Được dẫn đường bởi [DAO.md](DAO.md).
 
 ---
 
-## 2. Core Principles of Minimalism
+## 1. Năm Cấp Độ Luyện Tập (Level 0 → Level 4)
 
-1. **Prefer minimizing requirements over adding new ones.**
-2. **Prefer refactoring existing systems over writing new code.**
-3. **Prefer deleting text and boilerplate over adding text.**
-4. **Zero-Warning Strict Quality**: No unhandled errors, clean TypeScript build.
-5. **Only commit specifications, source code, and benchmark results**: Never commit environment variables, secret keys, or real student personal data.
-
----
-
-## 3. Key Capabilities & The 6 Views
-
-The application provides exact visual and workflow parity with the native macOS version:
-
-1. **Dashboard (Today's Garden)**:
-   - Overview of active stories, practice metrics, dialect rules, and seasonal curriculum rhythms.
-2. **Story Retelling Practice**:
-   - Story selection and upload (.txt / .md / manual input) with automated scene decomposition.
-   - **Step 1 — Scene Map & 3 Waldorf Art Techniques**: Wet-on-Wet watercolor (Goethean color theory washes), Crayon drawing (beeswax crayons), and Chalkboard pastel drawing. Includes procedural canvas rendering and AI generation prompts.
-   - **Step 2 — Voice Recording & Acoustic Analysis**: Direct in-browser 24kHz WAV audio recording with immediate acoustic delivery metrics (duration, RMS loudness dB, dynamic range, pause ratio %, and pace in WPM).
-   - **Step 3 — Transcription & Dialect Adaptation**: Privacy-first transcription with explicit consent toggles. Local dialect rule engine preserving regional pronunciations (Quảng Nam, Central, Northern, Southern).
-   - **Constructive Heuristic Feedback**: Warm, encouragement-oriented feedback without punitive numerical scores.
-3. **Weekly Schedule (Timetable)**:
-   - Monday–Friday 08:00–15:00 interactive grid distinguishing Main Lesson / Instructional time from Living Rhythm.
-   - Live schedule validation (overlap detection, time gap checks, 2,100 minutes weekly total).
-4. **Classroom Documents & Portfolio**:
-   - Live generation of all 6 mandatory educational documents: Overall Program, Grade Program, Alignment Matrix, Academic Year Plan, Timetable, and Teaching Journal.
-   - Markdown copy and `.md` file download.
-   - Teaching Journal observation entry form (student-centered, non-judgmental).
-5. **AI Assistant Chat**:
-   - Pedagogical dialogue with prompt suggestions and tool execution.
-6. **Settings & Sync Center**:
-   - Key management (`META_API_KEY`), complete JSON backup export and restore, seed data reset, and cross-device sync pairing.
+1. **Level 0 — Không gian bối cảnh & Linh hồn câu chuyện**:
+   Nắm tinh thần văn hóa, nhịp điệu kể, thông điệp ẩn dụ theo lứa tuổi và cách phát âm tên cổ trước khi đọc văn bản.
+2. **Level 1 — Toàn văn câu chuyện**:
+   Văn phong kể chuyện đọc thành tiếng hoàn chỉnh, giàu hình ảnh và đi kèm *Lưu ý giọng kể* riêng cho từng phân cảnh.
+3. **Level 2 — Dàn ý chi tiết**:
+   Luyện kể không nhìn toàn văn nhưng giữ trọn nhân vật, chi tiết bản địa hóa và nhịp cảm xúc theo lứa tuổi.
+4. **Level 3 — Dàn ý tóm tắt**:
+   1 bản khung xương duy nhất bám sát cốt truyện gốc (4–6 ý/phân cảnh).
+5. **Level 4 — Tranh gợi nhớ thuần hình ảnh**:
+   Mỗi phân cảnh 1 bức tranh vẽ tay truyền thống (*Màu nước ướt-trên-ướt*, *Màu sáp ong*, *Phấn bảng đen*), **không chữ gợi ý**, giúp người kể tự tuôn chảy bằng ngôn ngữ sống của mình.
 
 ---
 
-## 4. Seamless Synchronization Architecture
+## 2. Thu âm & Nghe lại Thuần túy
 
-ViWaldorf provides dual-mode synchronization between this web app and the macOS desktop app (`xuvi-harness`):
-
-1. **Local Mode (Direct File System Access API)**:
-   When running the web app on your Mac, connect directly to `~/Library/Application Support/XuViHarness/waldorf.json`. The web app reads and writes directly to disk with atomic backups—zero latency, zero cloud storage, 100% private.
-2. **Remote Vercel Mode (Encrypted `/api/sync`)**:
-   When deployed on Vercel, the app provides a serverless `/api/sync` endpoint. Data is encrypted client-side using your personal Passkey (AES-GCM) before transmission, ensuring zero-knowledge privacy across multiple devices.
+- Thu âm trực tiếp từ micro ngay trên trình duyệt (`MediaRecorder`) kèm đồng hồ thời lượng.
+- Nghe lại tức thì bằng trình phát âm thanh (`<audio controls>`), quản lý và nghe lại các lượt thu trong phiên hoặc tải về máy.
+- **Không sử dụng AI**: Không gọi API AI, không chấm điểm, không phân tích tự động hay lưu dữ liệu ra máy chủ ngoài.
 
 ---
 
-## 5. Development & Deployment
+## 3. Cấu trúc Mã nguồn & Đặc tả
 
-### Local Development
+| Thành phần | Vai trò | Vị trí |
+|---|---|---|
+| **DAO** | Hiến chương bất khả xâm phạm | [DAO.md](DAO.md) |
+| **Đặc tả Hệ thống** | Kiến trúc client-side & plugin Waldorf | [harness/specs/](harness/specs/README.md), [plugins/waldorf/specs/](plugins/waldorf/specs/00_master_prompt.md) |
+| **Giao diện chính** | Không gian Luyện kể chuyện 5 cấp độ + Thu âm/Nghe lại | [app/page.tsx](app/page.tsx), [components/Shell.tsx](components/Shell.tsx) |
+| **Dữ liệu & Tranh** | Mô hình 5 level, kho truyện mẫu, tranh SVG thuần hình ảnh | [lib/types.ts](lib/types.ts), [lib/seedData.ts](lib/seedData.ts), [lib/art/proceduralIllustrator.ts](lib/art/proceduralIllustrator.ts) |
+| **Kiểm thử & Đánh giá** | Bộ kiểm thử tự động & báo cáo chất lượng | [tests/](tests/), [benchmarker/](benchmarker/specs/01-overall-benchmark.md) |
+
+---
+
+## 4. Phát triển & Kiểm thử Cục bộ
+
 ```bash
-# Install dependencies
-pnpm install # or npm install
+# Cài đặt phụ thuộc
+pnpm install
 
-# Run development server
-pnpm dev # or npm run dev
-# Open http://localhost:3000
-```
+# Chạy máy chủ phát triển
+pnpm dev
+# Mở http://localhost:3000
 
-### Build & Typecheck
-```bash
-pnpm build
-```
-
-### Deploy to Vercel
-```bash
-# Deploy via Vercel CLI or connect repository on Vercel Dashboard
-vercel
+# Kiểm tra TypeScript, chạy unit tests và build
+npx tsc --noEmit
+npm test
+npm run build
 ```

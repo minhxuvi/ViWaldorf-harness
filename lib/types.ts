@@ -1,170 +1,73 @@
 export type WaldorfArtStyle = "wet-on-wet" | "crayon" | "chalkboard";
-export type AIProvider = "meta" | "local";
-export type StoryViewMode = "studio" | "reader";
-export type ReaderViewMode = "picture-book" | "continuous";
+export type PracticeLevel = 0 | 1 | 2 | 3 | 4;
 
-export type AIOperationKind =
-  | "chat"
-  | "image-generation"
-  | "audio-analysis"
-  | "story-segmentation";
-
-export interface AIContextTelemetry {
-  kind: AIOperationKind;
-  title: string;
-  prompt: string;
-  systemPrompt?: string;
-  negativePrompt?: string;
-  styleInstruction?: string;
-  model: string;
-  provider: "meta" | "local";
-  historyTurns?: number;
-  injectedContext?: Record<string, any>;
-  generationConfig?: {
-    temperature?: number;
-    maxOutputTokens?: number;
-    aspectRatio?: string;
-    responseModalities?: string[];
-  };
-  rawPayload?: any;
-  latencyMs?: number;
-  timestamp: string;
-  metrics?: Record<string, any>;
+export interface PronunciationGuideItem {
+  term: string;
+  pronunciation: string;
+  meaning: string;
 }
 
-export interface ChatMessage {
-  id: string;
-  sender: "user" | "viwaldorf";
-  text: string;
-  timestamp?: string;
-  contextInfo?: AIContextTelemetry;
+/** Level 0: Không gian bối cảnh & Linh hồn câu chuyện */
+export interface StorySoulContext {
+  culturalSpirit: string;
+  storytellingRhythm: string;
+  ageMetaphor: string;
+  pronunciations: PronunciationGuideItem[];
+}
+
+/** Level 2: Dàn ý chi tiết theo phân cảnh */
+export interface SceneDetailedOutline {
+  characters: string[];
+  localizedDetails: string[];
+  emotionalRhythm: string;
+  beats: string[];
 }
 
 export interface StoryScene {
   id: string;
   ord: number;
   title: string;
-  summary: string;
-  /** Verbatim story text for this scene (Level 1). Optional for backward compatibility. */
-  passage?: string;
-  keywords: string[];
+  /** Level 1: Toàn văn đọc thành tiếng cho phân cảnh */
+  passage: string;
+  /** Level 1: Lưu ý giọng kể riêng của phân cảnh */
+  voiceNote: string;
+  /** Level 2: Dàn ý chi tiết */
+  detailedOutline: SceneDetailedOutline;
+  /** Level 3: 4–6 ý khung xương bám sát cốt truyện gốc */
+  summaryPoints: string[];
+  /** Level 4: Chất liệu tranh vẽ tay truyền thống (thuần hình ảnh, không chữ) */
   artStyle: WaldorfArtStyle;
-  imagePrompt: string;
+  /** Ảnh vẽ tay tùy chọn do người dùng tải lên (nếu có) */
   imagePath?: string | null;
-  imageSourceLabel: string;
-  isGenerating?: boolean;
-  generationError?: string | null;
-  contextInfo?: AIContextTelemetry;
 }
 
 export interface WaldorfStory {
   id: string;
   title: string;
-  titleVi?: string;
-  sourceText: string;
-  sourceTextVi?: string;
+  titleEn?: string;
   sourceInfo: string;
   ageRange: string;
   goal: string;
   defaultArtStyle: WaldorfArtStyle;
+  /** Level 0 */
+  soul: StorySoulContext;
+  /** 4–6 phân cảnh */
   scenes: StoryScene[];
-  segmentationContextInfo?: AIContextTelemetry;
 }
 
-export interface AudioDeliveryMetrics {
-  durationSeconds: number;
-  sampleRate: number;
-  rmsDecibels: number;
-  dynamicRangeDb: number;
-  pauseRatio: number;
-  pauseCount: number;
-  estimatedPaceWPM: number;
-  deliverySummary: string;
-}
-
-export type TranscriptSource = "remoteASR" | "demoSample" | "manualEdit" | "unavailable";
-
-export interface PracticeAttempt {
+export interface VoiceRecording {
   id: string;
   storyId: string;
-  mode: "prompt" | "fading" | "free";
-  audioPath?: string | null;
-  rawTranscript: string;
-  transcript: string;
-  audioMetrics?: AudioDeliveryMetrics | null;
-  appliedDialectRules: string[];
-  storySnapshot: string;
+  level: PracticeLevel;
+  sceneOrd: number;
+  label: string;
+  audioUrl: string;
+  durationSeconds: number;
   createdAt: string;
-  contextInfo?: AIContextTelemetry;
-}
-
-export interface TimetableEntry {
-  id: string;
-  day: number; // 2..6 (Mon..Fri)
-  startMinutes: number; // from midnight (e.g. 480 = 08:00)
-  endMinutes: number;
-  title: string;
-  teacher?: string;
-  objective?: string;
-  kind: "hoc" | "sinh-hoat"; // Instructional vs Living Rhythm
-}
-
-export interface DialectCorrectionRule {
-  id: string;
-  rawPhrase: string;
-  correctedPhrase: string;
-  regionNote: string;
-  occurrences: number;
-  updatedAt: string;
-}
-
-export interface JournalEntry {
-  id: string;
-  date: string;
-  contentDelivered: string;
-  attendanceNote: string;
-  observationNote: string;
-  assignmentNote: string;
-  artifactNote: string;
-  periodicReportNote: string;
-}
-
-export interface WaldorfStudent {
-  id: string;
-  name: string;
-  birthYear: number;
-  className: string;
-  illustrative: boolean;
 }
 
 export interface WaldorfData {
-  programPhilosophy: string;
-  programGoals: string;
-  gradeLevel: string;
-  ageRange: string;
-  students: WaldorfStudent[];
   stories: WaldorfStory[];
-  attempts: PracticeAttempt[];
-  timetable: TimetableEntry[];
-  yearThemes: string[];
-  dialectRules: DialectCorrectionRule[];
-  journalEntries: JournalEntry[];
   updatedAt?: string;
   version?: string;
-}
-
-export type DocumentType =
-  | "overallProgram"
-  | "gradeProgram"
-  | "alignmentMatrix"
-  | "yearPlan"
-  | "timetable"
-  | "journalRecords";
-
-export interface StoryFeedback {
-  warmthNote: string;
-  imageryNote: string;
-  pacingNote: string;
-  breathNote: string;
-  encouragement: string;
 }

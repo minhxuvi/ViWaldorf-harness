@@ -8,19 +8,19 @@ All three gates must be `PASS` with concrete evidence for any evolutionary candi
 
 | Gate | PASS Criteria | FAIL Criteria |
 |---|---|---|
-| **G1. DAO & Life Safety** | Protects the freedom and unhurried rhythm of the child; `DAO.md` unmodified (0 diff). | Addictive patterns, pressure, or any unauthorized modification to `DAO.md`. |
-| **G2. Truth in Evidence** | Real AI models are labeled as real AI; local procedural tools labeled as local; no fake accreditations. | Misleading labels; claim of unverified state/Waldorf certification. |
-| **G3. Privacy & Secrets** | Zero real student data committed; secrets and API keys protected; sandboxed filesystem operations. | API keys leaked; real student personal data exposed. |
+| **G1. DAO & Life Safety** | Protects the freedom and unhurried rhythm of the child and storyteller; `DAO.md` unmodified (0 diff). | Addictive patterns, pressure, or any unauthorized modification to `DAO.md`. |
+| **G2. Truth in Evidence** | All visual art and story segmentation are honestly labeled as local; zero fake AI claims or unverified certifications. | Misleading AI claims; claim of unverified state/Waldorf certification. |
+| **G3. Privacy & Secrets** | Zero AI API calls, zero API keys, zero student personal data committed; audio stays purely in-browser. | Secrets exposed or voice recordings transmitted externally. |
 
 ## 2. Eight Scoring Dimensions (`B1–B8`, 0–4 scale)
 
 | # | Dimension | Weight | Focus Criteria |
 |---|---|---|---|
-| **B1** | **Product Value & Completeness** | 20% | Complete story upload, scene decomposition, 3 Waldorf art techniques, in-browser audio recording with acoustic metrics, dialect engine, 6 documents. |
-| **B2** | **Pedagogical & Cultural Quality** | 15% | True to Waldorf ethos in Vietnam, honoring regional cultural diversity and dialects. |
-| **B3** | **User Experience & Design** | 10% | Intuitive warm paper design, responsive on 900x600 and 1280x880 screens, bilingual support. |
-| **B4** | **Harness Architecture & Sync** | 15% | Everything-is-a-plugin, seamless bi-directional macOS <-> Web synchronization. |
-| **B5** | **Technical Reliability & Privacy** | 15% | 100% test pass rate, atomic storage with rollback, client-side encryption. |
-| **B6** | **AI Integration & Offline Seams** | 10% | Meta AI / Muse first ecosystem with robust offline procedural fallbacks. |
-| **B7** | **Research Quality** | 5% | Rigorous separation of root architecture and domain research. |
-| **B8** | **Evolution Health & Minimalism** | 10% | Traceable specs-to-code mapping, code and text reduction. |
+| **B1** | **Storytelling Depth (Levels 0–4)** | 25% | Complete implementation of Level 0 (Context & Soul), Level 1 (Full Text + Vocal Notes), Level 2 (Detailed Outline), Level 3 (Unified Summary Skeleton 4–6 points/scene), Level 4 (Wordless Visual Recall). |
+| **B2** | **Pedagogical & Cultural Quality** | 20% | True to Waldorf oral storytelling ethos in Vietnam, honoring regional folklore and unhurried vocal craft. |
+| **B3** | **User Experience & Design** | 15% | Warm paper palette, single-purpose layout without clutter, responsive desktop and mobile stages. |
+| **B4** | **Pure Visual Art (Level 4)** | 10% | Authentic Wet-on-Wet, Crayon, and Chalkboard SVG illustrations with strictly zero text hints. |
+| **B5** | **Technical Reliability & Build** | 15% | 100% test pass rate, clean TypeScript (`tsc --noEmit`), clean `next build`. |
+| **B6** | **Voice Recording & Playback** | 5% | Smooth in-browser `MediaRecorder` capture and immediate `<audio>` playback with zero AI evaluation. |
+| **B7** | **Research Quality** | 5% | Clean separation of architecture and Waldorf storytelling domain research. |
+| **B8** | **Minimalism & Zero-AI Purity** | 5% | Zero AI routes/clients/inspectors, zero extraneous pages, traceable specs-to-code mapping. |

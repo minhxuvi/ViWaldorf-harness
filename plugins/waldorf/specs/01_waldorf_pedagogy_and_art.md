@@ -1,87 +1,40 @@
-# 01 — Waldorf Pedagogy & Three Art Techniques
+# 01 — Waldorf Storytelling Pedagogy & Three Art Techniques
 
 > Governed by [DAO.md](../../../DAO.md).
 
 ## 1. Pedagogical Foundation
 
-Waldorf education honors the threefold nature of the growing child:
-- **Thinking (Head)**: Clear, imaginative understanding born from living experience.
-- **Feeling (Heart)**: Aesthetic, empathetic connection cultivated through storytelling, poetry, and song.
-- **Willing (Hands)**: Purposeful, constructive action through practical crafts and artistic work.
+Waldorf oral storytelling nurtures the threefold child through living spoken language:
+- **Thinking (Head)**: Inner picture-building from well-structured, living narratives.
+- **Feeling (Heart)**: Warmth, breathing pauses, and emotional resonance carried by the storyteller's voice.
+- **Willing (Hands)**: Grounded connection to cultural crafts, nature rhythms, and seasonal life.
 
-### Three Practice Levels (Retelling Studio)
+### Five Practice Levels (Level 0 – Level 4)
 
-Scaffolding fades step by step, from reading to free recall from the inner picture:
+The storyteller moves step by step from spiritual preparation and read-aloud mastery to pure visual recall:
 
-| Level | Story text | Keywords | Image |
-|---|---|---|---|
-| 1 · Full Story (`prompt`) | Full verbatim passage of the scene | hidden | shown |
-| 2 · Keywords (`fading`) | hidden | shown | shown |
-| 3 · Free Recall (`free`) | hidden (title reduced to "Scene N of M") | hidden | hidden by default, one-click reveal; re-hidden on scene change |
-
-Passage source order: `scene.passage` → matching paragraph of the story source text (when paragraph count equals scene count) → `scene.summary`.
-
-## 2. Three Waldorf Art Techniques & Calibrated Aesthetic Standards
-
-### 1. Wet-on-Wet Watercolor (`wet-on-wet`)
-- **Recommended Age**: Kindergarten & Grades 1–3 (ages 3–9).
-- **Core Principle**: *"Form emerging from color"* (*Form aus der Farbe*). Scenes are never pre-drawn with ink or pencil lines; archetypal forms coalesce out of fluid translucent pigment pools.
-- **Color Theory**: Grounded in Goethe's *Theory of Colours*—luminous polarities of lemon yellow (radiant light core) spreading into vermilion rose, carmine, and deep Prussian/ultramarine blue at atmospheric margins.
-- **Surface & Medium**: Moistened heavy 300gsm cold-press cotton paper, delicate watery blooming (cauliflower blooms), soft feathery transitions, visible paper grain.
-- **Figures**: Gentle archetypal silhouettes in loose natural attire, soft-focus poetic impression without cartoonish or hyper-detailed facial features.
-- **Strict Negative Constraints**: Zero black ink lines, no harsh cartoon borders, no 3D CGI gloss, no anime/manga eyes, no text or typography.
-
-### 2. Crayon Drawing / Kỹ thuật vẽ Màu sáp (`crayon`)
-- **Recommended Age**: Grades 1–5 (ages 6–11).
-- **Core Principle**: Kỹ thuật vẽ màu sáp (Crayon Drawing) tạo hình từ mảng màu và cảm nhận bề mặt giấy; sử dụng chất liệu sáp ong tự nhiên (beeswax crayons, bao gồm cả sáp khối *block crayons* và sáp que/thỏi *stick crayons*). Lớp sáp ong bán trong suốt (*translucent beeswax glaze*) phủ nhẹ trên giấy vẽ màu kem có thớ nổi tự nhiên.
-- **Surface & Texture**: Heavy pebbled vellum drawing paper tooth where natural Stockmar beeswax catches on raised bumps, producing a distinctive speckled wax grain (scumbling/frottage) and warm matte sheen.
-- **Lighting & Color**: Concentric radiating halos of warm light (golden lemon yellow core radiating outwards through warm honey orange, peach, and vermilion, into soft turquoise/cobalt in the corners).
-- **Steiner Complementary Shadow Law**: Shadows are **never flat dead black**; shadows are built by layering complementary blues, deep purples, and indigo over warm undertones.
-- **Stroke Dynamics**: Broad flat-edge strokes (dùng cạnh phẳng hoặc mặt thỏi sáp) tạo mảng màu lớn, kết hợp đan nét hữu cơ (*directional organic hatching*) bám theo hình thể của cảnh vật mà không dùng đường viền đen.
-- **Strict Negative Constraints**: No cheap waxy oil-pastel smudges, no black outlines, no felt-tip markers, no flat digital fills, no sharp vector clip art.
-
-### 3. Chalkboard Drawing (`chalkboard`)
-- **Recommended Age**: Grades 1–8 (ages 6–14).
-- **Core Principle**: *Light emerging out of primordial darkness*. The dark charcoal/black slate serves as the deepest shadow, night, and cosmic space; light is pulled into existence with pure white and warm yellow chalk.
-- **Medium & Surface**: Authentic classroom matte dark slate blackboard framed in natural wood, fine mineral chalk dust and powdery tooth, finger-blended atmospheric halos.
-- **Techniques**: Broad flat side-of-the-chalk sweeps for atmospheric skies, rolling hills, and ocean waves; fine chalk cross-hatching, stippling, and volumetric crepuscular light rays streaming from celestial bodies.
-- **Color Palette**: Luminous white and butter-yellow chalk highlights, warm terracotta, carmine red, soft cerulean blue, seafoam cyan, and moss green pastels against dark slate.
-- **Composition**: Timeless pedagogical panoramas, decorative hand-drawn chalk vine borders, dignified archetypal human figures in community or reverent wonder.
-- **Strict Negative Constraints**: No whiteboards, no dry-erase markers, no neon LED glow, no digital vector lines, no computer fonts, no cluttered modern classroom elements.
+| Level | Name | Displayed Content |
+|---|---|---|
+| **Level 0** | **Không gian bối cảnh & Linh hồn câu chuyện** (Context & Soul) | Cultural spirit, storytelling breathing rhythm, age-appropriate metaphor, and pronunciation guide for ancient/regional names. |
+| **Level 1** | **Toàn văn câu chuyện** (Full Story) | Complete read-aloud passage per scene with rich imagery and *Lưu ý giọng kể* (vocal delivery notes). |
+| **Level 2** | **Dàn ý chi tiết** (Detailed Outline) | Full text hidden; shows characters, localized sensory details, age-appropriate emotional rhythm, and narrative beats per scene. |
+| **Level 3** | **Dàn ý tóm tắt** (Summary Skeleton) | **One unified skeleton outline** closely following the original plot, with **4–6 concise points per scene**. |
+| **Level 4** | **Tranh gợi nhớ thuần hình ảnh** (Pure Visual Recall) | **One traditional hand-drawn illustration per scene** (`wet-on-wet`, `crayon`, or `chalkboard`) with **zero text hints** (no titles, no keywords, no `<text>` elements in SVG). |
 
 ---
 
-## 3. Master Prompt Templates
+## 2. Three Traditional Waldorf Art Techniques (Pure Visuals)
 
-### A. Wet-on-Wet Watercolor
-```text
-An authentic Waldorf wet-on-wet watercolor painting depicting [SCENE_TITLE] - [SCENE_SUMMARY].
-Style: Traditional Steiner-Waldorf early childhood pedagogy wet-in-wet watercolor on moist 300gsm heavy cold-press cotton paper.
-Color Harmony: Luminous Goethean color washes; radiant warm lemon yellow and pure white paper light glowing at the center, softly blending into vermilion rose, soft peach, and deep ultramarine Prussian blue at the outer atmospheric edges.
-Technique: Forms and figures emerge naturally out of fluid translucent color fields rather than lines. Soft feathery blooming transitions, natural watercolor granulation, delicate watery pooling, zero black lineart, zero pen outlines.
-Subject: [SUBJECT_DETAILS], portrayed with gentle archetypal gestures in loose natural attire, soft-focus poetic impression, reverent peaceful childlike wonder.
-```
+All procedural illustrations in Level 4 are rendered locally (`ProceduralIllustrator`) as pure visual SVGs **without text overlays or labels**:
 
-### B. Chalkboard Drawing
-```text
-An authentic Waldorf Main Lesson chalkboard drawing depicting [SCENE_TITLE] - [SCENE_SUMMARY].
-Medium: Multi-layered soft pastel chalk on genuine matte dark slate blackboard, framed with warm natural wood.
-Technique: Light emerging dramatically out of cosmic darkness; broad sweeping side-of-the-chalk strokes for atmospheric skies, waves, and rolling earth; delicate chalk cross-hatching, stippling, and powdery finger-blended halos.
-Lighting & Drama: Brilliant pure white and golden-yellow chalk crepuscular light rays streaming down through dark skies; luminous radiant halos and starry points of light; deep black slate preserved as natural shadow and depth.
-Color Palette: Vibrant natural chalk pastels: warm butter yellow, golden ochre, terracotta, carmine red, soft cerulean blue, seafoam cyan, and earthy moss green against dark charcoal slate.
-Composition: [SUBJECT_DETAILS], dignified and archetypal living narrative, timeless reverent classroom pedagogical illustration, decorative hand-drawn chalk vine border.
-```
+### 1. Wet-on-Wet Watercolor (`wet-on-wet`)
+- **Recommended Age**: Kindergarten & Grades 1–3 (ages 3–9).
+- **Core Principle**: *"Form emerging from color"* (*Form aus der Farbe*). Archetypal forms coalesce out of fluid translucent Goethean washes (warm lemon yellow, vermilion rose, ultramarine/Prussian blue, and leaf green) on moist heavy cotton paper.
 
-### C. Crayon Drawing (Beeswax Crayon)
-```text
-An authentic Waldorf crayon drawing on textured heavy cream drawing paper depicting [SCENE_TITLE] - [SCENE_SUMMARY].
-Medium: Pure natural Waldorf beeswax crayons (Stockmar style, blocks and sticks), visible pebbled paper tooth with speckled wax adherence and warm matte wax sheen.
-Color & Lighting: Concentric radiating aura of warm light; pure golden lemon yellow core radiating outwards through warm honey orange, peach, and vermilion, into soft turquoise and cobalt blue in the outer corners.
-Technique: Authentic Waldorf crayon drawing technique; broad flat strokes laying down luminous fields of color layered with gentle directional textured hatching following organic contours; soft translucent wax glazes where undertones shine through; shadows created with complementary deep blue and violet rather than black.
-Subject: [SUBJECT_DETAILS], tender and living archetypal forms, warm nurturing atmosphere, reverent storytelling quality.
-```
+### 2. Crayon Drawing / Kỹ thuật vẽ Màu sáp (`crayon`)
+- **Recommended Age**: Grades 1–5 (ages 6–11).
+- **Core Principle**: Layered beeswax crayon strokes (*block* and *stick* crayons) with speckled vellum paper grain, radiating warm halos, and complementary blue/violet shadows instead of flat black.
 
-### Universal Negative Constraints
-```text
-harsh black outlines, black ink contours, cartoon outlines, anime, manga, comic book style, 3D CGI plastic rendering, glossy digital art, photorealism, sharp mechanical edges, high-contrast black shadows, modern graphic design, text, watermark, typography, letters, signature, deformed limbs, hyper-detailed facial features, whiteboard, dry erase marker, neon glow, flat vector fills.
-```
+### 3. Chalkboard Drawing (`chalkboard`)
+- **Recommended Age**: Grades 1–8 (ages 6–14).
+- **Core Principle**: *Light emerging out of primordial darkness*. Luminous butter-yellow, terracotta, cerulean, and white pastel chalk strokes emerging from a deep matte charcoal slate background.
