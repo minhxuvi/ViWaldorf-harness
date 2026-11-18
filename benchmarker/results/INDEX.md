@@ -17,3 +17,4 @@
 | 2026-11-18 | Cycle 13 — SEO & Share Metadata (OG Image from Illustration 08) | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 13 Report](2026-11-18-cycle-13-seo-and-share-metadata.md) |
 | 2026-11-18 | Cycle 14 — Mobile & Cross-Browser Full-Story PDF Export (180 Chapters) | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 14 Report](2026-11-18-cycle-14-mobile-full-pdf-export.md) |
 | 2026-11-18 | Cycle 15 — Multilingual Corpus (`vi`, `en`, `zh`), 28 Illustrations & Local Pre-Push Bridge | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 15 Report](2026-11-18-cycle-15-multilingual-corpus-and-28-illustrations.md) |
+| 2026-11-18 | Cycle 16 — Single "Download Full Story PDF" Entry Point | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 16 Report](2026-11-18-cycle-16-single-pdf-entry-point.md) |

@@ -169,9 +169,8 @@ export default function StorytellingPracticePage() {
   // Xuất PDF toàn văn (2 lựa chọn: kèm ảnh hoặc không kèm ảnh)
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
   const [pdfError, setPdfError] = useState<string>("");
-  const [pdfMenuLocation, setPdfMenuLocation] = useState<"header" | "level1" | null>(null);
-  const headerPdfMenuRef = useRef<HTMLDivElement | null>(null);
-  const level1PdfMenuRef = useRef<HTMLDivElement | null>(null);
+  const [isPdfMenuOpen, setIsPdfMenuOpen] = useState<boolean>(false);
+  const pdfMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Level 4: theo dõi URL ảnh từ repo bị lỗi & chế độ SVG dự phòng
   const [failedRepoImages, setFailedRepoImages] = useState<Record<string, boolean>>({});
@@ -217,20 +216,14 @@ export default function StorytellingPracticePage() {
 
   // Đóng menu tùy chọn PDF khi bấm ra ngoài hoặc nhấn Escape
   useEffect(() => {
-    if (!pdfMenuLocation) return;
+    if (!isPdfMenuOpen) return;
     const handlePointerDown = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      if (
-        (headerPdfMenuRef.current && headerPdfMenuRef.current.contains(target)) ||
-        (level1PdfMenuRef.current && level1PdfMenuRef.current.contains(target))
-      ) {
-        return;
-      }
-      setPdfMenuLocation(null);
+      if (pdfMenuRef.current?.contains(e.target as Node | null)) return;
+      setIsPdfMenuOpen(false);
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setPdfMenuLocation(null);
+        setIsPdfMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handlePointerDown);
@@ -239,7 +232,7 @@ export default function StorytellingPracticePage() {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [pdfMenuLocation]);
+  }, [isPdfMenuOpen]);
 
   // Làm mới bộ nhớ đệm ảnh lỗi & văn bản cổ khi vừa đồng bộ xong hoặc đổi ngôn ngữ
   useEffect(() => {
@@ -663,7 +656,7 @@ export default function StorytellingPracticePage() {
 
   const handleExportPdf = async (includeImages: boolean = true) => {
     if (!selectedStory || isExportingPdf) return;
-    setPdfMenuLocation(null);
+    setIsPdfMenuOpen(false);
     setPdfError("");
     setIsExportingPdf(true);
     try {
@@ -1042,14 +1035,11 @@ export default function StorytellingPracticePage() {
               </button>
 
               <PdfExportDropdown
-                isOpen={pdfMenuLocation === "header"}
+                isOpen={isPdfMenuOpen}
                 isExporting={isExportingPdf}
-                onToggle={() =>
-                  setPdfMenuLocation((prev) => (prev === "header" ? null : "header"))
-                }
+                onToggle={() => setIsPdfMenuOpen((v) => !v)}
                 onSelect={(includeImages) => void handleExportPdf(includeImages)}
-                menuRef={headerPdfMenuRef}
-                variant="header"
+                menuRef={pdfMenuRef}
                 copy={t.story.pdf}
               />
 
@@ -1548,18 +1538,6 @@ export default function StorytellingPracticePage() {
                       </button>
                     ))}
                   </div>
-
-                  <PdfExportDropdown
-                    isOpen={pdfMenuLocation === "level1"}
-                    isExporting={isExportingPdf}
-                    onToggle={() =>
-                      setPdfMenuLocation((prev) => (prev === "level1" ? null : "level1"))
-                    }
-                    onSelect={(includeImages) => void handleExportPdf(includeImages)}
-                    menuRef={level1PdfMenuRef}
-                    variant="level1"
-                    copy={t.story.pdf}
-                  />
                 </div>
 
                 {level1FlowMode === "scene" && (
@@ -2552,7 +2530,6 @@ function IllustrationNavControls({
 
 interface PdfMenuCopy {
   downloadBtn: string;
-  mobileShortBtn: string;
   downloadingBtn: string;
   withImagesOption: string;
   withImagesDesc: string;
@@ -2567,7 +2544,6 @@ function PdfExportDropdown({
   onToggle,
   onSelect,
   menuRef,
-  variant,
   copy,
 }: {
   isOpen: boolean;
@@ -2575,10 +2551,9 @@ function PdfExportDropdown({
   onToggle: () => void;
   onSelect: (includeImages: boolean) => void;
   menuRef: React.RefObject<HTMLDivElement | null>;
-  variant: "header" | "level1";
   copy: PdfMenuCopy;
 }) {
-  const [alignRight, setAlignRight] = useState(variant === "header");
+  const [alignRight, setAlignRight] = useState(true);
 
   const handleTriggerClick = () => {
     if (!isOpen && menuRef.current && typeof window !== "undefined") {
@@ -2590,11 +2565,6 @@ function PdfExportDropdown({
     }
     onToggle();
   };
-
-  const triggerClass =
-    variant === "header"
-      ? "btn-terra text-xs py-2 px-3"
-      : "btn-ghost text-xs py-1.5 px-2.5 border-terra/35 text-terra hover:bg-[#FDF2F0]";
 
   const options = [
     {
@@ -2620,19 +2590,12 @@ function PdfExportDropdown({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={copy.downloadBtn}
-        className={triggerClass}
+        className="btn-terra text-xs py-2 px-3"
       >
         <FileDown
           className={`w-3.5 h-3.5 ${isExporting ? "animate-bounce" : ""}`}
         />
-        <span className={variant === "level1" ? "hidden sm:inline" : ""}>
-          {isExporting ? copy.downloadingBtn : copy.downloadBtn}
-        </span>
-        {variant === "level1" && (
-          <span className="sm:hidden">
-            {isExporting ? copy.downloadingBtn : copy.mobileShortBtn}
-          </span>
-        )}
+        <span>{isExporting ? copy.downloadingBtn : copy.downloadBtn}</span>
         <ChevronDown
           className={`w-3.5 h-3.5 transition-transform ${
             isOpen ? "rotate-180" : ""

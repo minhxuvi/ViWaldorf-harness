@@ -23,6 +23,6 @@ plugins/<name>/
 The `waldorf` plugin focuses exclusively on **Storytelling Practice (Luyện kể chuyện)** for *Từ Sáng Thế Đến Giáng Sinh* (`vi`, `en`, `zh`):
 - **Background & Story Soul Reading Drawer (`locales/{lang}/level-0-context/`)** for cultural context, breathing rhythm, pronunciation, and ancient reference texts.
 - **4 Progressive Practice Levels (Level 1–4)** for internalizing the 180 chapters and 28 cluster illustrations organically.
-- **Full-Text Printable PDF Export** across all 180 chapters (Level 1) with two choices: **With Images** (all 28 Level 4 illustrations in `assets/images/`) or **Without Images** (text-only edition).
+- **Full-Text Printable PDF Export** across all 180 chapters, exposed as a single selector on the Epic Header Card, with two choices: **With Images** (all 28 Level 4 illustrations in `assets/images/`) or **Without Images** (text-only edition).
 - **3 Pure-Visual Waldorf Art Styles** (Wet-on-Wet watercolor, Beeswax crayon, Chalkboard pastel) with zero text overlays.
 - **In-Browser Voice Recording & Playback** without AI scoring or evaluation.

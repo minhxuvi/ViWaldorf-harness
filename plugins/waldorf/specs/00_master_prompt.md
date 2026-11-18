@@ -6,7 +6,7 @@
 - **Optional Context & Story Soul Reading Drawer (`locales/{lang}/level-0-context/`)**:
   - Surfaced as a dedicated **Read More: Background & Story Soul** panel containing the epic overview (`00-epic-soul-overview.md`), book-level cultural spirit, storytelling rhythm, metaphors, ancient name pronunciations, and the 25 ancient reference texts (`ancient-texts/`).
 - **Four Progressive Practice Levels (Level 1 – Level 4)**:
-  1. **Level 1 — Toàn văn câu chuyện**: Complete read-aloud narrative across all **180 Chapters** paired with explicit *Lưu ý giọng kể* / *Storytelling Notes* / *讲演提示* per chapter, plus **Export Full Story PDF** with two options: **With Images (28 Level 4 illustrations)** or **Without Images (Text Only)**.
+  1. **Level 1 — Toàn văn câu chuyện**: Complete read-aloud narrative across all **180 Chapters** paired with explicit *Lưu ý giọng kể* / *Storytelling Notes* / *讲演提示* per chapter. **Export Full Story PDF** (**With Images** or **Without Images**) lives once on the Epic Header Card.
   2. **Level 2 — Dàn ý chi tiết**: Practice retelling without the full text while retaining characters/motifs, detailed beats, and storytelling takeaways per chapter.
   3. **Level 3 — Dàn ý tóm tắt**: One unified skeleton outline closely following the original plot (`locales/{lang}/level-3-summary-outline/chapter-summaries.md`) across all 180 chapters.
   4. **Level 4 — Tranh gợi nhớ thuần hình ảnh**: Displays all **28 cluster illustrations** directly from `assets/images/` (`image_generated === true` for all 28 scenes) with seamless fallback to local hand-drawn SVG styles (`wet-on-wet`, `crayon`, `chalkboard`) containing **zero text hints**.

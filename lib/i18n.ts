@@ -107,7 +107,6 @@ export const translations = {
       illustrationsCountSuffix: "Tranh gợi nhớ",
       pdf: {
         downloadBtn: "Tải PDF Toàn văn",
-        mobileShortBtn: "Tải PDF Toàn văn",
         downloadingBtn: "Đang tạo bản PDF...",
         withImagesOption: "Kèm ảnh (28 tranh Level 4)",
         withImagesDesc: "Trọn bộ 5 Quyển · 180 chương và 28 tranh minh họa cụm chương",
@@ -359,7 +358,6 @@ export const translations = {
       illustrationsCountSuffix: "Illustrations",
       pdf: {
         downloadBtn: "Download Full Story PDF",
-        mobileShortBtn: "Full Story PDF",
         downloadingBtn: "Preparing PDF...",
         withImagesOption: "With Images (28 Level 4 Artworks)",
         withImagesDesc: "All 5 Books · 180 chapters with 28 cluster illustrations",
@@ -609,7 +607,6 @@ export const translations = {
       illustrationsCountSuffix: "幅记忆插画",
       pdf: {
         downloadBtn: "下载全文 PDF",
-        mobileShortBtn: "全文 PDF",
         downloadingBtn: "正在生成 PDF...",
         withImagesOption: "含插画（28幅 Level 4 手绘插画）",
         withImagesDesc: "完整收录5卷 · 180章及28幅单元插画",
