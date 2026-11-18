@@ -32,4 +32,5 @@ graph TD
 
 - **Zero AI**: Zero AI endpoints, zero AI API keys, and zero AI terminology in community feedback or storytelling flows.
 - **Audio Sovereignty**: Voice recordings stay strictly in-browser (`Blob` URLs); never uploaded.
+- **SEO & Share Metadata**: `app/layout.tsx` (constants in `lib/site.ts`) emits title, description, canonical, Open Graph (`vi_VN`), `twitter:card=summary_large_image`, and JSON-LD (`WebSite` + `CreativeWork`, ages 9–10, free; no certification claims). Share image `app/opengraph-image.jpg` (+ `twitter-image.jpg`) is a 1200×630 crop of repo Illustration 08 (Noah's ark & rainbow); `app/icon.svg` is a local procedural rainbow icon. `app/robots.ts` allows `/`, disallows `/api/`; `app/sitemap.ts` lists `/`.
 - **Session & OAuth Security**: Password hashing uses `crypto.scryptSync` with `crypto.timingSafeEqual`; sessions use `HttpOnly`, `SameSite=Lax` cookies; Google OAuth uses Authorization Code flow with CSRF `state` verification and verified email validation.
