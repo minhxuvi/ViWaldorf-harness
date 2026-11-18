@@ -140,3 +140,74 @@ export interface WaldorfData {
   updatedAt?: string;
   version?: string;
 }
+
+export interface ReadingProgress {
+  storyId: string;
+  selectedBookId: string;
+  activeLevel: PracticeLevel;
+  sceneId: string;
+  sceneIndex: number;
+  illustrationId: string;
+  illustrationIndex: number;
+  level1FlowMode: "scene" | "full";
+  level1TextSize: "sm" | "md" | "lg";
+  level3Scope: "all" | "current";
+  showContextSection: boolean;
+  scrollY: number;
+  scrollRatio: number;
+  updatedAt: string;
+}
+
+export interface AuthUser {
+  id: number;
+  name: string;
+  email: string;
+  googleConnected: boolean;
+  createdAt: string;
+}
+
+export type FeedbackStatus = "open" | "in_progress" | "answered" | "closed";
+
+export type FeedbackDevelopmentStatus =
+  | "none"
+  | "considering"
+  | "planned"
+  | "in_progress"
+  | "implemented"
+  | "declined";
+
+export interface FeedbackMessageItem {
+  id: number;
+  threadId: number;
+  body: string;
+  createdAt: string;
+  user: {
+    id: number;
+    name: string;
+    isEditorial: boolean;
+  };
+}
+
+export interface FeedbackThreadItem {
+  id: number;
+  title: string;
+  body: string;
+  chapterRef?: string | null;
+  status: FeedbackStatus;
+  development: {
+    status: FeedbackDevelopmentStatus;
+    openspecChange?: string | null;
+    githubIssueUrl?: string | null;
+    githubPrUrl?: string | null;
+    implementedAt?: string | null;
+    deployedAt?: string | null;
+  };
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: number;
+    name: string;
+  };
+  messagesCount?: number;
+  messages?: FeedbackMessageItem[];
+}

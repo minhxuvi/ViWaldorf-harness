@@ -1,8 +1,46 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { getSeedData } from "../lib/seedData";
 import { ProceduralIllustrator } from "../lib/art/proceduralIllustrator";
 import { buildFullStoryPrintableHtml } from "../lib/pdfExporter";
+import { translations } from "../lib/i18n";
+import {
+  computeScrollRatio,
+  computeTargetScrollY,
+  createDefaultReadingProgress,
+  isValidReadingProgress,
+  mergeReadingProgress,
+  resolveIllustrationIndexFromProgress,
+  resolveSceneIndexFromProgress,
+  sanitizeReadingProgress,
+} from "../lib/readingProgress";
+import {
+  authenticateWithGoogleProfile,
+  AuthError,
+  buildGoogleAuthorizationUrl,
+  createSession,
+  destroySession,
+  getUserBySessionToken,
+  isGoogleOAuthConfigured,
+  loginUser,
+  registerUser,
+  verifyFeedbackBearerToken,
+} from "../lib/server/auth";
+import {
+  closeFeedbackThread,
+  createFeedbackReply,
+  createFeedbackThread,
+  FeedbackActionError,
+  getEditorialUser,
+  getFeedbackThreadById,
+  getUserReadingProgress,
+  listFeedbackThreads,
+  resetDbForTests,
+  saveUserReadingProgress,
+  updateFeedbackDevelopment,
+} from "../lib/server/db";
 import {
   GENESIS_JSDELIVR_BASE_URL,
   GENESIS_RAW_BASE_URL,
@@ -284,4 +322,308 @@ test("Rate-limit-safe repo sync: TTL guard, multi-CDN fallback order, and bounde
 test("ProceduralIllustrator.escapeXml: safely escapes XML metacharacters", () => {
   const escaped = ProceduralIllustrator.escapeXml(`<script>alert("XSS")</script> & 'test'`);
   assert.equal(escaped, "&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt; &amp; &apos;test&apos;");
+});
+
+test("Reading Progress: validates, resolves chapter/illustration by ID, computes scroll ratio, and merges by timestamp", () => {
+  const seed = getSeedData();
+  const story = seed.stories[0];
+
+  const base = createDefaultReadingProgress(story.id);
+  assert.equal(isValidReadingProgress(base), true);
+
+  const book2Scenes = story.scenes.filter((sc) => sc.bookId === "quyen-2");
+  const targetChapter = book2Scenes[12];
+  assert.ok(targetChapter, "Expected chapter in Book 2");
+
+  const resolvedIdx = resolveSceneIndexFromProgress(book2Scenes, {
+    sceneId: targetChapter.id,
+    sceneIndex: 999,
+  });
+  assert.equal(resolvedIdx, 12, "Must prioritize exact sceneId match over stale index");
+
+  const fallbackIdx = resolveSceneIndexFromProgress(book2Scenes, {
+    sceneId: "non-existent-id",
+    sceneIndex: 5,
+  });
+  assert.equal(fallbackIdx, 5);
+
+  const illIdx = resolveIllustrationIndexFromProgress(story.illustrations, {
+    illustrationId: story.illustrations[9].id,
+    illustrationIndex: 0,
+  });
+  assert.equal(illIdx, 9);
+
+  const ratio = computeScrollRatio(500, 2000, 1000);
+  assert.equal(ratio, 0.5);
+  assert.equal(computeTargetScrollY(ratio, 0, 3000, 1000), 1000);
+  assert.equal(computeTargetScrollY(0, 420, 2000, 1000), 420);
+
+  const sanitized = sanitizeReadingProgress({
+    storyId: story.id,
+    selectedBookId: "quyen-2",
+    activeLevel: 2,
+    sceneId: targetChapter.id,
+    sceneIndex: 12,
+    illustrationId: story.illustrations[9].id,
+    illustrationIndex: 9,
+    level1FlowMode: "full",
+    level1TextSize: "lg",
+    level3Scope: "current",
+    showContextSection: true,
+    scrollY: 750,
+    scrollRatio: 0.42,
+    updatedAt: "2026-11-18T08:00:00.000Z",
+  });
+  assert.ok(sanitized);
+  assert.equal(sanitized.level1TextSize, "lg");
+
+  const older = { ...base, sceneId: "quyen-1-chuong-01", updatedAt: "2026-11-18T07:00:00.000Z" };
+  const newer = { ...base, sceneId: targetChapter.id, updatedAt: "2026-11-18T08:00:00.000Z" };
+  assert.equal(mergeReadingProgress(older, newer)?.sceneId, targetChapter.id);
+  assert.equal(mergeReadingProgress(newer, older)?.sceneId, targetChapter.id);
+});
+
+test("Auth, Google SSO & Reading Progress Sync: registers, logs in, links Google accounts safely, and syncs progress", () => {
+  resetDbForTests(":memory:");
+  const prevEnv = {
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
+  };
+
+  try {
+    // 1. Register & login via Email + Password
+    const parent = registerUser({
+      name: "Mẹ An",
+      email: "me.an@example.com",
+      password: "waldorf-story-password",
+    });
+    assert.equal(parent.email, "me.an@example.com");
+    assert.equal(parent.role, "member");
+
+    const loggedIn = loginUser({
+      email: "ME.AN@example.com",
+      password: "waldorf-story-password",
+    });
+    assert.equal(loggedIn.id, parent.id);
+
+    assert.throws(
+      () => loginUser({ email: "me.an@example.com", password: "wrong-password" }),
+      AuthError
+    );
+
+    // Editorial account cannot log in interactively
+    const editorial = getEditorialUser();
+    assert.equal(editorial.role, "editorial");
+    assert.throws(
+      () => loginUser({ email: editorial.email, password: "any-password" }),
+      AuthError
+    );
+
+    // Session cookie roundtrip
+    const session = createSession(Number(parent.id));
+    const resolvedUser = getUserBySessionToken(session.token);
+    assert.equal(resolvedUser?.id, parent.id);
+    destroySession(session.token);
+    assert.equal(getUserBySessionToken(session.token), null);
+
+    // 2. Save and retrieve reading progress per user (respecting latest timestamp)
+    const olderProg = {
+      ...createDefaultReadingProgress(GENESIS_STORY_ID),
+      selectedBookId: "quyen-1",
+      sceneId: "quyen-1-chuong-03",
+      sceneIndex: 2,
+      scrollY: 320,
+      scrollRatio: 0.25,
+      updatedAt: "2026-11-18T08:00:00.000Z",
+    };
+    const newerProg = {
+      ...olderProg,
+      selectedBookId: "quyen-2",
+      sceneId: "quyen-2-chuong-10",
+      sceneIndex: 9,
+      scrollY: 880,
+      scrollRatio: 0.61,
+      updatedAt: "2026-11-18T08:15:00.000Z",
+    };
+    saveUserReadingProgress(Number(parent.id), newerProg);
+    saveUserReadingProgress(Number(parent.id), olderProg);
+    const loadedProg = getUserReadingProgress(Number(parent.id));
+    assert.equal(loadedProg?.sceneId, "quyen-2-chuong-10");
+    assert.equal(loadedProg?.scrollY, 880);
+
+    // 3. Google OAuth URL & safe account linking
+    process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
+    process.env.GOOGLE_CLIENT_SECRET = "test-google-client-secret";
+    process.env.GOOGLE_REDIRECT_URI = "http://localhost:3000/api/auth/google/callback";
+
+    assert.equal(isGoogleOAuthConfigured("http://localhost:3000"), true);
+    const authUrl = new URL(buildGoogleAuthorizationUrl("csrf-state-123", "http://localhost:3000"));
+    assert.equal(authUrl.origin, "https://accounts.google.com");
+    assert.equal(authUrl.searchParams.get("scope"), "openid profile email");
+    assert.equal(authUrl.searchParams.get("prompt"), "select_account");
+    assert.equal(authUrl.searchParams.get("state"), "csrf-state-123");
+
+    // Unverified Google email must be rejected
+    assert.throws(
+      () =>
+        authenticateWithGoogleProfile({
+          sub: "google-sub-unverified",
+          email: "unverified@gmail.com",
+          email_verified: false,
+          name: "Unverified",
+        }),
+      AuthError
+    );
+
+    // New Gmail user is created cleanly
+    const googleUser = authenticateWithGoogleProfile({
+      sub: "google-sub-1",
+      email: "thay.minh@gmail.com",
+      email_verified: true,
+      name: "Thầy Minh",
+    });
+    assert.equal(googleUser.google_id, "google-sub-1");
+    assert.equal(googleUser.password_hash, null);
+
+    // Existing non-Gmail account is NOT auto-linked when non-authoritative third-party email collides
+    assert.throws(
+      () =>
+        authenticateWithGoogleProfile({
+          sub: "google-sub-other",
+          email: "me.an@example.com",
+          email_verified: true,
+          name: "Other",
+        }),
+      AuthError
+    );
+
+    // Existing @gmail.com password user IS safely linked once when google_id is null
+    const gmailPasswordUser = registerUser({
+      name: "Cô Lan",
+      email: "co.lan@gmail.com",
+      password: "secure-password-123",
+    });
+    const linked = authenticateWithGoogleProfile({
+      sub: "google-sub-lan",
+      email: "co.lan@gmail.com",
+      email_verified: true,
+      name: "Cô Lan Google",
+    });
+    assert.equal(linked.id, gmailPasswordUser.id);
+    assert.equal(linked.google_id, "google-sub-lan");
+    assert.equal(linked.name, "Cô Lan", "Must preserve original profile name");
+  } finally {
+    process.env.GOOGLE_CLIENT_ID = prevEnv.GOOGLE_CLIENT_ID;
+    process.env.GOOGLE_CLIENT_SECRET = prevEnv.GOOGLE_CLIENT_SECRET;
+    process.env.GOOGLE_REDIRECT_URI = prevEnv.GOOGLE_REDIRECT_URI;
+    resetDbForTests();
+  }
+});
+
+test("Community Feedback (Zero-AI): supports threads, replies, editorial responses, development progress, and zero AI references", () => {
+  resetDbForTests(":memory:");
+  const prevToken = process.env.FEEDBACK_API_TOKEN;
+
+  try {
+    process.env.FEEDBACK_API_TOKEN = "editorial-secret-token";
+
+    const author = registerUser({
+      name: "Phụ huynh Hoa",
+      email: "hoa@example.com",
+      password: "waldorf-parent-pass",
+    });
+    const peer = registerUser({
+      name: "Giáo viên Nam",
+      email: "nam@example.com",
+      password: "waldorf-teacher-pass",
+    });
+
+    const thread = createFeedbackThread({
+      userId: Number(author.id),
+      title: "Góp ý cỡ chữ khi đọc buổi tối",
+      body: "Rất mong giữ cỡ chữ Lớn ổn định khi mở lại chương truyện.",
+      chapterRef: "Quyển I · Chương 5",
+    });
+    assert.equal(thread.status, "open");
+    assert.equal(thread.development.status, "none");
+
+    // Member reply keeps status open
+    const peerReply = createFeedbackReply({
+      threadId: thread.id,
+      userId: Number(peer.id),
+      body: "Mình cũng thấy rất hữu ích khi đọc cho con trước giờ ngủ.",
+    });
+    assert.equal(peerReply.message.user.isEditorial, false);
+    assert.equal(peerReply.thread.status, "open");
+
+    // Bearer token guard and editorial response flips open -> answered
+    assert.equal(verifyFeedbackBearerToken("Bearer wrong-token"), false);
+    assert.equal(verifyFeedbackBearerToken("Bearer editorial-secret-token"), true);
+
+    const editorial = getEditorialUser();
+    const editorialReply = createFeedbackReply({
+      threadId: thread.id,
+      userId: Number(editorial.id),
+      body: "Ban biên tập đã bổ sung lưu tự động cỡ chữ và vị trí đang đọc.",
+      isEditorialResponse: true,
+    });
+    assert.equal(editorialReply.message.user.isEditorial, true);
+    assert.equal(editorialReply.message.user.name, "Ban biên tập ViWaldorf");
+    assert.equal(editorialReply.thread.status, "answered");
+
+    // Development metadata lifecycle
+    const updatedDev = updateFeedbackDevelopment(thread.id, {
+      development_status: "implemented",
+      openspec_change: "restore-reading-progress",
+    });
+    assert.equal(updatedDev.development.status, "implemented");
+    assert.ok(updatedDev.development.implementedAt);
+
+    // Filter threads by status
+    const answeredThreads = listFeedbackThreads({ status: "answered", includeMessages: true });
+    assert.equal(answeredThreads.length, 1);
+    assert.equal(answeredThreads[0].messages?.length, 2);
+
+    // Non-author cannot close thread; author can close thread
+    assert.throws(
+      () => closeFeedbackThread({ threadId: thread.id, userId: Number(peer.id) }),
+      FeedbackActionError
+    );
+    const closed = closeFeedbackThread({ threadId: thread.id, userId: Number(author.id) });
+    assert.equal(closed.status, "closed");
+
+    // Replying to closed thread fails with 422
+    assert.throws(
+      () =>
+        createFeedbackReply({
+          threadId: thread.id,
+          userId: Number(peer.id),
+          body: "Bổ sung thêm",
+        }),
+      FeedbackActionError
+    );
+
+    // Strict Zero-AI check across feedback payloads, i18n copy, and UI component
+    const loaded = getFeedbackThreadById(thread.id);
+    const serializedThread = JSON.stringify(loaded);
+    assert.ok(!/is_ai|trợ lý ai|\bai\b/i.test(serializedThread), "Feedback API payload must not mention AI");
+
+    const feedbackCopyVi = JSON.stringify(translations.vi.feedback);
+    const feedbackCopyEn = JSON.stringify(translations.en.feedback);
+    assert.ok(!/\bai\b|trợ lý ai/i.test(feedbackCopyVi), "Vietnamese feedback copy must not mention AI");
+    assert.ok(!/\bai\b|assistant/i.test(feedbackCopyEn), "English feedback copy must not mention AI");
+
+    const feedbackComponentSrc = fs.readFileSync(
+      path.join(process.cwd(), "components", "FeedbackSection.tsx"),
+      "utf8"
+    );
+    assert.ok(
+      !/Trợ lý AI|is_ai|\bAI\b/.test(feedbackComponentSrc),
+      "FeedbackSection.tsx must not mention AI"
+    );
+  } finally {
+    process.env.FEEDBACK_API_TOKEN = prevToken;
+    resetDbForTests();
+  }
 });

@@ -3,9 +3,17 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useApp } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
+import { FeedbackSection } from "@/components/FeedbackSection";
+import {
+  computeScrollRatio,
+  computeTargetScrollY,
+  resolveIllustrationIndexFromProgress,
+  resolveSceneIndexFromProgress,
+} from "@/lib/readingProgress";
 import {
   AncientBookItem,
   PracticeLevel,
+  ReadingProgress,
   StoryIllustration,
   StoryScene,
   WaldorfArtStyle,
@@ -129,6 +137,12 @@ export default function StorytellingPracticePage() {
     syncError,
     syncNotice,
     syncFromRepo,
+    activeView,
+    setActiveView,
+    readingProgress,
+    isProgressLoaded,
+    progressVersion,
+    updateReadingProgress,
   } = useApp();
 
   // Trạng thái luyện tập 4 cấp độ (Level 1 -> Level 4)
@@ -233,6 +247,227 @@ export default function StorytellingPracticePage() {
   );
   const currentIllustration: StoryIllustration | undefined =
     visibleIllustrations[safeIllustrationIndex] || visibleIllustrations[0];
+
+  // Lưu & khôi phục tiến độ đọc (chương truyện, cấp độ, quyển, cỡ chữ, vị trí cuộn trang)
+  const hasHydratedProgressRef = useRef<boolean>(false);
+  const appliedProgressVersionRef = useRef<number>(-1);
+  const pendingScrollRestoreRef = useRef<{ scrollY: number; scrollRatio: number } | null>(null);
+  const suppressScrollCaptureUntilRef = useRef<number>(0);
+  const prevActiveViewRef = useRef(activeView);
+  const latestStorySnapshotRef = useRef<Omit<
+    ReadingProgress,
+    "scrollY" | "scrollRatio" | "updatedAt"
+  > | null>(null);
+
+  latestStorySnapshotRef.current = selectedStory
+    ? {
+        storyId: selectedStory.id,
+        selectedBookId,
+        activeLevel,
+        sceneId: currentScene?.id || "",
+        sceneIndex: safeSceneIndex,
+        illustrationId: currentIllustration?.id || "",
+        illustrationIndex: safeIllustrationIndex,
+        level1FlowMode,
+        level1TextSize,
+        level3Scope,
+        showContextSection,
+      }
+    : null;
+
+  // Khôi phục vị trí từ localStorage (và từ tài khoản nếu có bản mới hơn)
+  useEffect(() => {
+    if (!isProgressLoaded || !selectedStory) return;
+    if (appliedProgressVersionRef.current === progressVersion) return;
+
+    appliedProgressVersionRef.current = progressVersion;
+
+    if (readingProgress && readingProgress.storyId === selectedStory.id) {
+      const nextBookId = readingProgress.selectedBookId || "all";
+      const targetScenes =
+        nextBookId !== "all"
+          ? allScenes.filter((sc) => sc.bookId === nextBookId)
+          : allScenes;
+      const effectiveScenes = targetScenes.length > 0 ? targetScenes : allScenes;
+
+      const targetIllustrations =
+        nextBookId !== "all"
+          ? allIllustrations.filter((il) => il.bookId === nextBookId)
+          : allIllustrations;
+      const effectiveIllustrations =
+        targetIllustrations.length > 0 ? targetIllustrations : allIllustrations;
+
+      const resolvedSceneIdx = resolveSceneIndexFromProgress(
+        effectiveScenes,
+        readingProgress
+      );
+      const resolvedIllIdx = resolveIllustrationIndexFromProgress(
+        effectiveIllustrations,
+        readingProgress
+      );
+
+      setSelectedBookId(nextBookId);
+      setActiveLevel(readingProgress.activeLevel);
+      setActiveSceneIndex(resolvedSceneIdx);
+      setActiveIllustrationIndex(resolvedIllIdx);
+      setLevel1FlowMode(readingProgress.level1FlowMode);
+      setLevel1TextSize(readingProgress.level1TextSize);
+      setLevel3Scope(readingProgress.level3Scope);
+      setShowContextSection(readingProgress.showContextSection);
+
+      pendingScrollRestoreRef.current = {
+        scrollY: readingProgress.scrollY,
+        scrollRatio: readingProgress.scrollRatio,
+      };
+      suppressScrollCaptureUntilRef.current = Date.now() + 450;
+    }
+
+    hasHydratedProgressRef.current = true;
+  }, [
+    isProgressLoaded,
+    progressVersion,
+    readingProgress,
+    selectedStory,
+    allScenes,
+    allIllustrations,
+  ]);
+
+  // Chuyển giữa trang đọc truyện và trang Góp ý
+  useEffect(() => {
+    const prev = prevActiveViewRef.current;
+    prevActiveViewRef.current = activeView;
+    if (prev === activeView) return;
+
+    if (activeView === "feedback") {
+      suppressScrollCaptureUntilRef.current = Date.now() + 300;
+      window.scrollTo({ top: 0, behavior: "auto" });
+    } else if (activeView === "story" && readingProgress) {
+      pendingScrollRestoreRef.current = {
+        scrollY: readingProgress.scrollY,
+        scrollRatio: readingProgress.scrollRatio,
+      };
+      suppressScrollCaptureUntilRef.current = Date.now() + 450;
+    }
+  }, [activeView, readingProgress]);
+
+  // Khôi phục chính xác vị trí cuộn trang sau khi nội dung chương đã render xong
+  useEffect(() => {
+    if (activeView !== "story") return;
+    if (!pendingScrollRestoreRef.current) return;
+
+    let raf1 = 0;
+    let raf2 = 0;
+    raf1 = window.requestAnimationFrame(() => {
+      raf2 = window.requestAnimationFrame(() => {
+        const target = pendingScrollRestoreRef.current;
+        if (!target) return;
+        pendingScrollRestoreRef.current = null;
+        const targetY = computeTargetScrollY(
+          target.scrollRatio,
+          target.scrollY,
+          document.documentElement.scrollHeight,
+          window.innerHeight
+        );
+        suppressScrollCaptureUntilRef.current = Date.now() + 250;
+        window.scrollTo({ top: targetY, behavior: "auto" });
+      });
+    });
+
+    return () => {
+      if (raf1) window.cancelAnimationFrame(raf1);
+      if (raf2) window.cancelAnimationFrame(raf2);
+    };
+  }, [
+    activeView,
+    progressVersion,
+    selectedBookId,
+    activeLevel,
+    safeSceneIndex,
+    safeIllustrationIndex,
+    level1FlowMode,
+    level1TextSize,
+    level3Scope,
+    showContextSection,
+  ]);
+
+  const persistCurrentReadingProgress = useCallback(() => {
+    if (
+      !hasHydratedProgressRef.current ||
+      pendingScrollRestoreRef.current !== null ||
+      activeView !== "story" ||
+      Date.now() < suppressScrollCaptureUntilRef.current ||
+      typeof window === "undefined"
+    ) {
+      return;
+    }
+    const snap = latestStorySnapshotRef.current;
+    if (!snap) return;
+
+    const scrollY = Math.max(0, Math.round(window.scrollY));
+    const scrollRatio = computeScrollRatio(
+      scrollY,
+      document.documentElement.scrollHeight,
+      window.innerHeight
+    );
+    updateReadingProgress({
+      ...snap,
+      scrollY,
+      scrollRatio,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [activeView, updateReadingProgress]);
+
+  // Lưu tiến độ khi người đọc chuyển chương, cấp độ, quyển hoặc tuỳ chọn hiển thị
+  useEffect(() => {
+    if (
+      !hasHydratedProgressRef.current ||
+      pendingScrollRestoreRef.current !== null ||
+      activeView !== "story"
+    ) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      persistCurrentReadingProgress();
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [
+    activeView,
+    selectedBookId,
+    activeLevel,
+    safeSceneIndex,
+    safeIllustrationIndex,
+    level1FlowMode,
+    level1TextSize,
+    level3Scope,
+    showContextSection,
+    persistCurrentReadingProgress,
+  ]);
+
+  // Lưu tiến độ cuộn trang liên tục (debounce 200ms)
+  useEffect(() => {
+    if (activeView !== "story") return;
+    let scrollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const onScroll = () => {
+      if (
+        !hasHydratedProgressRef.current ||
+        pendingScrollRestoreRef.current !== null ||
+        Date.now() < suppressScrollCaptureUntilRef.current
+      ) {
+        return;
+      }
+      if (scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        persistCurrentReadingProgress();
+      }, 200);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (scrollTimer) clearTimeout(scrollTimer);
+    };
+  }, [activeView, persistCurrentReadingProgress]);
 
   const scrollReadingSurfaceIfNeeded = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -698,6 +933,21 @@ export default function StorytellingPracticePage() {
     return ancientBooks.filter((ab) => ab.category === ancientCategory);
   }, [ancientBooks, ancientCategory]);
   const lastSyncedText = formatLastSynced(selectedStory?.lastSyncedAt, lang);
+  const currentChapterLabel = currentScene
+    ? `${books.find((b) => b.id === currentScene.bookId)?.title || ""} · ${currentScene.title}`.replace(
+        /^\s*·\s*/,
+        ""
+      )
+    : undefined;
+
+  if (activeView === "feedback") {
+    return (
+      <FeedbackSection
+        currentChapterLabel={currentChapterLabel}
+        onBackToStory={() => setActiveView("story")}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 pb-24 sm:pb-28">

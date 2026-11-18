@@ -9,7 +9,7 @@ import React, {
   useRef,
   ReactNode,
 } from "react";
-import { WaldorfData, WaldorfStory } from "./types";
+import { AuthUser, ReadingProgress, WaldorfData, WaldorfStory } from "./types";
 import { getSeedData } from "./seedData";
 import { translations, Language } from "./i18n";
 import {
@@ -19,6 +19,13 @@ import {
   REPO_MANUAL_COOLDOWN_MS,
   shouldAutoSyncRepo,
 } from "./repoStoryLoader";
+import {
+  loadLocalReadingProgress,
+  mergeReadingProgress,
+  saveLocalReadingProgress,
+} from "./readingProgress";
+
+export type AppActiveView = "story" | "feedback";
 
 interface AppContextType {
   data: WaldorfData;
@@ -31,6 +38,23 @@ interface AppContextType {
   syncError: string;
   syncNotice: string;
   syncFromRepo: (options?: { force?: boolean }) => Promise<WaldorfStory | null>;
+  // Auth & Navigation
+  user: AuthUser | null;
+  isAuthLoading: boolean;
+  googleOAuthConfigured: boolean;
+  authNotice: string;
+  setAuthNotice: (msg: string) => void;
+  isAuthModalOpen: boolean;
+  setIsAuthModalOpen: (open: boolean) => void;
+  activeView: AppActiveView;
+  setActiveView: (view: AppActiveView) => void;
+  setAuthSession: (user: AuthUser | null, serverProgress?: ReadingProgress | null) => void;
+  logout: () => Promise<void>;
+  // Reading Progress
+  readingProgress: ReadingProgress | null;
+  isProgressLoaded: boolean;
+  progressVersion: number;
+  updateReadingProgress: (progress: ReadingProgress) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -104,9 +128,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [syncError, setSyncError] = useState<string>("");
   const [syncNotice, setSyncNotice] = useState<string>("");
 
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [googleOAuthConfigured, setGoogleOAuthConfigured] = useState<boolean>(false);
+  const [authNotice, setAuthNotice] = useState<string>("");
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [activeView, setActiveView] = useState<AppActiveView>("story");
+
+  const [readingProgress, setReadingProgress] = useState<ReadingProgress | null>(null);
+  const [isProgressLoaded, setIsProgressLoaded] = useState<boolean>(false);
+  const [progressVersion, setProgressVersion] = useState<number>(0);
+
   const isSyncingInFlightRef = useRef<boolean>(false);
   const activeSyncPromiseRef = useRef<Promise<WaldorfStory | null> | null>(null);
   const lastSyncAttemptRef = useRef<number>(0);
+
+  const userRef = useRef<AuthUser | null>(null);
+  const readingProgressRef = useRef<ReadingProgress | null>(null);
+  const progressSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    readingProgressRef.current = readingProgress;
+  }, [readingProgress]);
 
   const persist = useCallback((newData: WaldorfData) => {
     try {
@@ -114,6 +161,85 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.warn("Local storage write warning:", err);
     }
+  }, []);
+
+  const pushProgressToServer = useCallback((progress: ReadingProgress, keepalive = false) => {
+    if (!userRef.current || typeof fetch === "undefined") return;
+    void fetch("/api/progress", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ readingProgress: progress }),
+      keepalive,
+    }).catch(() => {
+      // Ignore offline/network sync failures; localStorage holds latest state
+    });
+  }, []);
+
+  const updateReadingProgress = useCallback(
+    (progress: ReadingProgress) => {
+      readingProgressRef.current = progress;
+      setReadingProgress(progress);
+      saveLocalReadingProgress(progress);
+
+      if (!userRef.current) return;
+      if (progressSyncTimerRef.current) {
+        clearTimeout(progressSyncTimerRef.current);
+      }
+      progressSyncTimerRef.current = setTimeout(() => {
+        if (readingProgressRef.current) {
+          pushProgressToServer(readingProgressRef.current);
+        }
+      }, 600);
+    },
+    [pushProgressToServer]
+  );
+
+  const applyMergedRemoteProgress = useCallback(
+    (serverProgress: ReadingProgress | null | undefined) => {
+      if (!serverProgress) {
+        if (readingProgressRef.current && userRef.current) {
+          pushProgressToServer(readingProgressRef.current);
+        }
+        return;
+      }
+      const currentLocal = readingProgressRef.current;
+      const merged = mergeReadingProgress(currentLocal, serverProgress);
+      if (!merged) return;
+
+      const remoteWon =
+        !currentLocal || Date.parse(merged.updatedAt) > Date.parse(currentLocal.updatedAt);
+
+      if (remoteWon) {
+        readingProgressRef.current = merged;
+        setReadingProgress(merged);
+        saveLocalReadingProgress(merged);
+        setProgressVersion((v) => v + 1);
+      } else if (userRef.current) {
+        pushProgressToServer(merged);
+      }
+    },
+    [pushProgressToServer]
+  );
+
+  const setAuthSession = useCallback(
+    (nextUser: AuthUser | null, serverProgress?: ReadingProgress | null) => {
+      userRef.current = nextUser;
+      setUser(nextUser);
+      if (nextUser) {
+        applyMergedRemoteProgress(serverProgress);
+      }
+    },
+    [applyMergedRemoteProgress]
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Ignore network errors on logout
+    }
+    userRef.current = null;
+    setUser(null);
   }, []);
 
   const syncFromRepo = useCallback(
@@ -216,6 +342,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.warn("Local storage load warning:", err);
     }
 
+    // 1. Restore browser reading progress immediately
+    const localProg = loadLocalReadingProgress();
+    if (localProg) {
+      readingProgressRef.current = localProg;
+      setReadingProgress(localProg);
+      setProgressVersion((v) => v + 1);
+    }
+    setIsProgressLoaded(true);
+
+    // 2. Surface OAuth callback error query param if present
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      const authError = url.searchParams.get("authError");
+      if (authError) {
+        setAuthNotice(authError);
+        setIsAuthModalOpen(true);
+        url.searchParams.delete("authError");
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      }
+    }
+
+    // 3. Load auth session & merge remote progress if signed in
+    void (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (res.ok) {
+          const payload = (await res.json()) as {
+            user?: AuthUser | null;
+            readingProgress?: ReadingProgress | null;
+            googleOAuthConfigured?: boolean;
+          };
+          setGoogleOAuthConfigured(Boolean(payload.googleOAuthConfigured));
+          if (payload.user) {
+            userRef.current = payload.user;
+            setUser(payload.user);
+            applyMergedRemoteProgress(payload.readingProgress);
+          }
+        }
+      } catch {
+        // Offline or auth endpoint unreachable; browser continues working offline
+      } finally {
+        setIsAuthLoading(false);
+      }
+    })();
+
     if (!hasRepoStoryInCache || shouldAutoSyncRepo(repoLastSyncedAt)) {
       void syncFromRepo();
     } else if (repoLastSyncedAt) {
@@ -224,6 +395,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
         lastSyncAttemptRef.current = parsedMs;
       }
     }
+
+    // Flush latest reading progress on tab close/hide when signed in
+    const handlePageHide = () => {
+      if (progressSyncTimerRef.current) {
+        clearTimeout(progressSyncTimerRef.current);
+        progressSyncTimerRef.current = null;
+      }
+      if (userRef.current && readingProgressRef.current) {
+        pushProgressToServer(readingProgressRef.current, true);
+      }
+    };
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      if (progressSyncTimerRef.current) {
+        clearTimeout(progressSyncTimerRef.current);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -261,6 +450,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         syncError,
         syncNotice,
         syncFromRepo,
+        user,
+        isAuthLoading,
+        googleOAuthConfigured,
+        authNotice,
+        setAuthNotice,
+        isAuthModalOpen,
+        setIsAuthModalOpen,
+        activeView,
+        setActiveView,
+        setAuthSession,
+        logout,
+        readingProgress,
+        isProgressLoaded,
+        progressVersion,
+        updateReadingProgress,
       }}
     >
       {children}

@@ -13,3 +13,4 @@
 | 2026-11-17 | Cycle 09 — UI/UX Overhaul & Safe Multi-CDN Repo Sync | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 09 Report](2026-11-17-cycle-09-ui-ux-and-safe-repo-sync.md) |
 | 2026-11-18 | Cycle 10 — Single-Story 180-Chapter Sync, Background Reading & PDF Export | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 10 Report](2026-11-18-cycle-10-single-story-180-chapters-and-pdf.md) |
 | 2026-11-18 | Cycle 11 — Mobile Edge-to-Edge Reading, Auto-Hide Navbar & Half-Screen Tap Scroll | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 11 Report](2026-11-18-cycle-11-mobile-reading-ux-and-pagination.md) |
+| 2026-11-18 | Cycle 12 — Reading Progress Restoration, Member Auth (Google SSO) & Zero-AI Community Feedback | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 12 Report](2026-11-18-cycle-12-progress-auth-and-community-feedback.md) |

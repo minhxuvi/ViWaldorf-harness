@@ -1,6 +1,6 @@
 # ViWaldorf — Ứng dụng Luyện Kể Chuyện Sư Phạm: *Từ Sáng Thế Đến Giáng Sinh* (Zero-AI)
 
-> **Mục tiêu cốt lõi:** Ứng dụng web gọn nhẹ, hoạt động 100% cục bộ trên trình duyệt, phục vụ duy nhất bộ sử thi **Từ Sáng Thế Đến Giáng Sinh** (5 Quyển · 180 Chương · 28 Tranh gợi nhớ theo Cụm Chương, nguồn `xuvivn/from-genesis-to-nativity`), với **4 cấp độ luyện kể chuyện (Level 1–4)**, **mục đọc thêm Bối cảnh & Linh hồn câu chuyện**, chức năng **xuất bản PDF toàn văn kèm 28 tranh minh họa Level 4**, và **Thu âm & Nghe lại** thuần túy không AI. Được dẫn đường bởi [DAO.md](DAO.md).
+> **Mục tiêu cốt lõi:** Ứng dụng web gọn nhẹ, không AI, phục vụ duy nhất bộ sử thi **Từ Sáng Thế Đến Giáng Sinh** (5 Quyển · 180 Chương · 28 Tranh gợi nhớ theo Cụm Chương, nguồn `xuvivn/from-genesis-to-nativity`), với **4 cấp độ luyện kể chuyện (Level 1–4)**, **mục đọc thêm Bối cảnh & Linh hồn câu chuyện**, chức năng **xuất bản PDF toàn văn kèm 28 tranh minh họa Level 4**, **tự động ghi nhớ chương và vị trí đang đọc**, **đăng nhập thành viên (Email & Google SSO) để đồng bộ tiến độ**, **không gian Góp ý cộng đồng**, và **Thu âm & Nghe lại** thuần túy không AI. Được dẫn đường bởi [DAO.md](DAO.md).
 
 ---
 
@@ -19,31 +19,41 @@
 
 ---
 
-## 2. Xuất Bản PDF Toàn Văn & Thu âm / Nghe lại
+## 2. Ghi Nhớ Tiến Độ Đọc, Đăng Nhập (Google SSO) & Góp Ý Cộng Đồng
 
-- **Tải PDF Toàn văn (kèm tranh Level 4)**: Tạo tài liệu in ấn A4 cục bộ ngay trên trình duyệt gồm trang bìa, mục lục 5 Quyển, toàn văn 180 Chương (*Lưu ý giọng kể* + nội dung kể chuyện) và nhúng cả 28 tranh minh họa Level 4 tại đầu mỗi cụm chương.
-- **Thu âm & Nghe lại thuần túy**: Thu âm trực tiếp từ micro (`MediaRecorder`) kèm đồng hồ thời lượng và nghe lại tức thì (`<audio controls>`).
-- **Không sử dụng AI**: Không gọi API AI, không chấm điểm, không phân tích tự động hay lưu dữ liệu ra máy chủ ngoài.
+- **Tự động mở lại đúng chương & vị trí đọc dở**: Khi mở lại trang web trên trình duyệt cũ, ứng dụng khôi phục ngay Quyển, Cấp độ (`Level 1–4`), Chương (`1..180`) hoặc Tranh (`1..28`), cỡ chữ và đúng đoạn đang cuộn dở (`localStorage`).
+- **Đăng nhập thành viên & Google SSO**: Hỗ trợ đăng ký/đăng nhập bằng Email & Mật khẩu hoặc Google OAuth 2.0 để đồng bộ tiến độ đọc qua tài khoản (`/api/auth/*`, `/api/progress`).
+- **Góp ý cộng đồng thuần con người (Zero-AI)**: Phụ huynh và giáo viên có thể xem góp ý công khai, lọc theo trạng thái, theo dõi tiến độ cập nhật, gửi góp ý mới, thảo luận và nhận phản hồi từ **Ban biên tập ViWaldorf** — hoàn toàn không sử dụng hay đề cập đến AI.
 
 ---
 
-## 3. Cấu trúc Mã nguồn & Đặc tả
+## 3. Xuất Bản PDF Toàn Văn & Thu âm / Nghe lại
+
+- **Tải PDF Toàn văn (kèm tranh Level 4)**: Tạo tài liệu in ấn A4 cục bộ ngay trên trình duyệt gồm trang bìa, mục lục 5 Quyển, toàn văn 180 Chương (*Lưu ý giọng kể* + nội dung kể chuyện) và nhúng cả 28 tranh minh họa Level 4 tại đầu mỗi cụm chương.
+- **Thu âm & Nghe lại thuần túy**: Thu âm trực tiếp từ micro (`MediaRecorder`) kèm đồng hồ thời lượng và nghe lại tức thì (`<audio controls>`).
+- **Không sử dụng AI**: Không gọi API AI, không chấm điểm, không phân tích tự động hay truyền bản ghi âm ra ngoài trình duyệt.
+
+---
+
+## 4. Cấu trúc Mã nguồn & Đặc tả
 
 | Thành phần | Vai trò | Vị trí |
 |---|---|---|
 | **DAO** | Hiến chương bất khả xâm phạm | [DAO.md](DAO.md) |
-| **Đặc tả Hệ thống** | Kiến trúc client-side & plugin Waldorf | [harness/specs/](harness/specs/README.md), [plugins/waldorf/specs/](plugins/waldorf/specs/00_master_prompt.md) |
-| **Giao diện chính** | Không gian Luyện kể chuyện 4 cấp độ + Mục đọc thêm bối cảnh + Xuất PDF + Thu âm/Nghe lại | [app/page.tsx](app/page.tsx), [components/Shell.tsx](components/Shell.tsx) |
-| **Dữ liệu, Tranh & PDF** | Bộ tải trực tiếp `xuvivn/from-genesis-to-nativity` (5 Quyển · 180 Chương · 28 Tranh), dữ liệu khởi tạo, tranh SVG thuần hình ảnh dự phòng và bộ xuất PDF | [lib/types.ts](lib/types.ts), [lib/repoStoryLoader.ts](lib/repoStoryLoader.ts), [lib/seedData.ts](lib/seedData.ts), [lib/art/proceduralIllustrator.ts](lib/art/proceduralIllustrator.ts), [lib/pdfExporter.ts](lib/pdfExporter.ts) |
+| **Đặc tả Hệ thống** | Kiến trúc & plugin Waldorf | [harness/specs/](harness/specs/README.md), [plugins/waldorf/specs/](plugins/waldorf/specs/00_master_prompt.md) |
+| **Giao diện chính** | Không gian Luyện kể chuyện 4 cấp độ, Góp ý cộng đồng & Đăng nhập | [app/page.tsx](app/page.tsx), [components/Shell.tsx](components/Shell.tsx), [components/AuthModal.tsx](components/AuthModal.tsx), [components/FeedbackSection.tsx](components/FeedbackSection.tsx) |
+| **Tiến độ, Auth & API** | Lưu tiến độ đọc, xác thực Email/Google SSO, góp ý trên SQLite | [lib/readingProgress.ts](lib/readingProgress.ts), [lib/server/db.ts](lib/server/db.ts), [lib/server/auth.ts](lib/server/auth.ts), [app/api/](app/api/) |
+| **Dữ liệu, Tranh & PDF** | Bộ tải `xuvivn/from-genesis-to-nativity` (5 Quyển · 180 Chương · 28 Tranh), tranh SVG dự phòng & xuất PDF | [lib/types.ts](lib/types.ts), [lib/repoStoryLoader.ts](lib/repoStoryLoader.ts), [lib/seedData.ts](lib/seedData.ts), [lib/art/proceduralIllustrator.ts](lib/art/proceduralIllustrator.ts), [lib/pdfExporter.ts](lib/pdfExporter.ts) |
 | **Kiểm thử & Đánh giá** | Bộ kiểm thử tự động & báo cáo chất lượng | [tests/](tests/), [benchmarker/](benchmarker/specs/01-overall-benchmark.md) |
 
 ---
 
-## 4. Phát triển & Kiểm thử Cục bộ
+## 5. Phát triển & Kiểm thử Cục bộ
 
 ```bash
-# Cài đặt phụ thuộc
+# Cài đặt phụ thuộc & cấu hình môi trường mẫu (tùy chọn cho Google SSO / Ban biên tập)
 pnpm install
+cp .env.example .env
 
 # Chạy máy chủ phát triển
 pnpm dev
