@@ -5,7 +5,7 @@
 ## 1. System Philosophy
 
 ViWaldorf Harness is designed around three strict architectural principles:
-1. **100% Zero-AI Storytelling & Privacy-Respecting Sync**: All storytelling features—4-level storytelling practice (Levels 1–4), optional Background & Story Soul reading drawer (`level-0-khong-gian-boi-canh/`), full-text PDF export with embedded Level 4 illustrations (`lib/pdfExporter.ts`), pure visual fallback SVG art (`ProceduralIllustrator`), and voice recording/playback (`MediaRecorder`)—execute completely inside the user's browser with zero AI models or APIs. Voice recordings exist only as in-browser `Blob` object URLs (`<audio controls>`) and are never transmitted to any server.
+1. **100% Zero-AI Storytelling & Privacy-Respecting Sync**: All storytelling features—4-level storytelling practice (Levels 1–4), optional Background & Story Soul reading drawer (`level-0-khong-gian-boi-canh/`), full-text PDF export with two modes (with embedded Level 4 illustrations or text-only without images via `lib/pdfExporter.ts`), pure visual fallback SVG art (`ProceduralIllustrator`), and voice recording/playback (`MediaRecorder`)—execute completely inside the user's browser with zero AI models or APIs. Voice recordings exist only as in-browser `Blob` object URLs (`<audio controls>`) and are never transmitted to any server.
 2. **Rate-Limit-Safe Single-Epic Repo Content Sync**: The application serves exclusively *Từ Sáng Thế Đến Giáng Sinh* (5 books, 180 chapters, 28 cluster illustrations, unified 9–10 age edition) loaded from `xuvivn/from-genesis-to-nativity` (`story-index.json` + 17 Markdown files across `level-0-*` .. `level-3-*`) via jsDelivr CDN (`cdn.jsdelivr.net`) with `raw.githubusercontent.com` fallback, bounded concurrency (max 6 parallel requests), a 6-hour `localStorage` sync TTL, a 15-second manual sync cooldown, and `imageGenerated` gating to prevent 404 image requests.
 3. **Reading Progress Restoration, Member Sign-In & Human Community Feedback**:
    - **Browser Progress Persistence**: The active book, practice level, chapter (`sceneId` + `sceneIndex`), illustration (`illustrationId` + `illustrationIndex`), reading display settings (`level1FlowMode`, `level1TextSize`, `level3Scope`, `showContextSection`), and scroll position (`scrollY` + `scrollRatio`) are saved in `localStorage` (`viwaldorf_reading_progress_v1`) and restored automatically when reopening the site in the same browser.
@@ -21,7 +21,7 @@ graph TD
     STORE --> LOADER["Rate-Limit-Safe Multi-CDN Loader (lib/repoStoryLoader.ts)"]
     STORE --> SEED["Bootstrap Seed for 5 Books · 180 Chapters · 28 Illustrations (lib/seedData.ts)"]
     UI --> ART["Gated Repo PNGs + Pure Visual SVG Fallback (lib/art/proceduralIllustrator.ts)"]
-    UI --> PDF["Printable A4 HTML/PDF Exporter with Level 4 Art (lib/pdfExporter.ts)"]
+    UI --> PDF["Printable A4 HTML/PDF Exporter (With / Without Art) (lib/pdfExporter.ts)"]
     UI --> MIC["Browser MediaRecorder & Audio Playback"]
     UI --> FB["Zero-AI Community Feedback (components/FeedbackSection.tsx)"]
     HEADER["Shell Header & Auth Modal (components/Shell.tsx, AuthModal.tsx)"] --> AUTH_API["Next.js Route Handlers (/api/auth/*, /api/progress, /api/feedback/*)"]

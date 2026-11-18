@@ -7,6 +7,7 @@ export interface PdfExportOptions {
   failedImages?: Record<string, boolean>;
   preferProceduralArt?: boolean;
   lang?: "vi" | "en";
+  includeImages?: boolean;
 }
 
 function escapeHtml(input: string): string {
@@ -86,6 +87,7 @@ export function buildFullStoryPrintableHtml(
   options?: PdfExportOptions
 ): string {
   const isEn = options?.lang === "en";
+  const includeImages = options?.includeImages !== false;
   const allBooks: StoryBookMeta[] = story.books || [];
   const selectedBookId = options?.bookId && options.bookId !== "all" ? options.bookId : undefined;
 
@@ -137,7 +139,7 @@ export function buildFullStoryPrintableHtml(
             parts.push(`<h3 class="pdf-section-title">${escapeHtml(ch.section)}</h3>`);
           }
 
-          if (ch.illustrationId && !renderedIllustrationIds.has(ch.illustrationId)) {
+          if (includeImages && ch.illustrationId && !renderedIllustrationIds.has(ch.illustrationId)) {
             const ill = illustrationMap.get(ch.illustrationId);
             if (ill) {
               renderedIllustrationIds.add(ch.illustrationId);
@@ -407,7 +409,13 @@ export function buildFullStoryPrintableHtml(
     <h1>${escapeHtml(docTitle)}</h1>
     ${story.titleEn ? `<p class="pdf-cover-sub">${escapeHtml(story.titleEn)}</p>` : ""}
     <div class="pdf-cover-meta">
-      ${targetBooks.length} ${isEn ? "Books" : "Quyển"} · ${totalExportChapters} ${isEn ? "Chapters" : "Chương"} · ${totalExportIllustrations} ${isEn ? "Level 4 Illustrations" : "Tranh minh họa Level 4"}
+      ${targetBooks.length} ${isEn ? "Books" : "Quyển"} · ${totalExportChapters} ${isEn ? "Chapters" : "Chương"} · ${
+        includeImages
+          ? `${totalExportIllustrations} ${isEn ? "Level 4 Illustrations" : "Tranh minh họa Level 4"}`
+          : isEn
+            ? "Text-Only Edition (No Images)"
+            : "Bản thuần chữ (Không kèm ảnh)"
+      }
     </div>
     <p class="pdf-cover-goal">${escapeHtml(story.goal)}</p>
   </section>
@@ -486,6 +494,7 @@ export async function exportStoryToPdf(
     throw new Error("PDF export is only available in the browser.");
   }
 
+  const includeImages = options?.includeImages !== false;
   const html = buildFullStoryPrintableHtml(story, options);
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
@@ -500,10 +509,11 @@ export async function exportStoryToPdf(
   document.body.appendChild(iframe);
 
   const prevTitle = document.title;
-  const pdfBaseName =
+  const basePrefix =
     options?.bookId && options.bookId !== "all"
       ? `Tu-Sang-The-Den-Giang-Sinh-${options.bookId}`
       : "Tu-Sang-The-Den-Giang-Sinh-Toan-Van";
+  const pdfBaseName = includeImages ? basePrefix : `${basePrefix}-Khong-Anh`;
 
   const cleanup = () => {
     document.title = prevTitle;
@@ -521,7 +531,9 @@ export async function exportStoryToPdf(
     doc.write(html);
     doc.close();
 
-    await waitForImagesInDocument(doc, 15000);
+    if (includeImages) {
+      await waitForImagesInDocument(doc, 15000);
+    }
 
     document.title = pdfBaseName;
     const win = iframe.contentWindow;

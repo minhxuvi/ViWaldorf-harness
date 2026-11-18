@@ -1,6 +1,6 @@
 # ViWaldorf — Ứng dụng Luyện Kể Chuyện Sư Phạm: *Từ Sáng Thế Đến Giáng Sinh* (Zero-AI)
 
-> **Mục tiêu cốt lõi:** Ứng dụng web gọn nhẹ, không AI, phục vụ duy nhất bộ sử thi **Từ Sáng Thế Đến Giáng Sinh** (5 Quyển · 180 Chương · 28 Tranh gợi nhớ theo Cụm Chương, nguồn `xuvivn/from-genesis-to-nativity`), với **4 cấp độ luyện kể chuyện (Level 1–4)**, **mục đọc thêm Bối cảnh & Linh hồn câu chuyện**, chức năng **xuất bản PDF toàn văn kèm 28 tranh minh họa Level 4**, **tự động ghi nhớ chương và vị trí đang đọc**, **đăng nhập thành viên (Email & Google SSO) để đồng bộ tiến độ**, **không gian Góp ý cộng đồng**, và **Thu âm & Nghe lại** thuần túy không AI. Được dẫn đường bởi [DAO.md](DAO.md).
+> **Mục tiêu cốt lõi:** Ứng dụng web gọn nhẹ, không AI, phục vụ duy nhất bộ sử thi **Từ Sáng Thế Đến Giáng Sinh** (5 Quyển · 180 Chương · 28 Tranh gợi nhớ theo Cụm Chương, nguồn `xuvivn/from-genesis-to-nativity`), với **4 cấp độ luyện kể chuyện (Level 1–4)**, **mục đọc thêm Bối cảnh & Linh hồn câu chuyện**, chức năng **xuất bản PDF toàn văn (tùy chọn kèm 28 tranh minh họa Level 4 hoặc không kèm ảnh)**, **tự động ghi nhớ chương và vị trí đang đọc**, **đăng nhập thành viên (Email & Google SSO) để đồng bộ tiến độ**, **không gian Góp ý cộng đồng**, và **Thu âm & Nghe lại** thuần túy không AI. Được dẫn đường bởi [DAO.md](DAO.md).
 
 ---
 
@@ -9,7 +9,7 @@
 - **Đọc thêm — Bối cảnh & Linh hồn câu chuyện (`level-0-khong-gian-boi-canh/`)**:
   Nắm tinh thần văn hóa, nhịp điệu kể (9–10 tuổi theo phong cách Jakob Streit), điểm chạm ẩn dụ, hướng dẫn phát âm tên cổ theo từng Quyển, tổng quan sử thi và thư viện 25 văn bản cổ đọc thêm.
 1. **Level 1 — Toàn văn câu chuyện**:
-   Văn phong kể chuyện đọc thành tiếng hoàn chỉnh cho toàn bộ **180 Chương**, đi kèm *Lưu ý giọng kể* riêng từng chương và chức năng **Tải bản PDF Toàn văn (kèm 28 tranh Level 4)**.
+   Văn phong kể chuyện đọc thành tiếng hoàn chỉnh cho toàn bộ **180 Chương**, đi kèm *Lưu ý giọng kể* riêng từng chương và chức năng **Tải bản PDF Toàn văn (tùy chọn kèm 28 tranh Level 4 hoặc không kèm ảnh)**.
 2. **Level 2 — Dàn ý chi tiết**:
    Luyện kể không nhìn toàn văn nhưng giữ trọn nhân vật, hình tượng trung tâm, diễn biến chi tiết và ý nghĩa kể chuyện của từng chương.
 3. **Level 3 — Dàn ý tóm tắt**:
@@ -29,7 +29,7 @@
 
 ## 3. Xuất Bản PDF Toàn Văn & Thu âm / Nghe lại
 
-- **Tải PDF Toàn văn (kèm tranh Level 4)**: Tạo tài liệu in ấn A4 cục bộ ngay trên trình duyệt gồm trang bìa, mục lục 5 Quyển, toàn văn 180 Chương (*Lưu ý giọng kể* + nội dung kể chuyện) và nhúng cả 28 tranh minh họa Level 4 tại đầu mỗi cụm chương.
+- **Tải PDF Toàn văn (Kèm ảnh / Không kèm ảnh)**: Tạo tài liệu in ấn A4 cục bộ ngay trên trình duyệt gồm trang bìa, mục lục 5 Quyển và toàn văn 180 Chương (*Lưu ý giọng kể* + nội dung kể chuyện), với 2 lựa chọn: **Kèm ảnh** (nhúng 28 tranh minh họa Level 4 tại đầu mỗi cụm chương) hoặc **Không kèm ảnh** (bản thuần chữ nhẹ và in nhanh).
 - **Thu âm & Nghe lại thuần túy**: Thu âm trực tiếp từ micro (`MediaRecorder`) kèm đồng hồ thời lượng và nghe lại tức thì (`<audio controls>`).
 - **Không sử dụng AI**: Không gọi API AI, không chấm điểm, không phân tích tự động hay truyền bản ghi âm ra ngoài trình duyệt.
 

@@ -274,6 +274,29 @@ test("PDF Exporter: buildFullStoryPrintableHtml includes all 180 chapters and em
   assert.ok(book4Html.includes("data-illustration-id=\"tranh-23\""));
   assert.ok(!book4Html.includes("data-illustration-id=\"tranh-01\""));
   assert.ok(!book4Html.includes(GENESIS_JSDELIVR_BASE_URL));
+
+  // Text-only option (without images)
+  const textOnlyViHtml = buildFullStoryPrintableHtml(story, {
+    includeImages: false,
+    lang: "vi",
+  });
+  assert.ok(textOnlyViHtml.includes(story.title));
+  assert.ok(textOnlyViHtml.includes("Mục Lục Toàn Văn"));
+  assert.ok(textOnlyViHtml.includes("Bản thuần chữ (Không kèm ảnh)"));
+  assert.ok(textOnlyViHtml.includes("Lưu ý giọng kể"));
+  assert.ok(textOnlyViHtml.includes("Chương 1: Khởi Nguyên Của Thế Giới"));
+  assert.ok(textOnlyViHtml.includes("Chương 67: Sem Và Các Thiên Thần"));
+  assert.ok(textOnlyViHtml.includes("Chương 10: Từ Chiếc Áo Choàng Đỏ Thành Myra Đến Ông Già Noel Đêm Giáng Sinh"));
+  assert.ok(!textOnlyViHtml.includes("data-illustration-id="));
+  assert.ok(!textOnlyViHtml.includes("<img "));
+
+  const textOnlyEnHtml = buildFullStoryPrintableHtml(story, {
+    includeImages: false,
+    lang: "en",
+  });
+  assert.ok(textOnlyEnHtml.includes("Text-Only Edition (No Images)"));
+  assert.ok(!textOnlyEnHtml.includes("data-illustration-id="));
+  assert.ok(!textOnlyEnHtml.includes("<img "));
 });
 
 test("Rate-limit-safe repo sync: TTL guard, multi-CDN fallback order, and bounded concurrency", async () => {

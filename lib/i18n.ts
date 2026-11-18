@@ -106,8 +106,12 @@ export const translations = {
       chaptersCountSuffix: "Chương",
       illustrationsCountSuffix: "Tranh gợi nhớ",
       pdf: {
-        downloadBtn: "Tải PDF Toàn văn (kèm tranh Level 4)",
+        downloadBtn: "Tải PDF Toàn văn",
         downloadingBtn: "Đang tạo bản PDF...",
+        withImagesOption: "Kèm ảnh (28 tranh Level 4)",
+        withImagesDesc: "Đầy đủ 180 chương và 28 tranh minh họa cụm chương",
+        withoutImagesOption: "Không kèm ảnh (Bản thuần chữ)",
+        withoutImagesDesc: "Chỉ văn bản và lưu ý giọng kể, nhẹ & in nhanh",
         errorNotice: "Không thể khởi tạo bản PDF lúc này. Vui lòng thử lại.",
       },
       repo: {
@@ -351,8 +355,12 @@ export const translations = {
       chaptersCountSuffix: "Chapters",
       illustrationsCountSuffix: "Illustrations",
       pdf: {
-        downloadBtn: "Download Full Story PDF (with Level 4 Art)",
+        downloadBtn: "Download Full Story PDF",
         downloadingBtn: "Preparing PDF...",
+        withImagesOption: "With Images (28 Level 4 Artworks)",
+        withImagesDesc: "All 180 chapters with 28 cluster illustrations",
+        withoutImagesOption: "Without Images (Text Only)",
+        withoutImagesDesc: "Full narrative & vocal notes only, lightweight & fast",
         errorNotice: "Could not prepare the PDF right now. Please try again.",
       },
       repo: {

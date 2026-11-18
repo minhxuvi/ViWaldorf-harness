@@ -16,7 +16,7 @@ The storyteller grounds themselves in the optional **Background & Story Soul** r
 | Stage | Name | Displayed Content |
 |---|---|---|
 | **Đọc thêm (`level-0`)** | **Bối cảnh & Linh hồn câu chuyện** (Background & Story Soul) | Optional deep reading: epic overview, cultural spirit, storytelling breathing rhythm, metaphor & touchpoints, pronunciation guide for ancient names, and 25 ancient reference texts. |
-| **Level 1** | **Toàn văn câu chuyện** (Full Story) | Complete read-aloud narrative across 180 chapters with *Lưu ý giọng kể* (vocal delivery notes) and **Full-Text PDF Export with Level 4 Illustrations**. |
+| **Level 1** | **Toàn văn câu chuyện** (Full Story) | Complete read-aloud narrative across 180 chapters with *Lưu ý giọng kể* (vocal delivery notes) and **Full-Text PDF Export (With Level 4 Illustrations or Text-Only without images)**. |
 | **Level 2** | **Dàn ý chi tiết** (Detailed Outline) | Full text hidden; shows characters/motifs, detailed narrative beats, and storytelling significance per chapter. |
 | **Level 3** | **Dàn ý tóm tắt** (Summary Skeleton) | **One unified skeleton outline** closely following all 180 chapters of the original plot. |
 | **Level 4** | **Tranh gợi nhớ thuần hình ảnh** (Pure Visual Recall) | **28 traditional hand-drawn cluster illustrations** (`wet-on-wet`, `crayon`, or `chalkboard`) with **zero text hints** (no titles, no keywords, no `<text>` elements in SVG). |

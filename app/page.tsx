@@ -165,9 +165,12 @@ export default function StorytellingPracticePage() {
   const [ancientBookError, setAncientBookError] = useState<string>("");
   const ancientCacheRef = useRef<Record<string, string>>({});
 
-  // Xuất PDF toàn văn kèm tranh minh họa Level 4
+  // Xuất PDF toàn văn (2 lựa chọn: kèm ảnh hoặc không kèm ảnh)
   const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
   const [pdfError, setPdfError] = useState<string>("");
+  const [pdfMenuLocation, setPdfMenuLocation] = useState<"header" | "level1" | null>(null);
+  const headerPdfMenuRef = useRef<HTMLDivElement | null>(null);
+  const level1PdfMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Level 4: theo dõi URL ảnh từ repo bị lỗi & chế độ SVG dự phòng
   const [failedRepoImages, setFailedRepoImages] = useState<Record<string, boolean>>({});
@@ -210,6 +213,32 @@ export default function StorytellingPracticePage() {
       });
     };
   }, []);
+
+  // Đóng menu tùy chọn PDF khi bấm ra ngoài hoặc nhấn Escape
+  useEffect(() => {
+    if (!pdfMenuLocation) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (
+        (headerPdfMenuRef.current && headerPdfMenuRef.current.contains(target)) ||
+        (level1PdfMenuRef.current && level1PdfMenuRef.current.contains(target))
+      ) {
+        return;
+      }
+      setPdfMenuLocation(null);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPdfMenuLocation(null);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [pdfMenuLocation]);
 
   // Làm mới bộ nhớ đệm ảnh lỗi khi vừa đồng bộ xong từ repo
   useEffect(() => {
@@ -628,8 +657,9 @@ export default function StorytellingPracticePage() {
     await syncFromRepo({ force: true });
   };
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = async (includeImages: boolean = true) => {
     if (!selectedStory || isExportingPdf) return;
+    setPdfMenuLocation(null);
     setPdfError("");
     setIsExportingPdf(true);
     try {
@@ -645,6 +675,7 @@ export default function StorytellingPracticePage() {
         failedImages: failedRepoImages,
         preferProceduralArt,
         lang,
+        includeImages,
       });
     } catch (err) {
       setPdfError(err instanceof Error ? err.message : t.story.pdf.errorNotice);
@@ -1001,21 +1032,17 @@ export default function StorytellingPracticePage() {
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={handleExportPdf}
-                disabled={isExportingPdf}
-                className="btn-terra text-xs py-2 px-3"
-              >
-                <FileDown
-                  className={`w-3.5 h-3.5 ${isExportingPdf ? "animate-bounce" : ""}`}
-                />
-                <span>
-                  {isExportingPdf
-                    ? t.story.pdf.downloadingBtn
-                    : t.story.pdf.downloadBtn}
-                </span>
-              </button>
+              <PdfExportDropdown
+                isOpen={pdfMenuLocation === "header"}
+                isExporting={isExportingPdf}
+                onToggle={() =>
+                  setPdfMenuLocation((prev) => (prev === "header" ? null : "header"))
+                }
+                onSelect={(includeImages) => void handleExportPdf(includeImages)}
+                menuRef={headerPdfMenuRef}
+                variant="header"
+                copy={t.story.pdf}
+              />
 
               {selectedStory.repoUrl && (
                 <button
@@ -1509,21 +1536,17 @@ export default function StorytellingPracticePage() {
                     ))}
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleExportPdf}
-                    disabled={isExportingPdf}
-                    className="btn-ghost text-xs py-1.5 px-2.5 border-terra/35 text-terra hover:bg-[#FDF2F0]"
-                  >
-                    <FileDown
-                      className={`w-3.5 h-3.5 ${isExportingPdf ? "animate-bounce" : ""}`}
-                    />
-                    <span className="hidden sm:inline">
-                      {isExportingPdf
-                        ? t.story.pdf.downloadingBtn
-                        : t.story.pdf.downloadBtn}
-                    </span>
-                  </button>
+                  <PdfExportDropdown
+                    isOpen={pdfMenuLocation === "level1"}
+                    isExporting={isExportingPdf}
+                    onToggle={() =>
+                      setPdfMenuLocation((prev) => (prev === "level1" ? null : "level1"))
+                    }
+                    onSelect={(includeImages) => void handleExportPdf(includeImages)}
+                    menuRef={level1PdfMenuRef}
+                    variant="level1"
+                    copy={t.story.pdf}
+                  />
                 </div>
 
                 {level1FlowMode === "scene" && (
@@ -2510,6 +2533,126 @@ function IllustrationNavControls({
       >
         <ChevronRight className="w-3.5 h-3.5" />
       </button>
+    </div>
+  );
+}
+
+interface PdfMenuCopy {
+  downloadBtn: string;
+  downloadingBtn: string;
+  withImagesOption: string;
+  withImagesDesc: string;
+  withoutImagesOption: string;
+  withoutImagesDesc: string;
+}
+
+/** Nút chọn xuất PDF toàn văn với 2 chế độ: kèm ảnh Level 4 hoặc không kèm ảnh (thuần chữ). */
+function PdfExportDropdown({
+  isOpen,
+  isExporting,
+  onToggle,
+  onSelect,
+  menuRef,
+  variant,
+  copy,
+}: {
+  isOpen: boolean;
+  isExporting: boolean;
+  onToggle: () => void;
+  onSelect: (includeImages: boolean) => void;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  variant: "header" | "level1";
+  copy: PdfMenuCopy;
+}) {
+  const [alignRight, setAlignRight] = useState(variant === "header");
+
+  const handleTriggerClick = () => {
+    if (!isOpen && menuRef.current && typeof window !== "undefined") {
+      const rect = menuRef.current.getBoundingClientRect();
+      const menuWidth = 288;
+      const fitsRight = rect.left + menuWidth <= window.innerWidth - 16;
+      const fitsLeft = rect.right - menuWidth >= 16;
+      setAlignRight(!fitsRight && fitsLeft);
+    }
+    onToggle();
+  };
+
+  const triggerClass =
+    variant === "header"
+      ? "btn-terra text-xs py-2 px-3"
+      : "btn-ghost text-xs py-1.5 px-2.5 border-terra/35 text-terra hover:bg-[#FDF2F0]";
+
+  const options = [
+    {
+      includeImages: true,
+      label: copy.withImagesOption,
+      desc: copy.withImagesDesc,
+      Icon: ImageIcon,
+    },
+    {
+      includeImages: false,
+      label: copy.withoutImagesOption,
+      desc: copy.withoutImagesDesc,
+      Icon: ScrollText,
+    },
+  ];
+
+  return (
+    <div ref={menuRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={handleTriggerClick}
+        disabled={isExporting}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-label={copy.downloadBtn}
+        className={triggerClass}
+      >
+        <FileDown
+          className={`w-3.5 h-3.5 ${isExporting ? "animate-bounce" : ""}`}
+        />
+        <span className={variant === "level1" ? "hidden sm:inline" : ""}>
+          {isExporting ? copy.downloadingBtn : copy.downloadBtn}
+        </span>
+        {variant === "level1" && <span className="sm:hidden">PDF</span>}
+        <ChevronDown
+          className={`w-3.5 h-3.5 transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen && !isExporting && (
+        <div
+          role="menu"
+          aria-label={copy.downloadBtn}
+          className={`absolute top-full mt-1.5 z-30 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-[#FFFDF7] p-1.5 shadow-lg ${
+            alignRight ? "right-0" : "left-0"
+          }`}
+        >
+          {options.map(({ includeImages, label, desc, Icon }) => (
+            <button
+              key={includeImages ? "with-images" : "without-images"}
+              type="button"
+              role="menuitem"
+              onClick={() => onSelect(includeImages)}
+              className="w-full text-left flex items-start gap-2.5 rounded-lg px-2.5 py-2 transition hover:bg-[#F7ECD8]/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest"
+            >
+              <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#FDF0E6] text-terra border border-terra/20">
+                <Icon className="w-3.5 h-3.5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold text-forestDark">
+                  {label}
+                </span>
+                <span className="block text-[11px] leading-snug text-inkSoft mt-0.5">
+                  {desc}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
