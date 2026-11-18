@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useApp } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -21,6 +21,7 @@ import {
   GENESIS_JSDELIVR_BASE_URL,
   GENESIS_REPO_URL,
   getCandidateRepoBaseUrls,
+  paginatePassage,
 } from "@/lib/repoStoryLoader";
 import {
   Mic,
@@ -134,6 +135,7 @@ export default function StorytellingPracticePage() {
   // Trạng thái luyện tập 4 cấp độ (Level 1 -> Level 4)
   const [activeLevel, setActiveLevel] = useState<PracticeLevel>(1);
   const [activeSceneIndex, setActiveSceneIndex] = useState<number>(0);
+  const [activePageIndex, setActivePageIndex] = useState<number>(0);
   const [activeIllustrationIndex, setActiveIllustrationIndex] = useState<number>(0);
   const [level1FlowMode, setLevel1FlowMode] = useState<"scene" | "full">("scene");
   const [level1TextSize, setLevel1TextSize] = useState<Level1TextSize>("md");
@@ -159,11 +161,14 @@ export default function StorytellingPracticePage() {
   const [failedRepoImages, setFailedRepoImages] = useState<Record<string, boolean>>({});
   const [preferProceduralArt, setPreferProceduralArt] = useState<boolean>(false);
 
-  // Vuốt ngang trên thiết bị cảm ứng
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  // Điều hướng chạm / vuốt ngang trên thiết bị cảm ứng
+  const readingSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchLastRef = useRef<{ x: number; y: number } | null>(null);
+  const lastSwipeAtRef = useRef<number>(0);
 
-  // Thu âm & Nghe lại thuần túy (MediaRecorder)
+  // Thu âm & Nghe lại thuần túy (MediaRecorder) - thu gọn ở góc phải dưới
+  const [isRecorderExpanded, setIsRecorderExpanded] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordings, setRecordings] = useState<VoiceRecording[]>([]);
@@ -231,29 +236,135 @@ export default function StorytellingPracticePage() {
   const currentIllustration: StoryIllustration | undefined =
     visibleIllustrations[safeIllustrationIndex] || visibleIllustrations[0];
 
+  const chapterPages = useMemo(
+    () => paginatePassage(currentScene?.passage || "", level1TextSize),
+    [currentScene?.passage, level1TextSize]
+  );
+  const totalPages = chapterPages.length;
+  const safePageIndex = Math.min(activePageIndex, Math.max(0, totalPages - 1));
+  const currentPageText = chapterPages[safePageIndex] ?? "";
+
+  const scrollReadingSurfaceIfNeeded = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const el = readingSurfaceRef.current;
+    if (!el) return;
+    const top = el.getBoundingClientRect().top;
+    if (top < 12) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+
+  const goToScene = useCallback(
+    (index: number, pageIndex = 0) => {
+      const clamped = Math.max(0, Math.min(Math.max(0, totalScenes - 1), index));
+      setActiveSceneIndex(clamped);
+      setActivePageIndex(pageIndex);
+      if (!isRecording) setIsRecorderExpanded(false);
+      scrollReadingSurfaceIfNeeded();
+    },
+    [totalScenes, isRecording, scrollReadingSurfaceIfNeeded]
+  );
+
+  const handleSelectLevel = useCallback(
+    (lvl: PracticeLevel) => {
+      setActiveLevel(lvl);
+      setActivePageIndex(0);
+      if (!isRecording) setIsRecorderExpanded(false);
+    },
+    [isRecording]
+  );
+
   const handleBookSelect = (bookId: string) => {
     setSelectedBookId(bookId);
     setActiveSceneIndex(0);
     setActiveIllustrationIndex(0);
+    setActivePageIndex(0);
+    if (!isRecording) setIsRecorderExpanded(false);
   };
 
-  const handlePrevScene = () => {
-    setActiveSceneIndex((prev) => Math.max(0, prev - 1));
-  };
+  const handlePrevScene = useCallback(() => {
+    goToScene(safeSceneIndex - 1, 0);
+  }, [goToScene, safeSceneIndex]);
 
-  const handleNextScene = () => {
-    setActiveSceneIndex((prev) => Math.min(Math.max(0, totalScenes - 1), prev + 1));
-  };
+  const handleNextScene = useCallback(() => {
+    goToScene(safeSceneIndex + 1, 0);
+  }, [goToScene, safeSceneIndex]);
 
-  const handlePrevIllustration = () => {
+  const handlePrevIllustration = useCallback(() => {
     setActiveIllustrationIndex((prev) => Math.max(0, prev - 1));
-  };
+    if (!isRecording) setIsRecorderExpanded(false);
+  }, [isRecording]);
 
-  const handleNextIllustration = () => {
+  const handleNextIllustration = useCallback(() => {
     setActiveIllustrationIndex((prev) =>
       Math.min(Math.max(0, totalIllustrations - 1), prev + 1)
     );
-  };
+    if (!isRecording) setIsRecorderExpanded(false);
+  }, [totalIllustrations, isRecording]);
+
+  const handlePrevPage = useCallback(() => {
+    if (activeLevel === 4) {
+      handlePrevIllustration();
+      return;
+    }
+    if (activeLevel === 1 && level1FlowMode === "scene") {
+      if (safePageIndex > 0) {
+        setActivePageIndex(safePageIndex - 1);
+        if (!isRecording) setIsRecorderExpanded(false);
+        scrollReadingSurfaceIfNeeded();
+      } else if (safeSceneIndex > 0) {
+        const prevScene = visibleScenes[safeSceneIndex - 1];
+        const prevTotalPages = prevScene
+          ? paginatePassage(prevScene.passage, level1TextSize).length
+          : 1;
+        goToScene(safeSceneIndex - 1, Math.max(0, prevTotalPages - 1));
+      }
+      return;
+    }
+    handlePrevScene();
+  }, [
+    activeLevel,
+    level1FlowMode,
+    safePageIndex,
+    safeSceneIndex,
+    visibleScenes,
+    level1TextSize,
+    isRecording,
+    goToScene,
+    handlePrevIllustration,
+    handlePrevScene,
+    scrollReadingSurfaceIfNeeded,
+  ]);
+
+  const handleNextPage = useCallback(() => {
+    if (activeLevel === 4) {
+      handleNextIllustration();
+      return;
+    }
+    if (activeLevel === 1 && level1FlowMode === "scene") {
+      if (safePageIndex < totalPages - 1) {
+        setActivePageIndex(safePageIndex + 1);
+        if (!isRecording) setIsRecorderExpanded(false);
+        scrollReadingSurfaceIfNeeded();
+      } else if (safeSceneIndex < totalScenes - 1) {
+        goToScene(safeSceneIndex + 1, 0);
+      }
+      return;
+    }
+    handleNextScene();
+  }, [
+    activeLevel,
+    level1FlowMode,
+    safePageIndex,
+    totalPages,
+    safeSceneIndex,
+    totalScenes,
+    isRecording,
+    goToScene,
+    handleNextIllustration,
+    handleNextScene,
+    scrollReadingSurfaceIfNeeded,
+  ]);
 
   const handleJumpToIllustration = (illustrationId?: string) => {
     if (illustrationId) {
@@ -262,7 +373,7 @@ export default function StorytellingPracticePage() {
         setActiveIllustrationIndex(idx);
       }
     }
-    setActiveLevel(4);
+    handleSelectLevel(4);
   };
 
   // Điều hướng bàn phím ← / →
@@ -270,47 +381,61 @@ export default function StorytellingPracticePage() {
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (activeLevel === 4) {
-        if (e.key === "ArrowLeft") {
-          setActiveIllustrationIndex((prev) => Math.max(0, prev - 1));
-        } else if (e.key === "ArrowRight") {
-          setActiveIllustrationIndex((prev) =>
-            Math.min(Math.max(0, totalIllustrations - 1), prev + 1)
-          );
-        }
-      } else {
-        if (e.key === "ArrowLeft") {
-          setActiveSceneIndex((prev) => Math.max(0, prev - 1));
-        } else if (e.key === "ArrowRight") {
-          setActiveSceneIndex((prev) => Math.min(Math.max(0, totalScenes - 1), prev + 1));
-        }
+      if (e.key === "ArrowLeft") {
+        handlePrevPage();
+      } else if (e.key === "ArrowRight") {
+        handleNextPage();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeLevel, totalScenes, totalIllustrations]);
+  }, [handlePrevPage, handleNextPage]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchStartX(e.targetTouches[0].clientX);
-    setTouchEndX(null);
+    if (e.targetTouches.length !== 1) return;
+    touchStartRef.current = {
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    };
+    touchLastRef.current = null;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEndX(e.targetTouches[0].clientX);
+    if (!touchStartRef.current || e.targetTouches.length !== 1) return;
+    touchLastRef.current = {
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY,
+    };
   };
 
   const handleTouchEnd = () => {
-    if (touchStartX === null || touchEndX === null) return;
-    const delta = touchStartX - touchEndX;
-    if (activeLevel === 4) {
-      if (delta > 45) handleNextIllustration();
-      else if (delta < -45) handlePrevIllustration();
-    } else {
-      if (delta > 45) handleNextScene();
-      else if (delta < -45) handlePrevScene();
+    const start = touchStartRef.current;
+    const end = touchLastRef.current;
+    touchStartRef.current = null;
+    touchLastRef.current = null;
+    if (!start || !end) return;
+
+    const deltaX = start.x - end.x;
+    const deltaY = start.y - end.y;
+    if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+      lastSwipeAtRef.current = Date.now();
+      if (deltaX > 0) handleNextPage();
+      else handlePrevPage();
     }
-    setTouchStartX(null);
-    setTouchEndX(null);
+  };
+
+  const handleReadingSurfaceClick = (e: React.MouseEvent<HTMLElement>) => {
+    if (Date.now() - lastSwipeAtRef.current < 350) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("button, a, select, input, label, audio, summary, textarea")) return;
+    const selection = typeof window !== "undefined" ? window.getSelection()?.toString() : "";
+    if (selection && selection.trim().length > 0) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const relX = (e.clientX - rect.left) / rect.width;
+    if (relX < 0.35) handlePrevPage();
+    else handleNextPage();
   };
 
   const handleSyncRepoClick = async () => {
@@ -626,7 +751,7 @@ export default function StorytellingPracticePage() {
   const lastSyncedText = formatLastSynced(selectedStory?.lastSyncedAt, lang);
 
   return (
-    <div className="space-y-6 pb-32">
+    <div className="space-y-6 pb-24 sm:pb-28">
       <PageHeader title={t.story.pageTitle} subtitle={t.story.pageSubtitle} />
 
       {/* Thẻ thông tin bộ sử thi duy nhất, nút Bối cảnh, Tải PDF, Đồng bộ CDN & Chọn Quyển */}
@@ -1082,7 +1207,7 @@ export default function StorytellingPracticePage() {
                   type="button"
                   role="tab"
                   aria-selected={isActive}
-                  onClick={() => setActiveLevel(lvl)}
+                  onClick={() => handleSelectLevel(lvl)}
                   className={`text-left p-3 rounded-xl border transition-all ${
                     isActive
                       ? "bg-forest text-white border-forest shadow-md"
@@ -1127,13 +1252,16 @@ export default function StorytellingPracticePage() {
           {/* LEVEL 1: TOÀN VĂN CÂU CHUYỆN + LƯU Ý GIỌNG KỂ                  */}
           {/* ============================================================== */}
           {activeLevel === 1 && (
-            <div className="garden-card space-y-5">
+            <div ref={readingSurfaceRef} className="reading-surface space-y-4 sm:space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="flex rounded-xl bg-[#F7ECD8]/70 p-1 border border-line">
                     <button
                       type="button"
-                      onClick={() => setLevel1FlowMode("scene")}
+                      onClick={() => {
+                        setLevel1FlowMode("scene");
+                        setActivePageIndex(0);
+                      }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                         level1FlowMode === "scene"
                           ? "bg-forest text-white shadow-sm"
@@ -1209,7 +1337,7 @@ export default function StorytellingPracticePage() {
                     scenes={visibleScenes}
                     onPrev={handlePrevScene}
                     onNext={handleNextScene}
-                    onSelect={setActiveSceneIndex}
+                    onSelect={(idx) => goToScene(idx, 0)}
                     sceneLabel={t.story.nav.sceneLabel}
                     prevLabel={t.story.nav.prevScene}
                     nextLabel={t.story.nav.nextScene}
@@ -1219,7 +1347,8 @@ export default function StorytellingPracticePage() {
 
               {level1FlowMode === "scene" && currentScene ? (
                 <div
-                  className="space-y-4 max-w-[68ch] mx-auto py-2"
+                  className="space-y-4 max-w-none sm:max-w-[68ch] mx-auto cursor-pointer select-text"
+                  onClick={handleReadingSurfaceClick}
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
@@ -1249,28 +1378,74 @@ export default function StorytellingPracticePage() {
                     )}
                   </div>
 
-                  {/* Đặt Lưu ý giọng kể lên đầu để người kể lấy hơi & tông giọng trước khi đọc */}
-                  <div className="p-4 rounded-xl bg-[#E3EFE0]/70 border border-[#C5DEC0] space-y-1">
-                    <div className="text-xs font-bold uppercase tracking-wider text-forest flex items-center gap-1.5">
-                      <Volume2 className="w-4 h-4" />
-                      <span>{t.story.level1.voiceNoteLabel}</span>
+                  {/* Đặt Lưu ý giọng kể ở trang đầu của mỗi chương để người kể lấy hơi & tông giọng */}
+                  {safePageIndex === 0 && (
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-[#E3EFE0]/70 border border-[#C5DEC0] space-y-1">
+                      <div className="text-xs font-bold uppercase tracking-wider text-forest flex items-center gap-1.5">
+                        <Volume2 className="w-4 h-4" />
+                        <span>{t.story.level1.voiceNoteLabel}</span>
+                      </div>
+                      <p className="text-sm text-forestDark leading-relaxed italic whitespace-pre-line">
+                        {currentScene.voiceNote}
+                      </p>
                     </div>
-                    <p className="text-sm text-forestDark leading-relaxed italic whitespace-pre-line">
-                      {currentScene.voiceNote}
-                    </p>
-                  </div>
+                  )}
 
-                  <p
-                    className={`font-serif text-ink whitespace-pre-line bg-[#FFFDF9] p-5 sm:p-6 rounded-2xl border border-line shadow-sm ${
-                      level1TextSize === "sm"
-                        ? "text-sm sm:text-base leading-[1.8]"
-                        : level1TextSize === "lg"
-                        ? "text-lg sm:text-xl leading-[1.9]"
-                        : "text-base sm:text-lg leading-[1.85]"
-                    }`}
-                  >
-                    {currentScene.passage}
-                  </p>
+                  <div className="min-h-[42vh] flex flex-col justify-between gap-4">
+                    <p
+                      className={`font-serif text-ink whitespace-pre-line ${
+                        level1TextSize === "sm"
+                          ? "text-[15px] sm:text-base leading-[1.8]"
+                          : level1TextSize === "lg"
+                          ? "text-lg sm:text-xl leading-[1.9]"
+                          : "text-base sm:text-lg leading-[1.85]"
+                      }`}
+                    >
+                      {currentPageText}
+                    </p>
+
+                    <div className="pt-3 border-t border-line/60 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePrevPage();
+                          }}
+                          disabled={safePageIndex <= 0 && safeSceneIndex <= 0}
+                          className="btn-ghost text-xs py-1.5 px-3 disabled:opacity-30 disabled:pointer-events-none"
+                          aria-label={t.story.level1.prevPage}
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                          <span>{t.story.level1.prevPage}</span>
+                        </button>
+
+                        <span className="text-xs font-serif font-bold text-forestDark whitespace-nowrap">
+                          {t.story.level1.pageLabel} {safePageIndex + 1} / {totalPages}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleNextPage();
+                          }}
+                          disabled={
+                            safePageIndex >= totalPages - 1 && safeSceneIndex >= totalScenes - 1
+                          }
+                          className="btn-ghost text-xs py-1.5 px-3 disabled:opacity-30 disabled:pointer-events-none"
+                          aria-label={t.story.level1.nextPage}
+                        >
+                          <span>{t.story.level1.nextPage}</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <p className="text-center text-[11px] text-inkSoft italic">
+                        {t.story.level1.tapOrSwipeHint}
+                      </p>
+                    </div>
+                  </div>
 
                   <div className="flex justify-center pt-1">
                     <ChapterNavControls
@@ -1279,7 +1454,7 @@ export default function StorytellingPracticePage() {
                       scenes={visibleScenes}
                       onPrev={handlePrevScene}
                       onNext={handleNextScene}
-                      onSelect={setActiveSceneIndex}
+                      onSelect={(idx) => goToScene(idx, 0)}
                       sceneLabel={t.story.nav.sceneLabel}
                       prevLabel={t.story.nav.prevScene}
                       nextLabel={t.story.nav.nextScene}
@@ -1287,7 +1462,7 @@ export default function StorytellingPracticePage() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-6 max-w-[68ch] mx-auto py-2">
+                <div className="space-y-6 max-w-none sm:max-w-[68ch] mx-auto py-2">
                   {visibleScenes.map((sc, idx) => (
                     <div
                       key={sc.id}
@@ -1335,7 +1510,7 @@ export default function StorytellingPracticePage() {
 
               <LevelStepFooter
                 activeLevel={activeLevel}
-                onSelectLevel={setActiveLevel}
+                onSelectLevel={handleSelectLevel}
                 prevPrefix={t.story.nav.prevLevelBtn}
                 nextPrefix={t.story.nav.nextLevelShortBtn}
               />
@@ -1347,7 +1522,9 @@ export default function StorytellingPracticePage() {
           {/* ============================================================== */}
           {activeLevel === 2 && currentScene && currentScene.detailedOutline && (
             <div
-              className="garden-card space-y-5"
+              ref={readingSurfaceRef}
+              className="reading-surface space-y-5 cursor-pointer select-text"
+              onClick={handleReadingSurfaceClick}
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
@@ -1370,7 +1547,7 @@ export default function StorytellingPracticePage() {
                   scenes={visibleScenes}
                   onPrev={handlePrevScene}
                   onNext={handleNextScene}
-                  onSelect={setActiveSceneIndex}
+                  onSelect={(idx) => goToScene(idx, 0)}
                   sceneLabel={t.story.nav.sceneLabel}
                   prevLabel={t.story.nav.prevScene}
                   nextLabel={t.story.nav.nextScene}
@@ -1443,7 +1620,7 @@ export default function StorytellingPracticePage() {
                   scenes={visibleScenes}
                   onPrev={handlePrevScene}
                   onNext={handleNextScene}
-                  onSelect={setActiveSceneIndex}
+                  onSelect={(idx) => goToScene(idx, 0)}
                   sceneLabel={t.story.nav.sceneLabel}
                   prevLabel={t.story.nav.prevScene}
                   nextLabel={t.story.nav.nextScene}
@@ -1452,7 +1629,7 @@ export default function StorytellingPracticePage() {
 
               <LevelStepFooter
                 activeLevel={activeLevel}
-                onSelectLevel={setActiveLevel}
+                onSelectLevel={handleSelectLevel}
                 prevPrefix={t.story.nav.prevLevelBtn}
                 nextPrefix={t.story.nav.nextLevelShortBtn}
               />
@@ -1463,7 +1640,16 @@ export default function StorytellingPracticePage() {
           {/* LEVEL 3: DÀN Ý TÓM TẮT (KHUNG XƯƠNG CỐT TRUYỆN)               */}
           {/* ============================================================== */}
           {activeLevel === 3 && (
-            <div className="garden-card space-y-5">
+            <div
+              ref={readingSurfaceRef}
+              className={`reading-surface space-y-5 ${
+                level3Scope === "current" ? "cursor-pointer select-text" : ""
+              }`}
+              onClick={level3Scope === "current" ? handleReadingSurfaceClick : undefined}
+              onTouchStart={level3Scope === "current" ? handleTouchStart : undefined}
+              onTouchMove={level3Scope === "current" ? handleTouchMove : undefined}
+              onTouchEnd={level3Scope === "current" ? handleTouchEnd : undefined}
+            >
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
                 <div className="flex items-center gap-2">
                   <ListChecks className="w-5 h-5 text-forest" />
@@ -1512,7 +1698,7 @@ export default function StorytellingPracticePage() {
                       scenes={visibleScenes}
                       onPrev={handlePrevScene}
                       onNext={handleNextScene}
-                      onSelect={setActiveSceneIndex}
+                      onSelect={(idx) => goToScene(idx, 0)}
                       sceneLabel={t.story.nav.sceneLabel}
                       prevLabel={t.story.nav.prevScene}
                       nextLabel={t.story.nav.nextScene}
@@ -1530,8 +1716,10 @@ export default function StorytellingPracticePage() {
                   return (
                     <div
                       key={sc.id}
-                      onClick={() => setActiveSceneIndex(idx)}
-                      className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                      onClick={level3Scope === "all" ? () => goToScene(idx, 0) : undefined}
+                      className={`p-4 rounded-xl border transition-all ${
+                        level3Scope === "all" ? "cursor-pointer " : ""
+                      }${
                         isFocused
                           ? "bg-[#E3EFE0]/50 border-forest shadow-sm"
                           : "bg-[#FFFDF8] border-line hover:border-forest/40"
@@ -1557,7 +1745,7 @@ export default function StorytellingPracticePage() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setActiveSceneIndex(idx);
+                                goToScene(idx, 0);
                                 handleJumpToIllustration(sc.illustrationId);
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-forest text-white text-xs font-semibold hover:bg-forestDark transition"
@@ -1584,7 +1772,7 @@ export default function StorytellingPracticePage() {
 
               <LevelStepFooter
                 activeLevel={activeLevel}
-                onSelectLevel={setActiveLevel}
+                onSelectLevel={handleSelectLevel}
                 prevPrefix={t.story.nav.prevLevelBtn}
                 nextPrefix={t.story.nav.nextLevelShortBtn}
               />
@@ -1596,7 +1784,8 @@ export default function StorytellingPracticePage() {
           {/* ============================================================== */}
           {activeLevel === 4 && currentIllustration && (
             <div
-              className="garden-card space-y-4"
+              ref={readingSurfaceRef}
+              className="reading-surface space-y-4"
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
@@ -1706,7 +1895,8 @@ export default function StorytellingPracticePage() {
 
               {/* Khung tranh thuần hình ảnh — tuyệt đối không chữ gợi ý */}
               <div
-                className={`relative w-full mx-auto aspect-[16/10] rounded-2xl overflow-hidden border-2 border-line bg-[#FAF6EC] shadow-md group transition-all ${
+                onClick={handleReadingSurfaceClick}
+                className={`relative w-full mx-auto aspect-[16/10] rounded-2xl overflow-hidden border-2 border-line bg-[#FAF6EC] shadow-md group transition-all cursor-pointer ${
                   isLevel4StageMode ? "max-w-5xl" : "max-w-3xl"
                 }`}
               >
@@ -1755,7 +1945,7 @@ export default function StorytellingPracticePage() {
 
               <LevelStepFooter
                 activeLevel={activeLevel}
-                onSelectLevel={setActiveLevel}
+                onSelectLevel={handleSelectLevel}
                 prevPrefix={t.story.nav.prevLevelBtn}
                 nextPrefix={t.story.nav.nextLevelShortBtn}
               />
@@ -1765,192 +1955,193 @@ export default function StorytellingPracticePage() {
       )}
 
       {/* ================================================================== */}
-      {/* THANH THU ÂM & NGHE LẠI (CHỈ THU ÂM VÀ PHÁT LẠI, KHÔNG ĐÁNH GIÁ)   */}
+      {/* NÚT & BẢNG THU ÂM GÓC PHẢI DƯỚI (THU NHỎ KHI ĐỌC, MỞ KHI CẦN)     */}
       {/* ================================================================== */}
       {selectedStory && (
         <aside
           aria-label="Thanh thu âm và nghe lại giọng kể"
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-3xl space-y-2"
+          className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2"
         >
-          {showTakesPanel && recordings.length > 0 && (
-            <div className="bg-[#FFFDF7]/98 backdrop-blur-md border border-line rounded-2xl shadow-xl p-3.5 max-h-60 overflow-y-auto space-y-2">
-              {recordings.map((rec) => {
-                const isCurrentTake =
-                  rec.storyId === selectedStory.id &&
-                  ((rec.level === 4 &&
-                    activeLevel === 4 &&
-                    currentIllustration &&
-                    rec.sceneOrd === currentIllustration.ord) ||
-                    (rec.level !== 4 &&
-                      activeLevel !== 4 &&
-                      currentScene &&
-                      rec.sceneOrd === currentScene.ord));
-                return (
-                  <div
-                    key={rec.id}
-                    className={`flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border ${
-                      activeRecording?.id === rec.id
-                        ? "bg-[#E3EFE0]/60 border-forest/40"
-                        : "bg-white border-line"
-                    }`}
+          {!isRecorderExpanded ? (
+            <button
+              type="button"
+              onClick={() => setIsRecorderExpanded(true)}
+              aria-expanded={false}
+              aria-label={t.story.recorder.expandBtnLabel}
+              title={t.story.recorder.expandBtnLabel}
+              className={`relative flex items-center justify-center rounded-full shadow-xl border-2 transition active:scale-95 ${
+                isRecording
+                  ? "h-12 px-3.5 gap-2 bg-red-700 hover:bg-red-800 text-white border-red-200 animate-pulse"
+                  : "w-12 h-12 bg-terra hover:bg-[#a84736] text-white border-[#FFFDF7]/90"
+              }`}
+            >
+              <Mic className="w-5 h-5" />
+              {isRecording && (
+                <span className="font-mono text-xs font-semibold">
+                  {formatDuration(recordingSeconds)}
+                </span>
+              )}
+              {!isRecording && recordings.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-forest text-white text-[10px] font-bold flex items-center justify-center border border-[#FFFDF7] shadow">
+                  {recordings.length}
+                </span>
+              )}
+            </button>
+          ) : (
+            <div className="w-[calc(100vw-2rem)] sm:w-96 max-w-md space-y-2">
+              {showTakesPanel && recordings.length > 0 && (
+                <div className="bg-[#FFFDF7]/98 backdrop-blur-md border border-line rounded-2xl shadow-xl p-3 max-h-60 overflow-y-auto space-y-2">
+                  {recordings.map((rec) => {
+                    const isCurrentTake =
+                      rec.storyId === selectedStory.id &&
+                      ((rec.level === 4 &&
+                        activeLevel === 4 &&
+                        currentIllustration &&
+                        rec.sceneOrd === currentIllustration.ord) ||
+                        (rec.level !== 4 &&
+                          activeLevel !== 4 &&
+                          currentScene &&
+                          rec.sceneOrd === currentScene.ord));
+                    return (
+                      <div
+                        key={rec.id}
+                        className={`flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border ${
+                          activeRecording?.id === rec.id
+                            ? "bg-[#E3EFE0]/60 border-forest/40"
+                            : "bg-white border-line"
+                        }`}
+                      >
+                        <div className="text-xs font-medium text-forestDark min-w-[130px]">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-semibold">{rec.label}</span>
+                            {isCurrentTake && (
+                              <span className="badge-leaf text-[10px] py-0 px-1.5">
+                                {t.story.recorder.currentSceneBadge}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-inkSoft">
+                            {formatDuration(rec.durationSeconds)} · {rec.createdAt}
+                          </div>
+                        </div>
+
+                        <audio controls src={rec.audioUrl} className="h-8 flex-1 min-w-[160px]" />
+
+                        <div className="flex items-center gap-1">
+                          <a
+                            href={rec.audioUrl}
+                            download={`ke-chuyen-L${rec.level}-${rec.sceneOrd}.webm`}
+                            className="p-1.5 rounded-lg border border-line text-forest hover:bg-[#F7ECD8] transition"
+                            title={t.story.recorder.downloadTake}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRecording(rec.id)}
+                            className="p-1.5 rounded-lg border border-line text-terra hover:bg-[#F7DDD6]/50 transition"
+                            title={t.story.recorder.deleteTake}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {micError && (
+                <div className="px-3 py-2 rounded-xl bg-[#FDF2F0] border border-terra/40 text-xs text-terra font-medium text-center shadow">
+                  {micError}
+                </div>
+              )}
+
+              <div className="bg-[#FFFDF7]/95 backdrop-blur-md border-2 border-forest/30 shadow-2xl rounded-2xl p-3 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="badge-leaf font-bold text-xs">Level {activeLevel}</span>
+                    {activeLevel === 4 ? (
+                      totalIllustrations > 0 && (
+                        <span className="text-xs font-serif font-bold text-forestDark whitespace-nowrap">
+                          {currentIllustration?.ord || safeIllustrationIndex + 1}/
+                          {allIllustrations.length}
+                        </span>
+                      )
+                    ) : (
+                      totalScenes > 0 && (
+                        <span className="text-xs font-serif font-bold text-forestDark whitespace-nowrap">
+                          {currentScene?.ord || safeSceneIndex + 1}/{allScenes.length}
+                        </span>
+                      )
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowTakesPanel(false);
+                      setIsRecorderExpanded(false);
+                    }}
+                    aria-label={t.story.recorder.collapseBtnLabel}
+                    title={t.story.recorder.collapseBtnLabel}
+                    className="btn-ghost text-xs py-1 px-2"
                   >
-                    <div className="text-xs font-medium text-forestDark min-w-[140px]">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-semibold">{rec.label}</span>
-                        {isCurrentTake && (
-                          <span className="badge-leaf text-[10px] py-0 px-1.5">
-                            {t.story.recorder.currentSceneBadge}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-inkSoft">
-                        {formatDuration(rec.durationSeconds)} · {rec.createdAt}
-                      </div>
-                    </div>
+                    <Minimize2 className="w-3.5 h-3.5" />
+                    <span>{t.story.recorder.collapseBtnLabel}</span>
+                  </button>
+                </div>
 
-                    <audio controls src={rec.audioUrl} className="h-8 flex-1 min-w-[180px]" />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {!isRecording ? (
+                    <button
+                      type="button"
+                      onClick={startRecording}
+                      className="px-4 py-2 rounded-xl bg-terra hover:bg-[#a84736] text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-md transition active:scale-95"
+                    >
+                      <Mic className="w-4 h-4" />
+                      <span>{t.story.recorder.recordBtn}</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={stopRecording}
+                      className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-md animate-pulse transition active:scale-95"
+                    >
+                      <Square className="w-3.5 h-3.5 fill-white" />
+                      <span>{t.story.recorder.stopBtn}</span>
+                      <span className="font-mono text-xs bg-red-900/60 px-1.5 py-0.5 rounded">
+                        {formatDuration(recordingSeconds)}
+                      </span>
+                    </button>
+                  )}
 
-                    <div className="flex items-center gap-1">
-                      <a
-                        href={rec.audioUrl}
-                        download={`ke-chuyen-L${rec.level}-${rec.sceneOrd}.webm`}
-                        className="p-1.5 rounded-lg border border-line text-forest hover:bg-[#F7ECD8] transition"
-                        title={t.story.recorder.downloadTake}
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteRecording(rec.id)}
-                        className="p-1.5 rounded-lg border border-line text-terra hover:bg-[#F7DDD6]/50 transition"
-                        title={t.story.recorder.deleteTake}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  {recordings.length > 0 && (
+                    <button
+                      type="button"
+                      aria-expanded={showTakesPanel}
+                      onClick={() => setShowTakesPanel((v) => !v)}
+                      className="btn-ghost text-xs py-1.5 px-2.5"
+                      title={t.story.recorder.showTakesBtn}
+                    >
+                      <ListMusic className="w-3.5 h-3.5" />
+                      <span>{recordings.length}</span>
+                    </button>
+                  )}
+                </div>
+
+                {activeRecording && !isRecording ? (
+                  <audio controls src={activeRecording.audioUrl} className="h-8 w-full" />
+                ) : (
+                  !isRecording && (
+                    <p className="text-[11px] text-inkSoft leading-snug">
+                      {t.story.recorder.noRecordingYet}
+                    </p>
+                  )
+                )}
+              </div>
             </div>
           )}
-
-          {micError && (
-            <div className="px-4 py-2 rounded-xl bg-[#FDF2F0] border border-terra/40 text-xs text-terra font-medium text-center shadow">
-              {micError}
-            </div>
-          )}
-
-          <div className="bg-[#FFFDF7]/95 backdrop-blur-md border-2 border-forest/30 shadow-2xl rounded-2xl px-3.5 py-2.5 sm:px-5 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="badge-leaf font-bold text-xs">Level {activeLevel}</span>
-              {activeLevel === 4 ? (
-                totalIllustrations > 0 && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={handlePrevIllustration}
-                      disabled={safeIllustrationIndex <= 0}
-                      className="p-1 rounded-lg border border-line bg-white text-forestDark hover:bg-[#F7ECD8] disabled:opacity-30 disabled:pointer-events-none"
-                      aria-label={t.story.level4.prevIllustration}
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-xs font-serif font-bold text-forestDark px-1 whitespace-nowrap">
-                      {currentIllustration?.ord || safeIllustrationIndex + 1}/
-                      {allIllustrations.length}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleNextIllustration}
-                      disabled={safeIllustrationIndex >= totalIllustrations - 1}
-                      className="p-1 rounded-lg border border-line bg-white text-forestDark hover:bg-[#F7ECD8] disabled:opacity-30 disabled:pointer-events-none"
-                      aria-label={t.story.level4.nextIllustration}
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )
-              ) : (
-                totalScenes > 0 && (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={handlePrevScene}
-                      disabled={safeSceneIndex <= 0}
-                      className="p-1 rounded-lg border border-line bg-white text-forestDark hover:bg-[#F7ECD8] disabled:opacity-30 disabled:pointer-events-none"
-                      aria-label={t.story.nav.prevScene}
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-xs font-serif font-bold text-forestDark px-1 whitespace-nowrap">
-                      {currentScene?.ord || safeSceneIndex + 1}/{allScenes.length}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleNextScene}
-                      disabled={safeSceneIndex >= totalScenes - 1}
-                      className="p-1 rounded-lg border border-line bg-white text-forestDark hover:bg-[#F7ECD8] disabled:opacity-30 disabled:pointer-events-none"
-                      aria-label={t.story.nav.nextScene}
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5 flex-1 justify-end">
-              {!isRecording ? (
-                <button
-                  type="button"
-                  onClick={startRecording}
-                  className="px-4 py-2 rounded-xl bg-terra hover:bg-[#a84736] text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-md transition active:scale-95"
-                >
-                  <Mic className="w-4 h-4" />
-                  <span>{t.story.recorder.recordBtn}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={stopRecording}
-                  className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-md animate-pulse transition active:scale-95"
-                >
-                  <Square className="w-3.5 h-3.5 fill-white" />
-                  <span>{t.story.recorder.stopBtn}</span>
-                  <span className="font-mono text-xs bg-red-900/60 px-1.5 py-0.5 rounded">
-                    {formatDuration(recordingSeconds)}
-                  </span>
-                </button>
-              )}
-
-              {activeRecording && !isRecording ? (
-                <audio
-                  controls
-                  src={activeRecording.audioUrl}
-                  className="h-8 w-44 sm:w-56"
-                />
-              ) : (
-                !isRecording && (
-                  <span className="text-xs text-inkSoft hidden sm:inline">
-                    {t.story.recorder.noRecordingYet}
-                  </span>
-                )
-              )}
-
-              {recordings.length > 0 && (
-                <button
-                  type="button"
-                  aria-expanded={showTakesPanel}
-                  onClick={() => setShowTakesPanel((v) => !v)}
-                  className="btn-ghost text-xs py-1.5 px-2.5"
-                  title={t.story.recorder.showTakesBtn}
-                >
-                  <ListMusic className="w-3.5 h-3.5" />
-                  <span>{recordings.length}</span>
-                </button>
-              )}
-            </div>
-          </div>
         </aside>
       )}
     </div>

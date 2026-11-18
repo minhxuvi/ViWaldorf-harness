@@ -1,15 +1,44 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useApp } from "@/lib/store";
 import { BookOpen, Languages } from "lucide-react";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const { lang, setLang, t } = useApp();
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
+  const lastScrollYRef = useRef(0);
+
+  useEffect(() => {
+    lastScrollYRef.current = Math.max(0, window.scrollY);
+
+    const handleScroll = () => {
+      const currentY = Math.max(0, window.scrollY);
+      const delta = currentY - lastScrollYRef.current;
+
+      if (currentY <= 36) {
+        setIsHeaderHidden(false);
+        lastScrollYRef.current = currentY;
+      } else if (delta > 8 && currentY > 64) {
+        setIsHeaderHidden(true);
+        lastScrollYRef.current = currentY;
+      } else if (delta < -8) {
+        setIsHeaderHidden(false);
+        lastScrollYRef.current = currentY;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
     <div className="min-h-screen bg-paper text-ink flex flex-col">
-      <header className="bg-forestDark text-onDark border-b border-[#2D4D36] sticky top-0 z-30 shadow-sm">
+      <header
+        className={`bg-forestDark text-onDark border-b border-[#2D4D36] sticky top-0 z-30 shadow-sm transition-transform duration-300 ease-in-out ${
+          isHeaderHidden ? "-translate-y-full pointer-events-none" : "translate-y-0"
+        }`}
+      >
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-[#2F5D3A] border border-[#497B55] flex items-center justify-center flex-shrink-0">

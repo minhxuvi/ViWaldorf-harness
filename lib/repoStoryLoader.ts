@@ -159,6 +159,101 @@ export function cleanInlineMarkdown(input: string): string {
     .trim();
 }
 
+const PASSAGE_PAGE_BUDGETS: Record<"sm" | "md" | "lg", { first: number; other: number }> = {
+  sm: { first: 600, other: 800 },
+  md: { first: 450, other: 650 },
+  lg: { first: 340, other: 480 },
+};
+
+/**
+ * Splits a chapter passage into screen-sized reading pages along paragraph and sentence boundaries.
+ */
+export function paginatePassage(
+  passage: string,
+  textSize: "sm" | "md" | "lg" = "md"
+): string[] {
+  const normalized = passage.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return [""];
+
+  const budget = PASSAGE_PAGE_BUDGETS[textSize] || PASSAGE_PAGE_BUDGETS.md;
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const pages: string[] = [];
+  let currentParts: string[] = [];
+  let currentLength = 0;
+
+  const getMaxChars = () => (pages.length === 0 ? budget.first : budget.other);
+
+  const flushPage = () => {
+    if (currentParts.length > 0) {
+      pages.push(currentParts.join("\n\n"));
+      currentParts = [];
+      currentLength = 0;
+    }
+  };
+
+  for (const para of paragraphs) {
+    const maxChars = getMaxChars();
+    const joinCost = currentParts.length > 0 ? 2 : 0;
+
+    if (currentLength + joinCost + para.length <= maxChars) {
+      currentParts.push(para);
+      currentLength += joinCost + para.length;
+      continue;
+    }
+
+    if (para.length <= budget.other && currentParts.length > 0) {
+      flushPage();
+      currentParts.push(para);
+      currentLength = para.length;
+      continue;
+    }
+
+    const sentences = para
+      .split(/(?<=[.!?…]["”’']?)\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (sentences.length <= 1) {
+      if (currentParts.length > 0) flushPage();
+      currentParts.push(para);
+      currentLength = para.length;
+      continue;
+    }
+
+    let sentenceBuffer = "";
+    for (const sentence of sentences) {
+      const activeBudget = getMaxChars();
+      const bufferJoinCost = currentParts.length > 0 && !sentenceBuffer ? 2 : 0;
+      const spaceCost = sentenceBuffer ? 1 : 0;
+      const projected =
+        currentLength + bufferJoinCost + sentenceBuffer.length + spaceCost + sentence.length;
+
+      if (projected <= activeBudget) {
+        sentenceBuffer = sentenceBuffer ? `${sentenceBuffer} ${sentence}` : sentence;
+      } else {
+        if (sentenceBuffer) {
+          currentParts.push(sentenceBuffer);
+          sentenceBuffer = "";
+        }
+        flushPage();
+        sentenceBuffer = sentence;
+      }
+    }
+
+    if (sentenceBuffer) {
+      currentParts.push(sentenceBuffer);
+      currentLength += (currentParts.length > 1 ? 2 : 0) + sentenceBuffer.length;
+    }
+  }
+
+  flushPage();
+  return pages.length > 0 ? pages : [normalized];
+}
+
 function stripTrailingRule(text: string): string {
   return text.replace(/(?:\n|\r\n)*---+\s*$/g, "").trim();
 }

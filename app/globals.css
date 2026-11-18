@@ -140,6 +140,30 @@ header :where(a, button):focus-visible {
   box-shadow: 0 1px 3px rgba(60, 50, 20, 0.05);
 }
 
+/* Single-frame edge-to-edge reading surface on mobile */
+.reading-surface {
+  background-color: var(--card);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  margin-left: -1rem;
+  margin-right: -1rem;
+  padding: 1rem;
+}
+
+@media (min-width: 640px) {
+  .reading-surface {
+    margin-left: 0;
+    margin-right: 0;
+    padding: 1.5rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 3px rgba(60, 50, 20, 0.05);
+  }
+}
+
 /* Badges */
 .badge-leaf {
   display: inline-flex;
