@@ -9,107 +9,182 @@ import {
   WaldorfData,
   WaldorfStory,
 } from "./types";
+import { Language } from "./i18n";
 import {
   GENESIS_JSDELIVR_BASE_URL,
   GENESIS_REPO_URL,
   GENESIS_STORY_ID,
 } from "./repoStoryLoader";
 
-const GENESIS_BOOKS: StoryBookMeta[] = [
+interface SeedBookConfig {
+  id: string;
+  number: number;
+  slug: string;
+  title: Record<Language, string>;
+  subtitle: Record<Language, string>;
+  isEpilogue: boolean;
+  illustrationStyle: string;
+  totalChapters: number;
+  fileSlug: string;
+}
+
+const GENESIS_BOOK_CONFIGS: SeedBookConfig[] = [
   {
     id: "quyen-1",
     number: 1,
     slug: "quyen-1-khoi-nguyen-va-anh-sang",
-    title: "Quyển I: Khởi Nguyên Và Ánh Sáng Đầu Tiên",
-    subtitle: "Từ Sáng Thế Đến Đại Hồng Thủy (theo And There Was Light)",
+    title: {
+      vi: "Quyển I: Khởi Nguyên Và Ánh Sáng Đầu Tiên",
+      en: "Book I: In the Beginning and the First Light",
+      zh: "第一卷：创世之初与最初的光明",
+    },
+    subtitle: {
+      vi: "Từ Sáng Thế Đến Đại Hồng Thủy (theo And There Was Light)",
+      en: "From Creation to the Great Flood (after And There Was Light)",
+      zh: "从创世到大洪水（参考《光之初现》）",
+    },
     isEpilogue: false,
     illustrationStyle: "charcoal_and_golden_ochre_chalk_pastel",
     totalChapters: 67,
-    level0File: "level-0-khong-gian-boi-canh/quyen-1-khoi-nguyen-va-anh-sang.md",
-    level1File: "level-1-toan-van/quyen-1-khoi-nguyen-va-anh-sang.md",
-    level2File: "level-2-dan-y-chi-tiet/quyen-1-khoi-nguyen-va-anh-sang.md",
+    fileSlug: "book-1-genesis-and-light.md",
   },
   {
     id: "quyen-2",
     number: 2,
     slug: "quyen-2-hanh-trinh-ve-dat-hua",
-    title: "Quyển II: Hành Trình Về Đất Hứa",
-    subtitle: "Từ Tháp Babel & Abraham Đến Giấc Mơ Vua David (theo Journey to the Promised Land)",
+    title: {
+      vi: "Quyển II: Hành Trình Về Đất Hứa",
+      en: "Book II: Journey to the Promised Land",
+      zh: "第二卷：前往应许之地的旅程",
+    },
+    subtitle: {
+      vi: "Từ Tháp Babel & Abraham Đến Giấc Mơ Vua David (theo Journey to the Promised Land)",
+      en: "From the Tower of Babel & Abraham to King David's Dream (after Journey to the Promised Land)",
+      zh: "从巴别塔与亚伯拉罕到大卫王之梦（参考《前往应许之地》）",
+    },
     isEpilogue: false,
     illustrationStyle: "monochrome_sepia_watercolor_and_pencil_oval_vignette",
     totalChapters: 56,
-    level0File: "level-0-khong-gian-boi-canh/quyen-2-hanh-trinh-ve-dat-hua.md",
-    level1File: "level-1-toan-van/quyen-2-hanh-trinh-ve-dat-hua.md",
-    level2File: "level-2-dan-y-chi-tiet/quyen-2-hanh-trinh-ve-dat-hua.md",
+    fileSlug: "book-2-journey-to-the-promised-land.md",
   },
   {
     id: "quyen-3",
     number: 3,
     slug: "quyen-3-chung-ta-se-xay-mot-den-tho",
-    title: "Quyển III: Chúng Ta Sẽ Xây Một Đền Thờ",
-    subtitle: "Từ Vua Solomon Đến Judas Maccabeus (theo We Will Build a Temple)",
+    title: {
+      vi: "Quyển III: Chúng Ta Sẽ Xây Một Đền Thờ",
+      en: "Book III: We Will Build a Temple",
+      zh: "第三卷：我们将建造一座圣殿",
+    },
+    subtitle: {
+      vi: "Từ Vua Solomon Đến Judas Maccabeus (theo We Will Build a Temple)",
+      en: "From King Solomon to Judas Maccabeus (after We Will Build a Temple)",
+      zh: "从所罗门王到犹大·马加比（参考《我们将建造一座圣殿》）",
+    },
     isEpilogue: false,
     illustrationStyle: "monochrome_sepia_watercolor_and_pencil_oval_vignette",
     totalChapters: 32,
-    level0File: "level-0-khong-gian-boi-canh/quyen-3-chung-ta-se-xay-mot-den-tho.md",
-    level1File: "level-1-toan-van/quyen-3-chung-ta-se-xay-mot-den-tho.md",
-    level2File: "level-2-dan-y-chi-tiet/quyen-3-chung-ta-se-xay-mot-den-tho.md",
+    fileSlug: "book-3-we-will-build-a-temple.md",
   },
   {
     id: "quyen-4",
     number: 4,
     slug: "quyen-4-hai-dua-tre-giang-sinh",
-    title: "Quyển IV: Hai Đứa Trẻ Giáng Sinh Và Bình Minh Bên Sông Jordan",
-    subtitle: "Hai Dòng Dõi Tại Nazareth Và John Người Làm Phép Rửa",
+    title: {
+      vi: "Quyển IV: Hai Đứa Trẻ Giáng Sinh Và Bình Minh Bên Sông Jordan",
+      en: "Book IV: The Two Christmas Children and Dawn on the Jordan",
+      zh: "第四卷：两个圣诞孩童与约旦河畔的黎明",
+    },
+    subtitle: {
+      vi: "Hai Dòng Dõi Tại Nazareth Và John Người Làm Phép Rửa",
+      en: "Two Lineages in Nazareth and John the Baptist",
+      zh: "拿撒勒的两支血脉与施洗约翰",
+    },
     isEpilogue: false,
     illustrationStyle: "monochrome_sepia_watercolor_and_pencil_oval_vignette",
     totalChapters: 15,
-    level0File: "level-0-khong-gian-boi-canh/quyen-4-hai-dua-tre-giang-sinh.md",
-    level1File: "level-1-toan-van/quyen-4-hai-dua-tre-giang-sinh.md",
-    level2File: "level-2-dan-y-chi-tiet/quyen-4-hai-dua-tre-giang-sinh.md",
+    fileSlug: "book-4-the-two-christmas-children.md",
   },
   {
     id: "quyen-5",
     number: 5,
     slug: "quyen-5-ngoai-truyen-ong-gia-noel",
-    title: "Quyển V (Ngoại Truyện): Hạt Giống Yêu Thương Đêm Đông",
-    subtitle: "Từ Thánh Nicholas Thành Myra Đến Ông Già Noel",
+    title: {
+      vi: "Quyển V (Ngoại Truyện): Hạt Giống Yêu Thương Đêm Đông",
+      en: "Book V (Epilogue): Seeds of Love in the Winter Night",
+      zh: "第五卷（外传）：冬夜里爱的种子",
+    },
+    subtitle: {
+      vi: "Từ Thánh Nicholas Thành Myra Đến Ông Già Noel",
+      en: "From Saint Nicholas of Myra to Santa Claus",
+      zh: "从米拉城的圣尼古拉到圣诞老人",
+    },
     isEpilogue: true,
     illustrationStyle: "monochrome_sepia_watercolor_and_pencil_oval_vignette",
     totalChapters: 10,
-    level0File: "level-0-khong-gian-boi-canh/quyen-5-ngoai-truyen-ong-gia-noel.md",
-    level1File: "level-1-toan-van/quyen-5-ngoai-truyen-ong-gia-noel.md",
-    level2File: "level-2-dan-y-chi-tiet/quyen-5-ngoai-truyen-ong-gia-noel.md",
+    fileSlug: "book-5-epilogue-saint-nicholas.md",
   },
 ];
 
-const GENESIS_ANCIENT_BOOKS: AncientBookItem[] = [
-  { id: "sach-sang-the", title: "Sách Sáng Thế", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-sang-the.md" },
-  { id: "sach-xuat-hanh", title: "Sách Xuất Hành", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-xuat-hanh.md" },
-  { id: "sach-dan-so", title: "Sách Dân Số", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-dan-so.md" },
-  { id: "sach-phuc-truyen-luat-le-ky", title: "Sách Phục Truyền Luật Lệ Ký", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-phuc-truyen-luat-le-ky.md" },
-  { id: "sach-gio-sue", title: "Sách Giô-suê", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-gio-sue.md" },
-  { id: "sach-sa-mu-en", title: "Sách Sa-mu-en", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-sa-mu-en.md" },
-  { id: "sach-cac-vua", title: "Sách Các Vua", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-cac-vua.md" },
-  { id: "sach-to-bit", title: "Sách Tô-bít", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-to-bit.md" },
-  { id: "sach-i-sai-a", title: "Sách Tiên Tri I-sai-a", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-i-sai-a.md" },
-  { id: "sach-gie-re-mi-a", title: "Sách Tiên Tri Giê-rê-mi-a", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-gie-re-mi-a.md" },
-  { id: "sach-da-ni-en", title: "Sách Tiên Tri Đa-ni-en", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-da-ni-en.md" },
-  { id: "sach-gio-na", title: "Sách Tiên Tri Giô-na", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-gio-na.md" },
-  { id: "sach-ne-he-mi-a", title: "Sách Nê-hê-mi-a", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-ne-he-mi-a.md" },
-  { id: "sach-giop", title: "Sách Gióp", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-giop.md" },
-  { id: "sach-ma-ca-be", title: "Sách Ma-ca-bê", category: "cuu-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-ma-ca-be.md" },
-  { id: "tin-mung-ma-thi-o", title: "Sách Tin Mừng Theo Ma-thi-ơ", category: "tan-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/tin-mung-ma-thi-o.md" },
-  { id: "tin-mung-lu-ca", title: "Sách Tin Mừng Theo Lu-ca", category: "tan-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/tin-mung-lu-ca.md" },
-  { id: "tin-mung-ma-ko", title: "Sách Tin Mừng Theo Ma-kô", category: "tan-uoc", file: "level-0-khong-gian-boi-canh/van-ban-co/tin-mung-ma-ko.md" },
-  { id: "sach-khai-huyen-va-khoi-nguyen-co", title: "Sách Khải Huyền Và Cổ Thư Khởi Nguyên", category: "co-thu", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-khai-huyen-va-khoi-nguyen-co.md" },
-  { id: "co-thu-tu-nhien-buoi-dau", title: "Cổ Thư Tự Nhiên Buổi Đầu", category: "co-thu", file: "level-0-khong-gian-boi-canh/van-ban-co/co-thu-tu-nhien-buoi-dau.md" },
-  { id: "sach-cuoc-doi-adam-va-eve", title: "Sách Cuộc Đời Adam Và Eve", category: "co-thu", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-cuoc-doi-adam-va-eve.md" },
-  { id: "sach-e-noc", title: "Sách Ê-nóc", category: "co-thu", file: "level-0-khong-gian-boi-canh/van-ban-co/sach-e-noc.md" },
-  { id: "co-su-luong-ha-va-ai-cap", title: "Cổ Sử Lưỡng Hà Và Ai Cập", category: "co-thu", file: "level-0-khong-gian-boi-canh/van-ban-co/co-su-luong-ha-va-ai-cap.md" },
-  { id: "co-truyen-nazareth-va-bien-chet", title: "Cổ Truyền Nazareth Và Cộng Đồng Biển Chết", category: "co-thu", file: "level-0-khong-gian-boi-canh/van-ban-co/co-truyen-nazareth-va-bien-chet.md" },
-  { id: "su-truyen-thanh-nicholas", title: "Sử Truyền Thánh Nicholas Thành Myra Và Huyền Thoại Mùa Đông", category: "co-thu", file: "level-0-khong-gian-boi-canh/van-ban-co/su-truyen-thanh-nicholas.md" },
+function buildBooksForLang(lang: Language): StoryBookMeta[] {
+  return GENESIS_BOOK_CONFIGS.map((cfg) => ({
+    id: cfg.id,
+    number: cfg.number,
+    slug: cfg.slug,
+    title: cfg.title[lang],
+    subtitle: cfg.subtitle[lang],
+    isEpilogue: cfg.isEpilogue,
+    illustrationStyle: cfg.illustrationStyle,
+    totalChapters: cfg.totalChapters,
+    level0File: `locales/${lang}/level-0-context/${cfg.fileSlug}`,
+    level1File: `locales/${lang}/level-1-full-text/${cfg.fileSlug}`,
+    level2File: `locales/${lang}/level-2-detailed-outline/${cfg.fileSlug}`,
+  }));
+}
+
+interface SeedAncientBookConfig {
+  id: string;
+  category: "cuu-uoc" | "tan-uoc" | "co-thu";
+  fileName: string;
+  title: Record<Language, string>;
+}
+
+const GENESIS_ANCIENT_BOOK_CONFIGS: SeedAncientBookConfig[] = [
+  { id: "sach-sang-the", category: "cuu-uoc", fileName: "book-of-genesis.md", title: { vi: "Sách Sáng Thế", en: "Book of Genesis", zh: "创世记" } },
+  { id: "sach-xuat-hanh", category: "cuu-uoc", fileName: "book-of-exodus.md", title: { vi: "Sách Xuất Hành", en: "Book of Exodus", zh: "出埃及记" } },
+  { id: "sach-dan-so", category: "cuu-uoc", fileName: "book-of-numbers.md", title: { vi: "Sách Dân Số", en: "Book of Numbers", zh: "民数记" } },
+  { id: "sach-phuc-truyen-luat-le-ky", category: "cuu-uoc", fileName: "book-of-deuteronomy.md", title: { vi: "Sách Phục Truyền Luật Lệ Ký", en: "Book of Deuteronomy", zh: "申命记" } },
+  { id: "sach-gio-sue", category: "cuu-uoc", fileName: "book-of-joshua.md", title: { vi: "Sách Giô-suê", en: "Book of Joshua", zh: "约书亚记" } },
+  { id: "sach-sa-mu-en", category: "cuu-uoc", fileName: "book-of-samuel.md", title: { vi: "Sách Sa-mu-en", en: "Books of Samuel", zh: "撒母耳记" } },
+  { id: "sach-cac-vua", category: "cuu-uoc", fileName: "book-of-kings.md", title: { vi: "Sách Các Vua", en: "Books of Kings", zh: "列王纪" } },
+  { id: "sach-to-bit", category: "cuu-uoc", fileName: "book-of-tobit.md", title: { vi: "Sách Tô-bít", en: "Book of Tobit", zh: "多比传" } },
+  { id: "sach-i-sai-a", category: "cuu-uoc", fileName: "book-of-isaiah.md", title: { vi: "Sách Tiên Tri I-sai-a", en: "Book of the Prophet Isaiah", zh: "以赛亚书" } },
+  { id: "sach-gie-re-mi-a", category: "cuu-uoc", fileName: "book-of-jeremiah.md", title: { vi: "Sách Tiên Tri Giê-rê-mi-a", en: "Book of the Prophet Jeremiah", zh: "耶利米书" } },
+  { id: "sach-da-ni-en", category: "cuu-uoc", fileName: "book-of-daniel.md", title: { vi: "Sách Tiên Tri Đa-ni-en", en: "Book of the Prophet Daniel", zh: "但以理书" } },
+  { id: "sach-gio-na", category: "cuu-uoc", fileName: "book-of-jonah.md", title: { vi: "Sách Tiên Tri Giô-na", en: "Book of the Prophet Jonah", zh: "约拿书" } },
+  { id: "sach-ne-he-mi-a", category: "cuu-uoc", fileName: "book-of-nehemiah.md", title: { vi: "Sách Nê-hê-mi-a", en: "Book of Nehemiah", zh: "尼希米记" } },
+  { id: "sach-giop", category: "cuu-uoc", fileName: "book-of-job.md", title: { vi: "Sách Gióp", en: "Book of Job", zh: "约伯记" } },
+  { id: "sach-ma-ca-be", category: "cuu-uoc", fileName: "book-of-maccabees.md", title: { vi: "Sách Ma-ca-bê", en: "Books of Maccabees", zh: "马加比书" } },
+  { id: "tin-mung-ma-thi-o", category: "tan-uoc", fileName: "gospel-of-matthew.md", title: { vi: "Sách Tin Mừng Theo Ma-thi-ơ", en: "Gospel According to Matthew", zh: "马太福音" } },
+  { id: "tin-mung-lu-ca", category: "tan-uoc", fileName: "gospel-of-luke.md", title: { vi: "Sách Tin Mừng Theo Lu-ca", en: "Gospel According to Luke", zh: "路加福音" } },
+  { id: "tin-mung-ma-ko", category: "tan-uoc", fileName: "gospel-of-mark.md", title: { vi: "Sách Tin Mừng Theo Ma-kô", en: "Gospel According to Mark", zh: "马可福音" } },
+  { id: "sach-khai-huyen-va-khoi-nguyen-co", category: "co-thu", fileName: "revelation-and-ancient-genesis.md", title: { vi: "Sách Khải Huyền Và Cổ Thư Khởi Nguyên", en: "Book of Revelation and Ancient Creation Writings", zh: "启示录与上古创世文献" } },
+  { id: "co-thu-tu-nhien-buoi-dau", category: "co-thu", fileName: "early-nature-legends.md", title: { vi: "Cổ Thư Tự Nhiên Buổi Đầu", en: "Early Nature Legends", zh: "上古自然神话选编" } },
+  { id: "sach-cuoc-doi-adam-va-eve", category: "co-thu", fileName: "life-of-adam-and-eve.md", title: { vi: "Sách Cuộc Đời Adam Và Eve", en: "The Life of Adam and Eve", zh: "亚当与夏娃生平书" } },
+  { id: "sach-e-noc", category: "co-thu", fileName: "book-of-enoch.md", title: { vi: "Sách Ê-nóc", en: "The Book of Enoch", zh: "以诺书" } },
+  { id: "co-su-luong-ha-va-ai-cap", category: "co-thu", fileName: "mesopotamia-and-egypt-chronicles.md", title: { vi: "Cổ Sử Lưỡng Hà Và Ai Cập", en: "Ancient Chronicles of Mesopotamia and Egypt", zh: "古代美索不达米亚与埃及史略" } },
+  { id: "co-truyen-nazareth-va-bien-chet", category: "co-thu", fileName: "nazareth-and-dead-sea-traditions.md", title: { vi: "Cổ Truyền Nazareth Và Cộng Đồng Biển Chết", en: "Ancient Traditions of Nazareth and the Dead Sea Community", zh: "拿撒勒古传与死海社区文献" } },
+  { id: "su-truyen-thanh-nicholas", category: "co-thu", fileName: "legend-of-saint-nicholas.md", title: { vi: "Sử Truyền Thánh Nicholas Thành Myra Và Huyền Thoại Mùa Đông", en: "Chronicles of Saint Nicholas of Myra and Winter Legends", zh: "米拉城圣尼古拉传记与冬日传说" } },
 ];
+
+function buildAncientBooksForLang(lang: Language): AncientBookItem[] {
+  return GENESIS_ANCIENT_BOOK_CONFIGS.map((ab) => ({
+    id: ab.id,
+    title: ab.title[lang],
+    category: ab.category,
+    file: `locales/${lang}/level-0-context/ancient-texts/${ab.fileName}`,
+  }));
+}
 
 const SEED_BOOK_SOULS: Record<string, StorySoulContext> = {
   "quyen-1": {
@@ -194,34 +269,34 @@ interface SeedIllustrationInput {
 }
 
 const GENESIS_ILLUSTRATIONS_META: SeedIllustrationInput[] = [
-  { id: "tranh-01", number: 1, bookId: "quyen-1", chaptersRef: "Chương 1–2", title: "Khởi Nguyên Thế Giới Và Cuộc Chiến Giữa Ánh Sáng Với Bóng Tối", image: "level-4-tranh-goi-nho/images/canh-01-khoi-nguyen-va-cuoc-chien-anh-sang.png", imageGenerated: true },
-  { id: "tranh-02", number: 2, bookId: "quyen-1", chaptersRef: "Chương 3–6, 10–11, 13–14", title: "Bảy Ngày Sáng Thế Và Sự Tạo Dựng Con Người Đầu Tiên", image: "level-4-tranh-goi-nho/images/canh-02-bay-ngay-sang-the.png", imageGenerated: true },
-  { id: "tranh-03", number: 3, bookId: "quyen-1", chaptersRef: "Chương 7–9, 12", title: "Muôn Hoa, Cây Cỏ Và Loài Vật Giữa Ánh Sáng Và Bóng Tối", image: "level-4-tranh-goi-nho/images/canh-03-muon-hoa-va-muon-thu-buoi-dau.png", imageGenerated: true },
-  { id: "tranh-04", number: 4, bookId: "quyen-1", chaptersRef: "Chương 15–17", title: "Vườn Địa Đàng, Trái Cấm Và Những Giọt Nước Mắt Đầu Tiên Trên Mặt Đất", image: "level-4-tranh-goi-nho/images/canh-04-vuon-dia-dang-va-buoc-chan-xuong-tran.png", imageGenerated: true },
-  { id: "tranh-05", number: 5, bookId: "quyen-1", chaptersRef: "Chương 18–26", title: "Cain, Abel, Người Em Mới Seth Và Ba Hạt Giống Cây Sự Sống", image: "level-4-tranh-goi-nho/images/canh-05-cain-abel-va-hat-giong-su-song.png", imageGenerated: true },
-  { id: "tranh-06", number: 6, bookId: "quyen-1", chaptersRef: "Chương 27–37", title: "Ba Con Trai Của Cain: Thuần Hóa Muôn Thú, Tiếng Đàn Thiên Giới, Lò Rèn Sắt Và Bi Kịch Kenos", image: "level-4-tranh-goi-nho/images/canh-06-con-chau-cain-va-ngon-lua-van-minh.png", imageGenerated: true },
-  { id: "tranh-07", number: 7, bookId: "quyen-1", chaptersRef: "Chương 38–45", title: "Ánh Sáng Của Enoch Giữa Đêm Tối Ngẫu Tượng", image: "level-4-tranh-goi-nho/images/canh-07-enoch-nguoi-giu-anh-sang.png", imageGenerated: true },
-  { id: "tranh-08", number: 8, bookId: "quyen-1", chaptersRef: "Chương 46–67", title: "Con Tàu Của Noah, Cơn Đại Hồng Thủy Và Chiếc Cầu Vồng Giao Ước", image: "level-4-tranh-goi-nho/images/canh-08-con-tau-noah-va-cau-vong-giao-uoc.png", imageGenerated: true },
-  { id: "tranh-09", number: 9, bookId: "quyen-2", chaptersRef: "Chương 1–5", title: "Ngai Bảy Tầng Của Nimrod, Tháp Babel Và Chàng Trai Abram Bước Ra Khỏi Lò Lửa", image: "level-4-tranh-goi-nho/images/canh-09-thap-babel-va-abram-buoc-ra-khoi-lua.png", imageGenerated: true },
-  { id: "tranh-10", number: 10, bookId: "quyen-2", chaptersRef: "Chương 6–12", title: "Lời Hứa Dưới Trời Sao, Cây Cổ Thụ Của Abraham, Phép Thử Trên Núi Moriah Và Cô Dâu Rebecca", image: "level-4-tranh-goi-nho/images/canh-10-abraham-goc-cay-thieng-va-le-hien-te-isaac.png", imageGenerated: true },
-  { id: "tranh-11", number: 11, bookId: "quyen-2", chaptersRef: "Chương 13–17", title: "Hai Anh Em Esau – Jacob, Chiếc Thang Ánh Sáng Và Cuộc Hòa Giải", image: "level-4-tranh-goi-nho/images/canh-11-chiec-thang-anh-sang-cua-jacob.png", imageGenerated: true },
-  { id: "tranh-12", number: 12, bookId: "quyen-2", chaptersRef: "Chương 18–24", title: "Chiếc Áo Ngũ Sắc Của Joseph, Giấc Mơ Pharaoh Và Cuộc Đoàn Tụ Nước Mắt", image: "level-4-tranh-goi-nho/images/canh-12-joseph-chiec-ao-ngu-sac-va-nguoi-ban-banh-mi.png", imageGenerated: true },
-  { id: "tranh-13", number: 13, bookId: "quyen-2", chaptersRef: "Chương 25–30", title: "Hài Nhi Moses Trên Sông Nile, Bụi Gai Bốc Cháy Và Biển Đỏ Rẽ Đôi", image: "level-4-tranh-goi-nho/images/canh-13-moses-bui-gai-chay-va-bien-do-re-nuoc.png", imageGenerated: true },
-  { id: "tranh-14", number: 14, bookId: "quyen-2", chaptersRef: "Chương 31–44", title: "Mười Điều Răn Trên Đỉnh Sinai, Ngôi Đền Tạm, Cái Nhìn Từ Núi Nebo Và Joshua Vượt Sông Jordan", image: "level-4-tranh-goi-nho/images/canh-14-muoi-dieu-ran-den-tam-va-cai-nhin-tu-nui-nebo.png", imageGenerated: true },
-  { id: "tranh-15", number: 15, bookId: "quyen-2", chaptersRef: "Chương 45–56", title: "Vua Saul, Tiếng Đàn Chăn Cừu Của David Và Giấc Mơ Cây Thế Giới", image: "level-4-tranh-goi-nho/images/canh-15-vua-saul-tieng-dan-david-va-giac-mo-cay-the-gioi.png", imageGenerated: true },
-  { id: "tranh-16", number: 16, bookId: "quyen-3", chaptersRef: "Chương 1–6", title: "Trái Tim Thông Tuệ Của Vua Solomon Và Ngôi Đền Thờ Jerusalem", image: "level-4-tranh-goi-nho/images/canh-16-solomon-trai-tim-thong-tue-va-ngoi-den-tho.png", imageGenerated: true },
-  { id: "tranh-17", number: 17, bookId: "quyen-3", chaptersRef: "Chương 7–9", title: "Tiên Tri Elijah: Hũ Bột Không Vơi, Ngọn Lửa Trên Núi Carmel Và Cỗ Xe Lửa", image: "level-4-tranh-goi-nho/images/canh-17-tien-tri-elijah-ngon-lua-trung-thuc-va-co-xe-lua.png", imageGenerated: true },
-  { id: "tranh-18", number: 18, bookId: "quyen-3", chaptersRef: "Chương 10–11", title: "Chuyến Đi Của Chàng Trẻ Tobias Và Thiên Thần Chữa Lành Raphael", image: "level-4-tranh-goi-nho/images/canh-18-hanh-trinh-cua-tobias-va-thien-than-chua-lanh.png", imageGenerated: true },
-  { id: "tranh-19", number: 19, bookId: "quyen-3", chaptersRef: "Chương 12–17", title: "Đôi Môi Chạm Lửa Của Isaiah Và Jeremiah Giấu Hòm Giao Ước Trước Giờ Đền Thờ Sụp Đổ", image: "level-4-tranh-goi-nho/images/canh-19-isaiah-va-jeremiah-loi-tien-tri-giua-tro-tan.png", imageGenerated: true },
-  { id: "tranh-20", number: 20, bookId: "quyen-3", chaptersRef: "Chương 18–24", title: "Daniel Và Các Bạn Trẻ Nơi Xứ Lưu Đày: Lò Lửa Và Hang Sư Tử Babylon", image: "level-4-tranh-goi-nho/images/canh-20-daniel-lo-lua-va-hang-su-tu-babylon.png", imageGenerated: true },
-  { id: "tranh-21", number: 21, bookId: "quyen-3", chaptersRef: "Chương 27", title: "Tiên Tri Jonah Trong Bụng Cá Khổng Lồ Và Bài Học Về Lòng Thương Xót", image: "level-4-tranh-goi-nho/images/canh-21-jonah-con-ca-khong-lo-va-long-bao-dung.png", imageGenerated: true },
-  { id: "tranh-22", number: 22, bookId: "quyen-3", chaptersRef: "Chương 25–26, 28–32", title: "Xây Lại Tường Thành, Lòng Kiên Trung Của Job Và Ngọn Lửa Phục Hưng Đền Thờ", image: "level-4-tranh-goi-nho/images/canh-22-xay-lai-thanh-quach-job-va-ngon-lua-maccabeus.png", imageGenerated: false },
-  { id: "tranh-23", number: 23, bookId: "quyen-4", chaptersRef: "Chương 1, 9–10", title: "Hai Ngọn Sáng Đêm Đông, Lời Báo Tin Trong Đền Thờ Và Cuộc Hội Ngộ Của Hai Người Mẹ", image: "level-4-tranh-goi-nho/images/canh-23-loi-bao-tin-trong-den-tho-va-cuoc-gap-go-hai-nguoi-me.png", imageGenerated: false },
-  { id: "tranh-24", number: 24, bookId: "quyen-4", chaptersRef: "Chương 2", title: "Đứa Trẻ Dòng Dõi Vua, Ba Nhà Thông Thái Phương Đông Và Cuộc Chạy Trốn Trong Đêm", image: "level-4-tranh-goi-nho/images/canh-24-dua-tre-dong-doi-vua-va-nhung-nha-thong-thai.png", imageGenerated: false },
-  { id: "tranh-25", number: 25, bookId: "quyen-4", chaptersRef: "Chương 3–4", title: "Đứa Trẻ Dòng Dõi Mục Đồng, Tiếng Hát Trên Đồng Cỏ Và Hai Gia Đình Ở Nazareth", image: "level-4-tranh-goi-nho/images/canh-25-dua-tre-muc-dong-va-tinh-ban-o-nazareth.png", imageGenerated: false },
-  { id: "tranh-26", number: 26, bookId: "quyen-4", chaptersRef: "Chương 5–8", title: "Năm Thứ Mười Hai Trong Đền Thờ, Nỗi Đau Mùa Đông Và Người Thợ Mộc Khôn Ngoan", image: "level-4-tranh-goi-nho/images/canh-26-nam-thu-muoi-hai-trong-den-tho-va-xuong-moc-nazareth.png", imageGenerated: false },
-  { id: "tranh-27", number: 27, bookId: "quyen-4", chaptersRef: "Chương 11–15", title: "John Giữa Cộng Đồng Áo Trắng, Tiếng Gọi Hoang Địa Và Bình Minh Trên Sông Jordan", image: "level-4-tranh-goi-nho/images/canh-27-john-ben-bo-bien-chet-va-phep-rua-tren-song-jordan.png", imageGenerated: false },
-  { id: "tranh-28", number: 28, bookId: "quyen-5", chaptersRef: "Chương 1–10", title: "Ngoại Truyện: Từ Chiếc Áo Choàng Đỏ Của Thánh Nicholas Đến Ông Già Noel Đêm Giáng Sinh", image: "level-4-tranh-goi-nho/images/canh-28-ngoai-truyen-thanh-nicholas-va-ong-gia-noel.png", imageGenerated: false },
+  { id: "tranh-01", number: 1, bookId: "quyen-1", chaptersRef: "Chương 1–2", title: "Khởi Nguyên Thế Giới Và Cuộc Chiến Giữa Ánh Sáng Với Bóng Tối", image: "assets/images/canh-01-khoi-nguyen-va-cuoc-chien-anh-sang.png", imageGenerated: true },
+  { id: "tranh-02", number: 2, bookId: "quyen-1", chaptersRef: "Chương 3–6, 10–11, 13–14", title: "Bảy Ngày Sáng Thế Và Sự Tạo Dựng Con Người Đầu Tiên", image: "assets/images/canh-02-bay-ngay-sang-the.png", imageGenerated: true },
+  { id: "tranh-03", number: 3, bookId: "quyen-1", chaptersRef: "Chương 7–9, 12", title: "Muôn Hoa, Cây Cỏ Và Loài Vật Giữa Ánh Sáng Và Bóng Tối", image: "assets/images/canh-03-muon-hoa-va-muon-thu-buoi-dau.png", imageGenerated: true },
+  { id: "tranh-04", number: 4, bookId: "quyen-1", chaptersRef: "Chương 15–17", title: "Vườn Địa Đàng, Trái Cấm Và Những Giọt Nước Mắt Đầu Tiên Trên Mặt Đất", image: "assets/images/canh-04-vuon-dia-dang-va-buoc-chan-xuong-tran.png", imageGenerated: true },
+  { id: "tranh-05", number: 5, bookId: "quyen-1", chaptersRef: "Chương 18–26", title: "Cain, Abel, Người Em Mới Seth Và Ba Hạt Giống Cây Sự Sống", image: "assets/images/canh-05-cain-abel-va-hat-giong-su-song.png", imageGenerated: true },
+  { id: "tranh-06", number: 6, bookId: "quyen-1", chaptersRef: "Chương 27–37", title: "Ba Con Trai Của Cain: Thuần Hóa Muôn Thú, Tiếng Đàn Thiên Giới, Lò Rèn Sắt Và Bi Kịch Kenos", image: "assets/images/canh-06-con-chau-cain-va-ngon-lua-van-minh.png", imageGenerated: true },
+  { id: "tranh-07", number: 7, bookId: "quyen-1", chaptersRef: "Chương 38–45", title: "Ánh Sáng Của Enoch Giữa Đêm Tối Ngẫu Tượng", image: "assets/images/canh-07-enoch-nguoi-giu-anh-sang.png", imageGenerated: true },
+  { id: "tranh-08", number: 8, bookId: "quyen-1", chaptersRef: "Chương 46–67", title: "Con Tàu Của Noah, Cơn Đại Hồng Thủy Và Chiếc Cầu Vồng Giao Ước", image: "assets/images/canh-08-con-tau-noah-va-cau-vong-giao-uoc.png", imageGenerated: true },
+  { id: "tranh-09", number: 9, bookId: "quyen-2", chaptersRef: "Chương 1–5", title: "Ngai Bảy Tầng Của Nimrod, Tháp Babel Và Chàng Trai Abram Bước Ra Khỏi Lò Lửa", image: "assets/images/canh-09-thap-babel-va-abram-buoc-ra-khoi-lua.png", imageGenerated: true },
+  { id: "tranh-10", number: 10, bookId: "quyen-2", chaptersRef: "Chương 6–12", title: "Lời Hứa Dưới Trời Sao, Cây Cổ Thụ Của Abraham, Phép Thử Trên Núi Moriah Và Cô Dâu Rebecca", image: "assets/images/canh-10-abraham-goc-cay-thieng-va-le-hien-te-isaac.png", imageGenerated: true },
+  { id: "tranh-11", number: 11, bookId: "quyen-2", chaptersRef: "Chương 13–17", title: "Hai Anh Em Esau – Jacob, Chiếc Thang Ánh Sáng Và Cuộc Hòa Giải", image: "assets/images/canh-11-chiec-thang-anh-sang-cua-jacob.png", imageGenerated: true },
+  { id: "tranh-12", number: 12, bookId: "quyen-2", chaptersRef: "Chương 18–24", title: "Chiếc Áo Ngũ Sắc Của Joseph, Giấc Mơ Pharaoh Và Cuộc Đoàn Tụ Nước Mắt", image: "assets/images/canh-12-joseph-chiec-ao-ngu-sac-va-nguoi-ban-banh-mi.png", imageGenerated: true },
+  { id: "tranh-13", number: 13, bookId: "quyen-2", chaptersRef: "Chương 25–30", title: "Hài Nhi Moses Trên Sông Nile, Bụi Gai Bốc Cháy Và Biển Đỏ Rẽ Đôi", image: "assets/images/canh-13-moses-bui-gai-chay-va-bien-do-re-nuoc.png", imageGenerated: true },
+  { id: "tranh-14", number: 14, bookId: "quyen-2", chaptersRef: "Chương 31–44", title: "Mười Điều Răn Trên Đỉnh Sinai, Ngôi Đền Tạm, Cái Nhìn Từ Núi Nebo Và Joshua Vượt Sông Jordan", image: "assets/images/canh-14-muoi-dieu-ran-den-tam-va-cai-nhin-tu-nui-nebo.png", imageGenerated: true },
+  { id: "tranh-15", number: 15, bookId: "quyen-2", chaptersRef: "Chương 45–56", title: "Vua Saul, Tiếng Đàn Chăn Cừu Của David Và Giấc Mơ Cây Thế Giới", image: "assets/images/canh-15-vua-saul-tieng-dan-david-va-giac-mo-cay-the-gioi.png", imageGenerated: true },
+  { id: "tranh-16", number: 16, bookId: "quyen-3", chaptersRef: "Chương 1–6", title: "Trái Tim Thông Tuệ Của Vua Solomon Và Ngôi Đền Thờ Jerusalem", image: "assets/images/canh-16-solomon-trai-tim-thong-tue-va-ngoi-den-tho.png", imageGenerated: true },
+  { id: "tranh-17", number: 17, bookId: "quyen-3", chaptersRef: "Chương 7–9", title: "Tiên Tri Elijah: Hũ Bột Không Vơi, Ngọn Lửa Trên Núi Carmel Và Cỗ Xe Lửa", image: "assets/images/canh-17-tien-tri-elijah-ngon-lua-trung-thuc-va-co-xe-lua.png", imageGenerated: true },
+  { id: "tranh-18", number: 18, bookId: "quyen-3", chaptersRef: "Chương 10–11", title: "Chuyến Đi Của Chàng Trẻ Tobias Và Thiên Thần Chữa Lành Raphael", image: "assets/images/canh-18-hanh-trinh-cua-tobias-va-thien-than-chua-lanh.png", imageGenerated: true },
+  { id: "tranh-19", number: 19, bookId: "quyen-3", chaptersRef: "Chương 12–17", title: "Đôi Môi Chạm Lửa Của Isaiah Và Jeremiah Giấu Hòm Giao Ước Trước Giờ Đền Thờ Sụp Đổ", image: "assets/images/canh-19-isaiah-va-jeremiah-loi-tien-tri-giua-tro-tan.png", imageGenerated: true },
+  { id: "tranh-20", number: 20, bookId: "quyen-3", chaptersRef: "Chương 18–24", title: "Daniel Và Các Bạn Trẻ Nơi Xứ Lưu Đày: Lò Lửa Và Hang Sư Tử Babylon", image: "assets/images/canh-20-daniel-lo-lua-va-hang-su-tu-babylon.png", imageGenerated: true },
+  { id: "tranh-21", number: 21, bookId: "quyen-3", chaptersRef: "Chương 27", title: "Tiên Tri Jonah Trong Bụng Cá Khổng Lồ Và Bài Học Về Lòng Thương Xót", image: "assets/images/canh-21-jonah-con-ca-khong-lo-va-long-bao-dung.png", imageGenerated: true },
+  { id: "tranh-22", number: 22, bookId: "quyen-3", chaptersRef: "Chương 25–26, 28–32", title: "Xây Lại Tường Thành, Lòng Kiên Trung Của Job Và Ngọn Lửa Phục Hưng Đền Thờ", image: "assets/images/canh-22-xay-lai-thanh-quach-job-va-ngon-lua-maccabeus.png", imageGenerated: true },
+  { id: "tranh-23", number: 23, bookId: "quyen-4", chaptersRef: "Chương 1, 9–10", title: "Hai Ngọn Sáng Đêm Đông, Lời Báo Tin Trong Đền Thờ Và Cuộc Hội Ngộ Của Hai Người Mẹ", image: "assets/images/canh-23-loi-bao-tin-trong-den-tho-va-cuoc-gap-go-hai-nguoi-me.png", imageGenerated: true },
+  { id: "tranh-24", number: 24, bookId: "quyen-4", chaptersRef: "Chương 2", title: "Đứa Trẻ Dòng Dõi Vua, Ba Nhà Thông Thái Phương Đông Và Cuộc Chạy Trốn Trong Đêm", image: "assets/images/canh-24-dua-tre-dong-doi-vua-va-nhung-nha-thong-thai.png", imageGenerated: true },
+  { id: "tranh-25", number: 25, bookId: "quyen-4", chaptersRef: "Chương 3–4", title: "Đứa Trẻ Dòng Dõi Mục Đồng, Tiếng Hát Trên Đồng Cỏ Và Hai Gia Đình Ở Nazareth", image: "assets/images/canh-25-dua-tre-muc-dong-va-tinh-ban-o-nazareth.png", imageGenerated: true },
+  { id: "tranh-26", number: 26, bookId: "quyen-4", chaptersRef: "Chương 5–8", title: "Năm Thứ Mười Hai Trong Đền Thờ, Nỗi Đau Mùa Đông Và Người Thợ Mộc Khôn Ngoan", image: "assets/images/canh-26-nam-thu-muoi-hai-trong-den-tho-va-xuong-moc-nazareth.png", imageGenerated: true },
+  { id: "tranh-27", number: 27, bookId: "quyen-4", chaptersRef: "Chương 11–15", title: "John Giữa Cộng Đồng Áo Trắng, Tiếng Gọi Hoang Địa Và Bình Minh Trên Sông Jordan", image: "assets/images/canh-27-john-ben-bo-bien-chet-va-phep-rua-tren-song-jordan.png", imageGenerated: true },
+  { id: "tranh-28", number: 28, bookId: "quyen-5", chaptersRef: "Chương 1–10", title: "Ngoại Truyện: Từ Chiếc Áo Choàng Đỏ Của Thánh Nicholas Đến Ông Già Noel Đêm Giáng Sinh", image: "assets/images/canh-28-ngoai-truyen-thanh-nicholas-va-ong-gia-noel.png", imageGenerated: true },
 ];
 
 // [globalNumber, bookId, chapterNumber, section, title, illustrationId]
@@ -410,24 +485,27 @@ const GENESIS_CHAPTERS_SEED: Array<[number, string, number, string, string, stri
 
 function buildChapterLevelPaths(
   book: StoryBookMeta,
-  ill: SeedIllustrationInput
+  ill: SeedIllustrationInput,
+  lang: Language
 ): SceneLevelPaths {
   return {
-    level0Overview: "level-0-khong-gian-boi-canh/00-tong-quan-linh-hon-su-thi.md",
+    level0Overview: `locales/${lang}/level-0-context/00-epic-soul-overview.md`,
     level0Book: book.level0File,
     level1: book.level1File,
     level2: book.level2File,
-    level3: "level-3-dan-y-tom-tat/dan-y-tom-tat-cac-chuong.md",
-    level4Gallery: "level-4-tranh-goi-nho/bo-tranh-goi-nho.md",
+    level3: `locales/${lang}/level-3-summary-outline/chapter-summaries.md`,
+    level4Gallery: `locales/${lang}/level-4-visual-prompts/illustration-gallery.md`,
     level4Image: ill.image,
-    level4PromptSpec: "level-4-tranh-goi-nho/prompts-28-phan-canh.md",
+    level4PromptSpec: `locales/${lang}/level-4-visual-prompts/prompts-28-scenes.md`,
   };
 }
 
-export function getSeedData(): WaldorfData {
-  const bookMap = new Map(GENESIS_BOOKS.map((b) => [b.id, b]));
+export function getSeedData(lang: Language = "vi"): WaldorfData {
+  const books = buildBooksForLang(lang);
+  const ancientBooks = buildAncientBooksForLang(lang);
+  const bookMap = new Map(books.map((b) => [b.id, b]));
   const illustrations: StoryIllustration[] = GENESIS_ILLUSTRATIONS_META.map((il) => {
-    const book = bookMap.get(il.bookId) || GENESIS_BOOKS[0];
+    const book = bookMap.get(il.bookId) || books[0];
     return {
       id: il.id,
       ord: il.number,
@@ -440,28 +518,42 @@ export function getSeedData(): WaldorfData {
     };
   });
 
-  const illMap = new Map(illustrations.map((il, idx) => [il.id, { il, meta: GENESIS_ILLUSTRATIONS_META[idx] }]));
+  const illMap = new Map(
+    illustrations.map((il, idx) => [il.id, { il, meta: GENESIS_ILLUSTRATIONS_META[idx] }])
+  );
 
   const scenes: StoryScene[] = GENESIS_CHAPTERS_SEED.map(
     ([globalNumber, bookId, chapterNumber, section, title, illustrationId]) => {
-      const book = bookMap.get(bookId) || GENESIS_BOOKS[0];
+      const book = bookMap.get(bookId) || books[0];
       const illEntry = illMap.get(illustrationId) || {
         il: illustrations[0],
         meta: GENESIS_ILLUSTRATIONS_META[0],
       };
       const id = `${bookId}-chuong-${String(chapterNumber).padStart(2, "0")}`;
-      const levelPaths = buildChapterLevelPaths(book, illEntry.meta);
+      const levelPaths = buildChapterLevelPaths(book, illEntry.meta, lang);
       const artStyle: WaldorfArtStyle = illEntry.il.artStyle;
+
+      const formattedTitle =
+        lang === "en"
+          ? `Chapter ${chapterNumber}: ${title}`
+          : lang === "zh"
+          ? `第${chapterNumber}章：${title}`
+          : `Chương ${chapterNumber}: ${title}`;
 
       const summaryPoints = [
         `${book.title} — ${section}.`,
-        `Chương ${chapterNumber}: ${title}.`,
+        `${formattedTitle}.`,
         `Thuộc cụm minh họa ${illEntry.il.chaptersRef}: ${illEntry.il.title}.`,
         `Nội dung toàn văn và dàn ý đầy đủ được đồng bộ tự động từ ${book.level1File}.`,
       ];
 
       const passage = `${title} (${section} · ${book.title}). Nội dung toàn văn đang được đồng bộ từ kho GitHub (xuvivn/from-genesis-to-nativity)...`;
-      const voiceNote = `Giữ nhịp kể ấm áp theo tinh thần ${book.title}. Đọc chậm rãi, ngắt hơi tự nhiên theo từng hình ảnh.`;
+      const voiceNote =
+        lang === "en"
+          ? `Keep a warm storytelling pace matching ${book.title}. Read unhurriedly and pause naturally between images.`
+          : lang === "zh"
+          ? `保持与《${book.title}》契合的温暖讲述节奏，从容朗读并在每个画面之间自然停顿。`
+          : `Giữ nhịp kể ấm áp theo tinh thần ${book.title}. Đọc chậm rãi, ngắt hơi tự nhiên theo từng hình ảnh.`;
 
       return {
         id,
@@ -472,7 +564,7 @@ export function getSeedData(): WaldorfData {
         illustrationId,
         slug: illEntry.meta.image.split("/").pop()?.replace(/\.png$/, "") || id,
         isEpilogue: book.isEpilogue,
-        title: `Chương ${chapterNumber}: ${title}`,
+        title: formattedTitle,
         passage,
         voiceNote,
         detailedOutline: {
@@ -492,23 +584,41 @@ export function getSeedData(): WaldorfData {
     }
   );
 
+  const storyTitle =
+    lang === "en"
+      ? "From Genesis to Nativity — 5-Level Storytelling Practice Corpus"
+      : lang === "zh"
+      ? "从创世到圣诞——五阶故事讲述练习语料库"
+      : "Từ Sáng Thế Đến Giáng Sinh — Bộ Sử Thi Luyện Kể Chuyện 5 Cấp Độ";
+
   const genesisStory: WaldorfStory = {
     id: GENESIS_STORY_ID,
-    title: "Từ Sáng Thế Đến Giáng Sinh — Bộ Sử Thi Luyện Kể Chuyện 5 Cấp Độ",
+    language: lang,
+    title: storyTitle,
     titleEn: "From Genesis to Nativity — Epic Storytelling Practice",
-    sourceInfo: "Nguồn từ repo xuvivn/from-genesis-to-nativity · 5 Quyển · 180 Chương · 28 Tranh",
-    targetAge: "9–10 tuổi",
+    sourceInfo:
+      lang === "en"
+        ? "Source: xuvivn/from-genesis-to-nativity · 5 Books · 180 Chapters · 28 Illustrations"
+        : lang === "zh"
+        ? "语料来源：xuvivn/from-genesis-to-nativity · 5卷 · 180章 · 28幅插画"
+        : "Nguồn từ repo xuvivn/from-genesis-to-nativity · 5 Quyển · 180 Chương · 28 Tranh",
+    targetAge: lang === "en" ? "9–10 years" : lang === "zh" ? "9–10岁" : "9–10 tuổi",
     styleReference: "Jakob Streit",
-    goal: "Đọc hiểu bối cảnh & luyện kể trọn vẹn 180 Chương theo 4 cấp độ từ toàn văn đến 28 tranh thuần hình ảnh.",
+    goal:
+      lang === "en"
+        ? "Explore background context and practice telling all 180 chapters across 4 levels—from full text to 28 wordless illustrations."
+        : lang === "zh"
+        ? "理解故事背景与精神，并循序练习讲述全180章——从完整全文到28幅纯视觉记忆插画。"
+        : "Đọc hiểu bối cảnh & luyện kể trọn vẹn 180 Chương theo 4 cấp độ từ toàn văn đến 28 tranh thuần hình ảnh.",
     defaultArtStyle: "chalkboard",
     repoUrl: GENESIS_REPO_URL,
     rawBaseUrl: GENESIS_JSDELIVR_BASE_URL,
-    books: GENESIS_BOOKS,
+    books,
     soul: {
       ...SEED_BOOK_SOULS["quyen-1"],
-      overviewPath: "level-0-khong-gian-boi-canh/00-tong-quan-linh-hon-su-thi.md",
+      overviewPath: `locales/${lang}/level-0-context/00-epic-soul-overview.md`,
       bookSouls: SEED_BOOK_SOULS,
-      ancientBooks: GENESIS_ANCIENT_BOOKS,
+      ancientBooks,
     },
     illustrations,
     scenes,
@@ -516,8 +626,9 @@ export function getSeedData(): WaldorfData {
 
   return {
     stories: [genesisStory],
+    storiesByLang: { [lang]: genesisStory },
     updatedAt: new Date().toISOString(),
-    version: "4.0-genesis-180",
+    version: "5.0-genesis-multilang",
   };
 }
 

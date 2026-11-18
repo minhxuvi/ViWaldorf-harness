@@ -11,7 +11,7 @@ export interface PdfExportOptions {
   bookId?: string;
   failedImages?: Record<string, boolean>;
   preferProceduralArt?: boolean;
-  lang?: "vi" | "en";
+  lang?: "vi" | "en" | "zh";
   includeImages?: boolean;
 }
 
@@ -91,10 +91,14 @@ function renderIllustrationFigureHtml(
   options?: PdfExportOptions
 ): string {
   const { src, fallbackSrc } = resolveIllustrationSrcForPdf(ill, story, options);
+  const ordStr = String(ill.ord).padStart(2, "0");
+  const exportLang = options?.lang || story.language || "vi";
   const captionPrefix =
-    options?.lang === "en"
-      ? `Illustration ${String(ill.ord).padStart(2, "0")}`
-      : `Tranh ${String(ill.ord).padStart(2, "0")}`;
+    exportLang === "en"
+      ? `Illustration ${ordStr}`
+      : exportLang === "zh"
+      ? `插画 ${ordStr}`
+      : `Tranh ${ordStr}`;
 
   return `<figure class="pdf-illustration" data-illustration-id="${escapeHtml(ill.id)}">
   <div class="pdf-illustration-frame">
@@ -382,8 +386,10 @@ export function buildEmbeddedPrintStyles(): string {
 function buildPrintableBodyContent(
   story: WaldorfStory,
   options?: PdfExportOptions
-): { docTitle: string; bodyHtml: string; isEn: boolean; includeImages: boolean } {
-  const isEn = options?.lang === "en";
+): { docTitle: string; bodyHtml: string; exportLang: "vi" | "en" | "zh"; includeImages: boolean } {
+  const exportLang = options?.lang || story.language || "vi";
+  const isEn = exportLang === "en";
+  const isZh = exportLang === "zh";
   const includeImages = options?.includeImages !== false;
   const allBooks: StoryBookMeta[] = story.books || [];
   const selectedBookId = options?.bookId && options.bookId !== "all" ? options.bookId : undefined;
@@ -411,15 +417,27 @@ function buildPrintableBodyContent(
     ? (story.illustrations || []).filter((il) => il.bookId === selectedBookId).length
     : (story.illustrations || []).length;
 
+  const chaptersWord = isEn ? "chapters" : isZh ? "章" : "chương";
   const tocItemsHtml = targetBooks
     .map((bk) => {
       const chCount = (scenesByBook.get(bk.id) || []).length;
       return `<li>
         <span class="toc-title">${escapeHtml(bk.title)}</span>
-        <span class="toc-meta">${chCount} ${isEn ? "chapters" : "chương"} · ${escapeHtml(bk.subtitle)}</span>
+        <span class="toc-meta">${chCount} ${chaptersWord} · ${escapeHtml(bk.subtitle)}</span>
       </li>`;
     })
     .join("\n");
+
+  const voiceLabel = isEn
+    ? "Vocal Delivery Note"
+    : isZh
+    ? "讲演提示"
+    : "Lưu ý giọng kể";
+  const culturalSpiritLabel = isEn
+    ? "Cultural Spirit"
+    : isZh
+    ? "文化背景与精神"
+    : "Tinh thần bối cảnh";
 
   const booksBodyHtml = targetBooks
     .map((bk) => {
@@ -447,7 +465,7 @@ function buildPrintableBodyContent(
           parts.push(`<article class="pdf-chapter">
   <h4 class="pdf-chapter-title">${escapeHtml(ch.title)}</h4>
   <div class="pdf-voice-note">
-    <span class="pdf-voice-label">${isEn ? "Vocal Delivery Note" : "Lưu ý giọng kể"}:</span>
+    <span class="pdf-voice-label">${voiceLabel}:</span>
     <div class="pdf-voice-body">${renderParagraphsHtml(ch.voiceNote)}</div>
   </div>
   <div class="pdf-passage">
@@ -459,15 +477,21 @@ function buildPrintableBodyContent(
         })
         .join("\n");
 
+      const bookBadge = isEn
+        ? `Book ${bk.number}`
+        : isZh
+        ? `第${bk.number}卷`
+        : `Quyển ${bk.number}`;
+
       return `<section class="pdf-book">
   <header class="pdf-book-header">
-    <p class="pdf-book-badge">${isEn ? `Book ${bk.number}` : `Quyển ${bk.number}`}</p>
+    <p class="pdf-book-badge">${bookBadge}</p>
     <h2>${escapeHtml(bk.title)}</h2>
     <p class="pdf-book-subtitle">${escapeHtml(bk.subtitle)}</p>
     ${
       bookSoul
         ? `<div class="pdf-book-soul">
-      <p><strong>${isEn ? "Cultural Spirit" : "Tinh thần bối cảnh"}:</strong> ${escapeHtml(bookSoul.culturalSpirit)}</p>
+      <p><strong>${culturalSpiritLabel}:</strong> ${escapeHtml(bookSoul.culturalSpirit)}</p>
     </div>`
         : ""
     }
@@ -481,24 +505,31 @@ function buildPrintableBodyContent(
     ? `${story.title} — ${targetBooks[0].title}`
     : story.title;
 
+  const booksLabel = isEn ? "Books" : isZh ? "卷" : "Quyển";
+  const chaptersLabel = isEn ? "Chapters" : isZh ? "章" : "Chương";
+  const editionMeta = includeImages
+    ? `${totalExportIllustrations} ${
+        isEn ? "Level 4 Illustrations" : isZh ? "幅 Level 4 插画" : "Tranh minh họa Level 4"
+      }`
+    : isEn
+    ? "Text-Only Edition (No Images)"
+    : isZh
+    ? "纯文本版（无插画）"
+    : "Bản thuần chữ (Không kèm ảnh)";
+  const tocHeading = isEn ? "Table of Contents" : isZh ? "全文目录" : "Mục Lục Toàn Văn";
+
   const bodyHtml = `<section class="pdf-cover">
     <div class="pdf-cover-eyebrow">ViWaldorf · ${escapeHtml(story.styleReference || "Jakob Streit")} · ${escapeHtml(story.targetAge)}</div>
     <h1>${escapeHtml(docTitle)}</h1>
-    ${story.titleEn ? `<p class="pdf-cover-sub">${escapeHtml(story.titleEn)}</p>` : ""}
+    ${story.titleEn && exportLang === "vi" ? `<p class="pdf-cover-sub">${escapeHtml(story.titleEn)}</p>` : ""}
     <div class="pdf-cover-meta">
-      ${targetBooks.length} ${isEn ? "Books" : "Quyển"} · ${totalExportChapters} ${isEn ? "Chapters" : "Chương"} · ${
-        includeImages
-          ? `${totalExportIllustrations} ${isEn ? "Level 4 Illustrations" : "Tranh minh họa Level 4"}`
-          : isEn
-            ? "Text-Only Edition (No Images)"
-            : "Bản thuần chữ (Không kèm ảnh)"
-      }
+      ${targetBooks.length} ${booksLabel} · ${totalExportChapters} ${chaptersLabel} · ${editionMeta}
     </div>
     <p class="pdf-cover-goal">${escapeHtml(story.goal)}</p>
   </section>
 
   <section class="pdf-toc">
-    <h2>${isEn ? "Table of Contents" : "Mục Lục Toàn Văn"}</h2>
+    <h2>${tocHeading}</h2>
     <ol>
       ${tocItemsHtml}
     </ol>
@@ -506,17 +537,17 @@ function buildPrintableBodyContent(
 
   ${booksBodyHtml}`;
 
-  return { docTitle, bodyHtml, isEn, includeImages };
+  return { docTitle, bodyHtml, exportLang, includeImages };
 }
 
 export function buildFullStoryPrintableHtml(
   story: WaldorfStory,
   options?: PdfExportOptions
 ): string {
-  const { docTitle, bodyHtml, isEn } = buildPrintableBodyContent(story, options);
+  const { docTitle, bodyHtml, exportLang } = buildPrintableBodyContent(story, options);
 
   return `<!DOCTYPE html>
-<html lang="${isEn ? "en" : "vi"}">
+<html lang="${exportLang}">
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(docTitle)}</title>
@@ -614,14 +645,14 @@ export async function exportStoryToPdf(
   document.getElementById(PRINT_ROOT_ID)?.remove();
   document.getElementById(PRINT_STYLE_ID)?.remove();
 
-  const { bodyHtml, isEn, includeImages } = buildPrintableBodyContent(story, options);
+  const { bodyHtml, exportLang, includeImages } = buildPrintableBodyContent(story, options);
   const styleEl = document.createElement("style");
   styleEl.id = PRINT_STYLE_ID;
   styleEl.textContent = buildEmbeddedPrintStyles();
 
   const printRoot = document.createElement("div");
   printRoot.id = PRINT_ROOT_ID;
-  printRoot.lang = isEn ? "en" : "vi";
+  printRoot.lang = exportLang;
   printRoot.setAttribute("aria-hidden", "true");
   printRoot.innerHTML = bodyHtml;
 

@@ -105,6 +105,7 @@ export interface StoryScene {
 
 export interface WaldorfStory {
   id: string;
+  language?: "vi" | "en" | "zh";
   title: string;
   titleEn?: string;
   sourceInfo: string;
@@ -137,6 +138,7 @@ export interface VoiceRecording {
 
 export interface WaldorfData {
   stories: WaldorfStory[];
+  storiesByLang?: Partial<Record<"vi" | "en" | "zh", WaldorfStory>>;
   updatedAt?: string;
   version?: string;
 }

@@ -120,15 +120,38 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 </button>
               ))}
 
-            <button
-              type="button"
-              onClick={() => setLang(lang === "vi" ? "en" : "vi")}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#254A2E] hover:bg-[#2F5D3A] text-xs font-semibold text-onDark transition"
+            <div
+              role="group"
+              aria-label={t.header.languageLabel}
               title={t.header.languageLabel}
+              className="inline-flex items-center gap-0.5 p-0.5 rounded-lg bg-[#254A2E] border border-[#3B6845]"
             >
-              <Languages className="w-3.5 h-3.5 text-[#E9C46A]" />
-              <span className="text-[#E9C46A]">{lang.toUpperCase()}</span>
-            </button>
+              <Languages className="w-3.5 h-3.5 text-[#E9C46A] ml-1.5 mr-0.5 hidden sm:block flex-shrink-0" />
+              {(
+                [
+                  { code: "vi", label: "VI" },
+                  { code: "en", label: "EN" },
+                  { code: "zh", label: "中文" },
+                ] as const
+              ).map((item) => {
+                const active = lang === item.code;
+                return (
+                  <button
+                    key={item.code}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setLang(item.code)}
+                    className={`px-1.5 sm:px-2 py-1 rounded-md text-[11px] sm:text-xs font-semibold transition ${
+                      active
+                        ? "bg-[#E9C46A] text-forestDark"
+                        : "text-onDark hover:bg-[#2F5D3A]"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </header>

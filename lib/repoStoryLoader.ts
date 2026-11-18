@@ -17,11 +17,31 @@ export const GENESIS_REPO_BRANCH = "main";
 export const GENESIS_REPO_URL = `https://github.com/${GENESIS_REPO_OWNER}/${GENESIS_REPO_NAME}`;
 export const GENESIS_RAW_BASE_URL = `https://raw.githubusercontent.com/${GENESIS_REPO_OWNER}/${GENESIS_REPO_NAME}/${GENESIS_REPO_BRANCH}`;
 export const GENESIS_JSDELIVR_BASE_URL = `https://cdn.jsdelivr.net/gh/${GENESIS_REPO_OWNER}/${GENESIS_REPO_NAME}@${GENESIS_REPO_BRANCH}`;
+export const LOCAL_REPO_API_BASE_URL = "/api/local-repo";
 export const GENESIS_STORY_ID = "story-from-genesis-to-nativity";
+
+export type RepoLanguage = "vi" | "en" | "zh";
 
 export const REPO_SYNC_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 export const REPO_MANUAL_COOLDOWN_MS = 15 * 1000; // 15 seconds
 export const REPO_FETCH_CONCURRENCY = 6;
+
+export function resolveLocaleRepoPath(
+  relativePath: string,
+  lang: RepoLanguage = "vi"
+): string {
+  const cleanPath = (relativePath || "").trim().replace(/^\/+/, "");
+  if (!cleanPath) return "";
+  if (
+    cleanPath.startsWith("assets/") ||
+    cleanPath.startsWith("locales/") ||
+    cleanPath === "languages.json" ||
+    cleanPath === "README.md"
+  ) {
+    return cleanPath;
+  }
+  return `locales/${lang}/${cleanPath}`;
+}
 
 export function shouldAutoSyncRepo(lastSyncedAt?: string, nowMs = Date.now()): boolean {
   if (!lastSyncedAt) return true;
@@ -51,12 +71,32 @@ export async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export function getCandidateRepoBaseUrls(preferredBaseUrl?: string): string[] {
+export function getCandidateRepoBaseUrls(
+  preferredBaseUrl?: string,
+  options?: { includeLocalApi?: boolean }
+): string[] {
   const defaults = [GENESIS_JSDELIVR_BASE_URL, GENESIS_RAW_BASE_URL];
-  if (!preferredBaseUrl || preferredBaseUrl === GENESIS_RAW_BASE_URL) {
-    return defaults;
+  const isBrowserLocalhost =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  const shouldUseLocalApi =
+    options?.includeLocalApi === true ||
+    preferredBaseUrl === LOCAL_REPO_API_BASE_URL ||
+    (options?.includeLocalApi !== false && isBrowserLocalhost);
+
+  const candidates: string[] = [];
+  if (shouldUseLocalApi) {
+    candidates.push(LOCAL_REPO_API_BASE_URL);
   }
-  return Array.from(new Set([preferredBaseUrl, ...defaults]));
+  if (
+    preferredBaseUrl &&
+    preferredBaseUrl !== GENESIS_RAW_BASE_URL &&
+    preferredBaseUrl !== LOCAL_REPO_API_BASE_URL
+  ) {
+    candidates.push(preferredBaseUrl);
+  }
+  candidates.push(...defaults);
+  return Array.from(new Set(candidates));
 }
 
 interface RepoIndexLevel0 {
@@ -170,11 +210,11 @@ function splitTopLevelCommas(text: string): string[] {
 
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (ch === "(") depth++;
-    else if (ch === ")" && depth > 0) depth--;
+    if (ch === "(" || ch === "（") depth++;
+    else if ((ch === ")" || ch === "）") && depth > 0) depth--;
 
-    if ((ch === "," || ch === ";") && depth === 0) {
-      const trimmed = current.trim().replace(/\.$/, "");
+    if ((ch === "," || ch === ";" || ch === "、" || ch === "，" || ch === "；") && depth === 0) {
+      const trimmed = current.trim().replace(/[.。]$/, "");
       if (trimmed) result.push(trimmed);
       current = "";
     } else {
@@ -182,14 +222,14 @@ function splitTopLevelCommas(text: string): string[] {
     }
   }
 
-  const tail = current.trim().replace(/\.$/, "");
+  const tail = current.trim().replace(/[.。]$/, "");
   if (tail) result.push(tail);
   return result;
 }
 
 function splitByChapterHeader(markdown: string) {
   const normalized = markdown.replace(/\r\n/g, "\n");
-  const headerRegex = /^###\s+Chương\s+(\d+):\s*(.+)$/gm;
+  const headerRegex = /^###\s+(?:Chương\s+|Chapter\s+|第)(\d+)(?:章)?\s*[:：]\s*(.+)$/gm;
 
   const matches: Array<{
     chapterNumber: number;
@@ -220,7 +260,10 @@ function splitByChapterHeader(markdown: string) {
   });
 }
 
-export function parseLevel0BookMarkdown(markdown: string): StorySoulContext {
+export function parseLevel0BookMarkdown(
+  markdown: string,
+  lang: RepoLanguage = "vi"
+): StorySoulContext {
   const normalized = markdown.replace(/\r\n/g, "\n");
   const sections = normalized.split(/^##\s+/m);
 
@@ -253,15 +296,30 @@ export function parseLevel0BookMarkdown(markdown: string): StorySoulContext {
       );
     } else if (/^4\./.test(heading)) {
       const lines = content.split("\n");
+      const hasSeparator = lines.some((l) => {
+        const t = l.trim();
+        return /^\|\s*:?---+/.test(t) || t.includes(":---");
+      });
+      let passedSeparator = !hasSeparator;
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed.startsWith("|")) continue;
-        if (trimmed.includes(":---") || trimmed.includes("---")) continue;
+        if (/^\|\s*:?---+/.test(trimmed) || trimmed.includes(":---")) {
+          passedSeparator = true;
+          continue;
+        }
+        if (!passedSeparator) continue;
         const cells = trimmed
           .split("|")
           .slice(1, -1)
           .map((c) => cleanInlineMarkdown(c));
-        if (cells.length >= 3 && !cells[0].toLowerCase().includes("tên trong văn bản")) {
+        const headerLower = (cells[0] || "").toLowerCase();
+        if (
+          cells.length >= 3 &&
+          !headerLower.includes("tên trong văn bản") &&
+          !headerLower.includes("name in text") &&
+          !headerLower.includes("标准中文译名")
+        ) {
           pronunciations.push({
             term: cells[0],
             pronunciation: cells[1],
@@ -272,20 +330,50 @@ export function parseLevel0BookMarkdown(markdown: string): StorySoulContext {
     }
   }
 
+  const fallbacks =
+    lang === "en"
+      ? {
+          culturalSpirit: "Syncing cultural spirit and context from the story repository.",
+          storytellingRhythm: "An unhurried, deeply resonant storytelling rhythm across each chapter.",
+          ageMetaphor: "Imaginative metaphors nurturing the inner life of ages 9–10.",
+        }
+      : lang === "zh"
+      ? {
+          culturalSpirit: "正在从故事资料库同步文化背景与核心精神。",
+          storytellingRhythm: "舒缓从容、沉静饱满的讲述节奏。",
+          ageMetaphor: "滋养9–10岁儿童心灵与想象力的诗意隐喻。",
+        }
+      : {
+          culturalSpirit: "Đang đồng bộ tinh thần văn hóa từ kho sử thi.",
+          storytellingRhythm: "Nhịp kể khoan thai, lắng sâu theo từng chương.",
+          ageMetaphor: "Thông điệp ẩn dụ nuôi dưỡng tâm hồn trẻ thơ.",
+        };
+
   return {
-    culturalSpirit: culturalSpirit || "Đang đồng bộ tinh thần văn hóa từ kho sử thi.",
-    storytellingRhythm: storytellingRhythm || "Nhịp kể khoan thai, lắng sâu theo từng chương.",
-    ageMetaphor: ageMetaphor || "Thông điệp ẩn dụ nuôi dưỡng tâm hồn trẻ thơ.",
+    culturalSpirit: culturalSpirit || fallbacks.culturalSpirit,
+    storytellingRhythm: storytellingRhythm || fallbacks.storytellingRhythm,
+    ageMetaphor: ageMetaphor || fallbacks.ageMetaphor,
     pronunciations,
   };
 }
 
-export function parseLevel1Markdown(markdown: string): Record<number, ParsedLevel1Chapter> {
+export function parseLevel1Markdown(
+  markdown: string,
+  lang: RepoLanguage = "vi"
+): Record<number, ParsedLevel1Chapter> {
   const blocks = splitByChapterHeader(markdown);
   const result: Record<number, ParsedLevel1Chapter> = {};
+  const defaultVoiceNote =
+    lang === "en"
+      ? "Keep a natural, clear speaking voice with gentle pauses between living images."
+      : lang === "zh"
+      ? "保持自然清晰的语调，在每个生动的画面之间从容停顿换气。"
+      : "Giữ giọng kể tự nhiên, rõ ràng và ngắt nhịp nhẹ nhàng theo từng hình ảnh.";
 
   for (const block of blocks) {
-    const voiceSplit = block.body.split(/^#{3,4}\s+Lưu ý giọng kể[^\n]*$/m);
+    const voiceSplit = block.body.split(
+      /^#{3,4}\s+(?:Lưu ý giọng kể|Storytelling Notes|讲演提示)[^\n]*$/m
+    );
     const rawPassage = stripTrailingRule(voiceSplit[0] || "");
     const rawVoiceNote = stripTrailingRule(voiceSplit[1] || "");
 
@@ -302,15 +390,17 @@ export function parseLevel1Markdown(markdown: string): Record<number, ParsedLeve
       chapterNumber: block.chapterNumber,
       title: block.title,
       passage: passage || block.title,
-      voiceNote:
-        voiceNote || "Giữ giọng kể tự nhiên, rõ ràng và ngắt nhịp nhẹ nhàng theo từng hình ảnh.",
+      voiceNote: voiceNote || defaultVoiceNote,
     };
   }
 
   return result;
 }
 
-export function parseLevel2Markdown(markdown: string): Record<number, SceneDetailedOutline> {
+export function parseLevel2Markdown(
+  markdown: string,
+  lang: RepoLanguage = "vi"
+): Record<number, SceneDetailedOutline> {
   const blocks = splitByChapterHeader(markdown);
   const result: Record<number, SceneDetailedOutline> = {};
 
@@ -322,7 +412,7 @@ export function parseLevel2Markdown(markdown: string): Record<number, SceneDetai
     for (const rawLine of lines) {
       const topMatch = rawLine.match(/^-\s+\*\*([^*]+)\*\*\s*(.*)$/);
       if (topMatch) {
-        currentKey = topMatch[1].replace(/:$/, "").trim().toLowerCase();
+        currentKey = topMatch[1].replace(/[:：]$/, "").trim().toLowerCase();
         topSections[currentKey] = [];
         if (topMatch[2].trim()) {
           topSections[currentKey].push(topMatch[2].trim());
@@ -346,7 +436,11 @@ export function parseLevel2Markdown(markdown: string): Record<number, SceneDetai
     for (const [key, valueLines] of Object.entries(topSections)) {
       const joinedClean = cleanInlineMarkdown(valueLines.join(" "));
 
-      if (key.includes("nhân vật")) {
+      if (
+        key.includes("nhân vật") ||
+        key.includes("character") ||
+        key.includes("人物")
+      ) {
         const items = splitTopLevelCommas(joinedClean);
         characters = items.slice(0, 14);
       } else if (key.includes("điệp khúc") || key.includes("refrain")) {
@@ -355,7 +449,13 @@ export function parseLevel2Markdown(markdown: string): Record<number, SceneDetai
         localizedDetails.push(`Cử chỉ minh họa: ${joinedClean}`);
       } else if (key.includes("bối cảnh")) {
         localizedDetails.push(`Bối cảnh & Tâm thức: ${joinedClean}`);
-      } else if (key.includes("diễn biến") || key.includes("mạch kể")) {
+      } else if (
+        key.includes("diễn biến") ||
+        key.includes("mạch kể") ||
+        key.includes("plot beat") ||
+        key.includes("detailed plot") ||
+        key.includes("情节")
+      ) {
         for (const l of valueLines) {
           const subMatch = l.match(/^-\s+(.+)$/);
           if (subMatch) {
@@ -367,7 +467,11 @@ export function parseLevel2Markdown(markdown: string): Record<number, SceneDetai
       } else if (
         key.includes("ý nghĩa") ||
         key.includes("điểm nhấn") ||
-        key.includes("chiều sâu")
+        key.includes("chiều sâu") ||
+        key.includes("meaning") ||
+        key.includes("storytelling focus") ||
+        key.includes("寓意") ||
+        key.includes("重点")
       ) {
         emotionalRhythm = joinedClean;
       }
@@ -385,7 +489,12 @@ export function parseLevel2Markdown(markdown: string): Record<number, SceneDetai
 
     if (!emotionalRhythm) {
       emotionalRhythm =
-        localizedDetails[0] || `Giữ nhịp kể ấm áp, lắng sâu cho "${block.title}".`;
+        localizedDetails[0] ||
+        (lang === "en"
+          ? `Keep a warm, unhurried storytelling cadence for "${block.title}".`
+          : lang === "zh"
+          ? `为《${block.title}》保持温暖从容、娓娓道来的讲述节奏。`
+          : `Giữ nhịp kể ấm áp, lắng sâu cho "${block.title}".`);
     }
 
     if (beats.length === 0) {
@@ -403,16 +512,26 @@ export function parseLevel2Markdown(markdown: string): Record<number, SceneDetai
   return result;
 }
 
-const ROMAN_BOOK_MAP: Record<string, string> = {
+const BOOK_NUMERAL_MAP: Record<string, string> = {
   I: "quyen-1",
   II: "quyen-2",
   III: "quyen-3",
   IV: "quyen-4",
   V: "quyen-5",
+  一: "quyen-1",
+  二: "quyen-2",
+  三: "quyen-3",
+  四: "quyen-4",
+  五: "quyen-5",
+  "1": "quyen-1",
+  "2": "quyen-2",
+  "3": "quyen-3",
+  "4": "quyen-4",
+  "5": "quyen-5",
 };
 
 /**
- * Phân tích tệp Level 3 (`dan-y-tom-tat-cac-chuong.md`).
+ * Phân tích tệp Level 3 (`chapter-summaries.md` / `dan-y-tom-tat-cac-chuong.md`).
  * Trả về map theo `chapterId` dạng `quyen-1-chuong-01` để không bị trùng số chương giữa các Quyển.
  */
 export function parseLevel3Markdown(markdown: string): Record<string, string[]> {
@@ -426,9 +545,12 @@ export function parseLevel3Markdown(markdown: string): Record<string, string[]> 
   for (const rawLine of lines) {
     const trimmed = rawLine.trim();
 
-    const bookMatch = trimmed.match(/^##\s+Quyển\s+([IVX]+)\b/);
+    const bookMatch = trimmed.match(
+      /^##\s+(?:Quyển\s+([IVX]+)|Book\s+([IVX]+)|第([一二三四五1-5])卷)(?=[\s:：（(]|$)/
+    );
     if (bookMatch) {
-      const mapped = ROMAN_BOOK_MAP[bookMatch[1]];
+      const token = bookMatch[1] || bookMatch[2] || bookMatch[3];
+      const mapped = token ? BOOK_NUMERAL_MAP[token] : undefined;
       if (mapped) {
         currentBookId = mapped;
         currentChapterKey = "";
@@ -436,7 +558,7 @@ export function parseLevel3Markdown(markdown: string): Record<string, string[]> 
       continue;
     }
 
-    const chMatch = trimmed.match(/^###\s+Chương\s+(\d+):\s*(.+)$/);
+    const chMatch = trimmed.match(/^###\s+(?:Chương\s+|Chapter\s+|第)(\d+)(?:章)?\s*[:：]\s*(.+)$/);
     if (chMatch) {
       const chNum = Number(chMatch[1]);
       currentChapterKey = `${currentBookId}-chuong-${String(chNum).padStart(2, "0")}`;
@@ -531,73 +653,106 @@ export async function fetchAncientBookMarkdown(
   );
 }
 
+function formatChapterTitle(
+  chapterNumber: number,
+  rawTitle: string,
+  lang: RepoLanguage
+): string {
+  const trimmed = rawTitle.trim();
+  if (/^(?:Chương|Chapter)\s+\d+\s*[:：]|^第\s*\d+\s*章\s*[:：]/.test(trimmed)) {
+    return trimmed;
+  }
+  if (lang === "en") return `Chapter ${chapterNumber}: ${trimmed}`;
+  if (lang === "zh") return `第${chapterNumber}章：${trimmed}`;
+  return `Chương ${chapterNumber}: ${trimmed}`;
+}
+
 export async function fetchGenesisStoryFromRepo(
   rawBaseUrl = GENESIS_JSDELIVR_BASE_URL,
-  options?: { preferFresh?: boolean }
+  options?: { preferFresh?: boolean; lang?: RepoLanguage }
 ): Promise<WaldorfStory> {
+  const lang: RepoLanguage = options?.lang || "vi";
   const cacheMode: RequestCache = options?.preferFresh ? "no-cache" : "default";
   const candidateBases = getCandidateRepoBaseUrls(rawBaseUrl);
   let indexData: RepoStoryIndex | null = null;
   let activeBaseUrl = candidateBases[0];
+  let loadedFromLegacyRoot = false;
   let lastStatus = 0;
 
+  const indexCandidates =
+    lang === "vi" ? [`locales/${lang}/story-index.json`, "story-index.json"] : [`locales/${lang}/story-index.json`];
+
   for (const base of candidateBases) {
-    try {
-      const indexRes = await fetch(buildRepoFileUrl("story-index.json", base), {
-        cache: cacheMode,
-      });
-      if (indexRes.ok) {
-        const candidateJson = (await indexRes.json()) as Partial<RepoStoryIndex>;
-        if (
-          Array.isArray(candidateJson.chapters) &&
-          candidateJson.chapters.length > 0 &&
-          Array.isArray(candidateJson.illustrations) &&
-          candidateJson.illustrations.length > 0
-        ) {
-          indexData = candidateJson as RepoStoryIndex;
-          activeBaseUrl = base;
-          break;
+    for (const indexRelPath of indexCandidates) {
+      try {
+        const indexRes = await fetch(buildRepoFileUrl(indexRelPath, base), {
+          cache: cacheMode,
+        });
+        if (indexRes.ok) {
+          const candidateJson = (await indexRes.json()) as Partial<RepoStoryIndex>;
+          if (
+            Array.isArray(candidateJson.chapters) &&
+            candidateJson.chapters.length > 0 &&
+            Array.isArray(candidateJson.illustrations) &&
+            candidateJson.illustrations.length > 0
+          ) {
+            indexData = candidateJson as RepoStoryIndex;
+            activeBaseUrl = base;
+            loadedFromLegacyRoot = indexRelPath === "story-index.json";
+            break;
+          }
         }
+        lastStatus = indexRes.status;
+      } catch {
+        // Thử đường dẫn hoặc CDN dự phòng tiếp theo
       }
-      lastStatus = indexRes.status;
-    } catch {
-      // Thử CDN dự phòng tiếp theo
     }
+    if (indexData) break;
   }
 
   if (!indexData) {
     throw new Error(
-      `Không thể đọc story-index.json từ CDN/Repo${lastStatus ? ` (${lastStatus})` : ""}`
+      `Không thể đọc locales/${lang}/story-index.json từ CDN/Repo${lastStatus ? ` (${lastStatus})` : ""}`
     );
   }
 
-  const level0Config = indexData.levels?.[0] || {};
-  const overviewPath =
-    level0Config.overview_file || "level-0-khong-gian-boi-canh/00-tong-quan-linh-hon-su-thi.md";
-  const ancientBooks = level0Config.ancient_books || [];
+  const resolvePath = (p: string) =>
+    loadedFromLegacyRoot ? (p || "").trim().replace(/^\/+/, "") : resolveLocaleRepoPath(p, lang);
 
-  const level3File =
+  const level0Config = indexData.levels?.[0] || {};
+  const overviewPath = resolvePath(
+    level0Config.overview_file || "level-0-context/00-epic-soul-overview.md"
+  );
+  const ancientBooks: AncientBookItem[] = (level0Config.ancient_books || []).map((ab) => ({
+    ...ab,
+    file: resolvePath(ab.file),
+  }));
+
+  const level3File = resolvePath(
     indexData.levels?.[3]?.file ||
-    indexData.chapters?.[0]?.levels?.level_3 ||
-    "level-3-dan-y-tom-tat/dan-y-tom-tat-cac-chuong.md";
-  const level4Gallery =
-    indexData.levels?.[4]?.gallery_file || "level-4-tranh-goi-nho/bo-tranh-goi-nho.md";
-  const level4PromptSpec =
-    indexData.levels?.[4]?.prompt_spec_file || "level-4-tranh-goi-nho/prompts-28-phan-canh.md";
+      indexData.chapters?.[0]?.levels?.level_3 ||
+      "level-3-summary-outline/chapter-summaries.md"
+  );
+  const level4Gallery = resolvePath(
+    indexData.levels?.[4]?.gallery_file || "level-4-visual-prompts/illustration-gallery.md"
+  );
+  const level4PromptSpec = resolvePath(
+    indexData.levels?.[4]?.prompt_spec_file || "level-4-visual-prompts/prompts-28-scenes.md"
+  );
 
   const level0BookFiles = new Set<string>();
   const level1Files = new Set<string>();
   const level2Files = new Set<string>();
 
   for (const bk of indexData.books || []) {
-    if (bk.level_0_file) level0BookFiles.add(bk.level_0_file);
-    if (bk.level_1_file) level1Files.add(bk.level_1_file);
-    if (bk.level_2_file) level2Files.add(bk.level_2_file);
+    if (bk.level_0_file) level0BookFiles.add(resolvePath(bk.level_0_file));
+    if (bk.level_1_file) level1Files.add(resolvePath(bk.level_1_file));
+    if (bk.level_2_file) level2Files.add(resolvePath(bk.level_2_file));
   }
 
   const allPaths = Array.from(
     new Set([overviewPath, ...level0BookFiles, ...level1Files, ...level2Files, level3File])
-  );
+  ).filter(Boolean);
   const orderedBases = [activeBaseUrl, ...candidateBases.filter((b) => b !== activeBaseUrl)];
 
   const fileCache: Record<string, string> = {};
@@ -610,11 +765,11 @@ export async function fetchGenesisStoryFromRepo(
 
   const bookSouls: Record<string, StorySoulContext> = {};
   const booksMeta: StoryBookMeta[] = (indexData.books || []).map((bk) => {
-    const level0File = bk.level_0_file || `level-0-khong-gian-boi-canh/${bk.slug}.md`;
-    const level1File = bk.level_1_file || `level-1-toan-van/${bk.slug}.md`;
-    const level2File = bk.level_2_file || `level-2-dan-y-chi-tiet/${bk.slug}.md`;
+    const level0File = resolvePath(bk.level_0_file || `level-0-context/${bk.slug}.md`);
+    const level1File = resolvePath(bk.level_1_file || `level-1-full-text/${bk.slug}.md`);
+    const level2File = resolvePath(bk.level_2_file || `level-2-detailed-outline/${bk.slug}.md`);
     if (fileCache[level0File]) {
-      bookSouls[bk.id] = parseLevel0BookMarkdown(fileCache[level0File]);
+      bookSouls[bk.id] = parseLevel0BookMarkdown(fileCache[level0File], lang);
     }
     return {
       id: bk.id,
@@ -635,12 +790,12 @@ export async function fetchGenesisStoryFromRepo(
 
   const parsedL1ByFile: Record<string, Record<number, ParsedLevel1Chapter>> = {};
   for (const p of level1Files) {
-    if (fileCache[p]) parsedL1ByFile[p] = parseLevel1Markdown(fileCache[p]);
+    if (fileCache[p]) parsedL1ByFile[p] = parseLevel1Markdown(fileCache[p], lang);
   }
 
   const parsedL2ByFile: Record<string, Record<number, SceneDetailedOutline>> = {};
   for (const p of level2Files) {
-    if (fileCache[p]) parsedL2ByFile[p] = parseLevel2Markdown(fileCache[p]);
+    if (fileCache[p]) parsedL2ByFile[p] = parseLevel2Markdown(fileCache[p], lang);
   }
 
   const level3Map = fileCache[level3File] ? parseLevel3Markdown(fileCache[level3File]) : {};
@@ -654,38 +809,71 @@ export async function fetchGenesisStoryFromRepo(
       chaptersRef: ill.chapters_ref,
       title: ill.title,
       artStyle: mapIllustrationStyle(bk?.illustrationStyle || "", bk?.number || 1),
-      repoImage: ill.image,
+      repoImage: resolvePath(ill.image),
       imageGenerated: Boolean(ill.image_generated),
     };
   });
 
   const illustrationMap = new Map(illustrations.map((il) => [il.id, il]));
 
+  const defaultVoiceNote =
+    lang === "en"
+      ? "Keep a warm, natural speaking voice and pause gently between living story images."
+      : lang === "zh"
+      ? "保持温暖自然的讲述语调，在每个生动的画面之间从容换气停顿。"
+      : "Giữ giọng kể ấm áp, tự nhiên, ngắt nhịp vừa phải theo từng hình ảnh.";
+
+  const defaultEmotionalRhythm =
+    lang === "en"
+      ? "Unhurried, dignified, and vivid with living imagery."
+      : lang === "zh"
+      ? "舒缓庄重，富有鲜活饱满的画面感。"
+      : "Khoan thai, trang trọng và giàu hình ảnh sống động.";
+
   const scenes: StoryScene[] = (indexData.chapters || []).map((ch) => {
     const bookMeta = bookMap.get(ch.book_id);
     const illMeta = illustrationMap.get(ch.illustration_id);
 
-    const l1Path = ch.levels?.level_1 || bookMeta?.level1File || "";
-    const l2Path = ch.levels?.level_2 || bookMeta?.level2File || "";
+    const l1Path = ch.levels?.level_1
+      ? resolvePath(ch.levels.level_1)
+      : bookMeta?.level1File || "";
+    const l2Path = ch.levels?.level_2
+      ? resolvePath(ch.levels.level_2)
+      : bookMeta?.level2File || "";
 
     const l1Chapter = l1Path ? parsedL1ByFile[l1Path]?.[ch.chapter_number] : undefined;
     const l2Outline = l2Path ? parsedL2ByFile[l2Path]?.[ch.chapter_number] : undefined;
     const l3Points = level3Map[ch.id];
 
+    const formattedTitle = formatChapterTitle(ch.chapter_number, ch.title, lang);
     const summaryPoints =
       l3Points && l3Points.length > 0
         ? l3Points
-        : l2Outline?.beats.slice(0, 5) || [`Chương ${ch.chapter_number}: ${ch.title}.`];
+        : l2Outline?.beats.slice(0, 5) || [`${formattedTitle}.`];
+
+    const level4ImagePath = ch.levels?.level_4?.image
+      ? resolvePath(ch.levels.level_4.image)
+      : ch.image
+      ? resolvePath(ch.image)
+      : illMeta?.repoImage || "";
 
     const levelPaths: SceneLevelPaths = {
-      level0Overview: ch.levels?.level_0?.overview || overviewPath,
-      level0Book: ch.levels?.level_0?.book || bookMeta?.level0File || "",
+      level0Overview: ch.levels?.level_0?.overview
+        ? resolvePath(ch.levels.level_0.overview)
+        : overviewPath,
+      level0Book: ch.levels?.level_0?.book
+        ? resolvePath(ch.levels.level_0.book)
+        : bookMeta?.level0File || "",
       level1: l1Path,
       level2: l2Path,
-      level3: ch.levels?.level_3 || level3File,
-      level4Gallery: ch.levels?.level_4?.gallery || level4Gallery,
-      level4Image: ch.levels?.level_4?.image || ch.image || illMeta?.repoImage || "",
-      level4PromptSpec: ch.levels?.level_4?.prompt_spec || level4PromptSpec,
+      level3: ch.levels?.level_3 ? resolvePath(ch.levels.level_3) : level3File,
+      level4Gallery: ch.levels?.level_4?.gallery
+        ? resolvePath(ch.levels.level_4.gallery)
+        : level4Gallery,
+      level4Image: level4ImagePath,
+      level4PromptSpec: ch.levels?.level_4?.prompt_spec
+        ? resolvePath(ch.levels.level_4.prompt_spec)
+        : level4PromptSpec,
     };
 
     return {
@@ -697,20 +885,20 @@ export async function fetchGenesisStoryFromRepo(
       illustrationId: ch.illustration_id,
       slug: illMeta?.repoImage?.split("/").pop()?.replace(/\.png$/, "") || ch.id,
       isEpilogue: Boolean(ch.is_epilogue),
-      title: `Chương ${ch.chapter_number}: ${ch.title}`,
+      title: formattedTitle,
       passage: l1Chapter?.passage || ch.title,
-      voiceNote:
-        l1Chapter?.voiceNote ||
-        "Giữ giọng kể ấm áp, tự nhiên, ngắt nhịp vừa phải theo từng hình ảnh.",
+      voiceNote: l1Chapter?.voiceNote || defaultVoiceNote,
       detailedOutline: l2Outline || {
         characters: [ch.title],
         localizedDetails: [],
-        emotionalRhythm: "Khoan thai, trang trọng và giàu hình ảnh sống động.",
+        emotionalRhythm: defaultEmotionalRhythm,
         beats: summaryPoints,
       },
       summaryPoints,
-      artStyle: illMeta?.artStyle || mapIllustrationStyle(bookMeta?.illustrationStyle || "", bookMeta?.number || 1),
-      repoImage: ch.image || illMeta?.repoImage,
+      artStyle:
+        illMeta?.artStyle ||
+        mapIllustrationStyle(bookMeta?.illustrationStyle || "", bookMeta?.number || 1),
+      repoImage: ch.image ? resolvePath(ch.image) : illMeta?.repoImage,
       imageGenerated: illMeta ? illMeta.imageGenerated : false,
       levelPaths,
     };
@@ -730,14 +918,29 @@ export async function fetchGenesisStoryFromRepo(
     ],
   };
 
+  const localizedSourceInfo =
+    lang === "en"
+      ? `Source: xuvivn/from-genesis-to-nativity · ${indexData.total_books} Books · ${indexData.total_chapters} Chapters · ${indexData.total_illustrations} Illustrations`
+      : lang === "zh"
+      ? `语料来源：xuvivn/from-genesis-to-nativity · ${indexData.total_books}卷 · ${indexData.total_chapters}章 · ${indexData.total_illustrations}幅插画`
+      : `Nguồn từ repo xuvivn/from-genesis-to-nativity · ${indexData.total_books} Quyển · ${indexData.total_chapters} Chương · ${indexData.total_illustrations} Tranh`;
+
+  const localizedGoal =
+    lang === "en"
+      ? "Explore background context and practice telling all 180 chapters across 4 levels—from full text to 28 wordless illustrations."
+      : lang === "zh"
+      ? "理解故事背景与精神，并循序练习讲述全180章——从完整全文到28幅纯视觉记忆插画。"
+      : "Đọc hiểu bối cảnh & luyện kể trọn vẹn 180 Chương theo 4 cấp độ từ toàn văn đến 28 tranh thuần hình ảnh.";
+
   return {
     id: GENESIS_STORY_ID,
+    language: lang,
     title: indexData.title || "Từ Sáng Thế Đến Giáng Sinh — Bộ Sử Thi Luyện Kể Chuyện",
-    titleEn: "From Genesis to Nativity — Epic Storytelling Practice",
-    sourceInfo: `Nguồn từ repo xuvivn/from-genesis-to-nativity · ${indexData.total_books} Quyển · ${indexData.total_chapters} Chương · ${indexData.total_illustrations} Tranh`,
-    targetAge: indexData.target_age || "9–10 tuổi",
+    titleEn: lang === "en" ? indexData.title : "From Genesis to Nativity — Epic Storytelling Practice",
+    sourceInfo: localizedSourceInfo,
+    targetAge: indexData.target_age || (lang === "en" ? "9–10 years" : lang === "zh" ? "9–10岁" : "9–10 tuổi"),
     styleReference: indexData.style_reference || "Jakob Streit",
-    goal: "Đọc hiểu bối cảnh & luyện kể trọn vẹn 180 Chương theo 4 cấp độ từ toàn văn đến 28 tranh thuần hình ảnh.",
+    goal: localizedGoal,
     defaultArtStyle: "chalkboard",
     repoUrl: GENESIS_REPO_URL,
     rawBaseUrl: activeBaseUrl,

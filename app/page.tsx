@@ -80,7 +80,8 @@ function formatLastSynced(iso?: string, lang?: string): string {
   const ts = Date.parse(iso);
   if (Number.isNaN(ts)) return "";
   try {
-    return new Date(ts).toLocaleString(lang === "en" ? "en-US" : "vi-VN", {
+    const localeTag = lang === "en" ? "en-US" : lang === "zh" ? "zh-CN" : "vi-VN";
+    return new Date(ts).toLocaleString(localeTag, {
       hour: "2-digit",
       minute: "2-digit",
       day: "2-digit",
@@ -240,11 +241,14 @@ export default function StorytellingPracticePage() {
     };
   }, [pdfMenuLocation]);
 
-  // Làm mới bộ nhớ đệm ảnh lỗi khi vừa đồng bộ xong từ repo
+  // Làm mới bộ nhớ đệm ảnh lỗi & văn bản cổ khi vừa đồng bộ xong hoặc đổi ngôn ngữ
   useEffect(() => {
     setFailedRepoImages({});
     ancientCacheRef.current = {};
-  }, [selectedStory?.lastSyncedAt]);
+    setActiveAncientBook(null);
+    setAncientBookContent("");
+    setAncientBookError("");
+  }, [selectedStory?.lastSyncedAt, selectedStory?.language]);
 
   const allScenes: StoryScene[] = useMemo(() => selectedStory?.scenes || [], [selectedStory]);
   const allIllustrations: StoryIllustration[] = useMemo(
@@ -696,7 +700,8 @@ export default function StorytellingPracticePage() {
     setActiveAncientBook(book);
     setAncientBookError("");
 
-    const cached = ancientCacheRef.current[book.file];
+    const cacheKey = `${lang}:${book.file}`;
+    const cached = ancientCacheRef.current[cacheKey];
     if (cached) {
       setAncientBookContent(cached);
       return;
@@ -709,7 +714,7 @@ export default function StorytellingPracticePage() {
         book.file,
         selectedStory?.rawBaseUrl || GENESIS_JSDELIVR_BASE_URL
       );
-      ancientCacheRef.current[book.file] = md;
+      ancientCacheRef.current[cacheKey] = md;
       setAncientBookContent(md);
     } catch (err) {
       setAncientBookError(
@@ -1119,9 +1124,13 @@ export default function StorytellingPracticePage() {
                     {bk.isEpilogue
                       ? lang === "en"
                         ? `Book V · Epilogue (${bk.totalChapters})`
+                        : lang === "zh"
+                        ? `第五卷 · 外传 (${bk.totalChapters})`
                         : `Quyển V · Ngoại truyện (${bk.totalChapters})`
                       : lang === "en"
                       ? `Book ${bk.number} (${bk.totalChapters})`
+                      : lang === "zh"
+                      ? `第${bk.number}卷 (${bk.totalChapters})`
                       : `Quyển ${bk.number} (${bk.totalChapters})`}
                   </button>
                 ))}

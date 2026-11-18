@@ -51,6 +51,7 @@ import {
   GENESIS_RAW_BASE_URL,
   GENESIS_REPO_URL,
   GENESIS_STORY_ID,
+  LOCAL_REPO_API_BASE_URL,
   REPO_SYNC_TTL_MS,
   getCandidateRepoBaseUrls,
   mapWithConcurrency,
@@ -58,8 +59,10 @@ import {
   parseLevel1Markdown,
   parseLevel2Markdown,
   parseLevel3Markdown,
+  resolveLocaleRepoPath,
   shouldAutoSyncRepo,
 } from "../lib/repoStoryLoader";
+import { getLocalGenesisRepoDir, resolveSafeLocalRepoFile } from "../lib/server/localRepo";
 import { WaldorfArtStyle } from "../lib/types";
 
 test("Default seed serves exclusively xuvivn/from-genesis-to-nativity (5 Books, 180 Chapters, 28 Illustrations)", () => {
@@ -86,7 +89,7 @@ test("Default seed serves exclusively xuvivn/from-genesis-to-nativity (5 Books, 
   assert.equal(chapterCountByBook.get("quyen-5"), 10);
 });
 
-test("Background & Practice levels: All 5 books, 180 chapters, and 28 illustrations have valid repo paths", () => {
+test("Background & Practice levels: All 5 books, 180 chapters, and 28 illustrations have valid repo paths across vi/en/zh", () => {
   const seed = getSeedData();
   const story = seed.stories[0];
 
@@ -97,9 +100,9 @@ test("Background & Practice levels: All 5 books, 180 chapters, and 28 illustrati
     assert.ok(bookSoul.storytellingRhythm.trim().length > 20, `${bk.id}: missing storytellingRhythm`);
     assert.ok(bookSoul.ageMetaphor.trim().length > 20, `${bk.id}: missing ageMetaphor`);
     assert.ok(bookSoul.pronunciations.length >= 3, `${bk.id}: must have pronunciation guides`);
-    assert.ok(bk.level0File.startsWith("level-0-khong-gian-boi-canh/"));
-    assert.ok(bk.level1File.startsWith("level-1-toan-van/"));
-    assert.ok(bk.level2File.startsWith("level-2-dan-y-chi-tiet/"));
+    assert.ok(bk.level0File.startsWith("locales/vi/level-0-context/"));
+    assert.ok(bk.level1File.startsWith("locales/vi/level-1-full-text/"));
+    assert.ok(bk.level2File.startsWith("locales/vi/level-2-detailed-outline/"));
   }
 
   for (const sc of story.scenes) {
@@ -110,15 +113,24 @@ test("Background & Practice levels: All 5 books, 180 chapters, and 28 illustrati
     assert.ok(sc.detailedOutline.beats.length >= 3, `${sc.id}: missing beats`);
     assert.ok(sc.summaryPoints.length >= 3, `${sc.id}: missing summaryPoints`);
     assert.ok(sc.levelPaths, `${sc.id}: missing levelPaths`);
-    assert.ok(sc.levelPaths.level0Book.startsWith("level-0-khong-gian-boi-canh/"));
-    assert.ok(sc.levelPaths.level1.startsWith("level-1-toan-van/"));
-    assert.ok(sc.levelPaths.level2.startsWith("level-2-dan-y-chi-tiet/"));
-    assert.equal(sc.levelPaths.level3, "level-3-dan-y-tom-tat/dan-y-tom-tat-cac-chuong.md");
-    assert.ok(sc.repoImage?.startsWith("level-4-tranh-goi-nho/images/"));
+    assert.ok(sc.levelPaths.level0Book.startsWith("locales/vi/level-0-context/"));
+    assert.ok(sc.levelPaths.level1.startsWith("locales/vi/level-1-full-text/"));
+    assert.ok(sc.levelPaths.level2.startsWith("locales/vi/level-2-detailed-outline/"));
+    assert.equal(sc.levelPaths.level3, "locales/vi/level-3-summary-outline/chapter-summaries.md");
+    assert.ok(sc.repoImage?.startsWith("assets/images/"));
   }
 
   const generatedCount = story.illustrations.filter((il) => il.imageGenerated).length;
-  assert.equal(generatedCount, 21, "Expected tranh-01..tranh-21 to have imageGenerated=true");
+  assert.equal(generatedCount, 28, "Expected all 28 illustrations tranh-01..tranh-28 to have imageGenerated=true");
+
+  for (const langCode of ["en", "zh"] as const) {
+    const localizedSeed = getSeedData(langCode).stories[0];
+    assert.equal(localizedSeed.language, langCode);
+    assert.equal(localizedSeed.scenes.length, 180);
+    assert.equal(localizedSeed.illustrations.length, 28);
+    assert.ok(localizedSeed.books?.[0].level1File.startsWith(`locales/${langCode}/level-1-full-text/`));
+    assert.ok(localizedSeed.soul.ancientBooks?.[0].file.startsWith(`locales/${langCode}/level-0-context/ancient-texts/`));
+  }
 });
 
 test("Repo Markdown parsers parse updated 180-chapter formats (Level 0, Level 1, Level 2, Level 3)", () => {
@@ -262,8 +274,9 @@ test("PDF Exporter: buildFullStoryPrintableHtml includes all 180 chapters and em
     );
   }
 
-  // Generated illustrations (1..21) use CDN PNG with SVG fallback; ungenerated (22..28) use SVG data URL
-  assert.ok(html.includes(`${GENESIS_JSDELIVR_BASE_URL}/level-4-tranh-goi-nho/images/canh-01`));
+  // All 28 generated illustrations use CDN/local PNG with SVG fallback
+  assert.ok(html.includes(`${GENESIS_JSDELIVR_BASE_URL}/assets/images/canh-01`));
+  assert.ok(html.includes(`${GENESIS_JSDELIVR_BASE_URL}/assets/images/canh-28`));
   assert.ok(html.includes("data:image/svg+xml;utf8,"));
 
   // Check chapter coverage in PDF
@@ -302,6 +315,22 @@ test("PDF Exporter: buildFullStoryPrintableHtml includes all 180 chapters and em
   assert.ok(textOnlyEnHtml.includes("Text-Only Edition (No Images)"));
   assert.ok(!textOnlyEnHtml.includes("data-illustration-id="));
   assert.ok(!textOnlyEnHtml.includes("<img "));
+
+  const zhSeed = getSeedData("zh").stories[0];
+  const zhPdfWithImages = buildFullStoryPrintableHtml(zhSeed, {
+    includeImages: true,
+    lang: "zh",
+  });
+  assert.ok(zhPdfWithImages.includes("全文目录"));
+  assert.ok(zhPdfWithImages.includes("插画 01"));
+  assert.ok(zhPdfWithImages.includes("讲演提示"));
+
+  const textOnlyZhHtml = buildFullStoryPrintableHtml(zhSeed, {
+    includeImages: false,
+    lang: "zh",
+  });
+  assert.ok(textOnlyZhHtml.includes("纯文本版（无插画）"));
+  assert.ok(!textOnlyZhHtml.includes("<img "));
 
   // Full-passage guard must reject unsynced seed placeholders
   assert.equal(hasFullStoryPassages(story), false);
@@ -671,8 +700,10 @@ test("Community Feedback (Zero-AI): supports threads, replies, editorial respons
 
     const feedbackCopyVi = JSON.stringify(translations.vi.feedback);
     const feedbackCopyEn = JSON.stringify(translations.en.feedback);
+    const feedbackCopyZh = JSON.stringify(translations.zh.feedback);
     assert.ok(!/\bai\b|trợ lý ai/i.test(feedbackCopyVi), "Vietnamese feedback copy must not mention AI");
     assert.ok(!/\bai\b|assistant/i.test(feedbackCopyEn), "English feedback copy must not mention AI");
+    assert.ok(!/\bai\b|人工智能|智能助手/i.test(feedbackCopyZh), "Chinese feedback copy must not mention AI");
 
     const feedbackComponentSrc = fs.readFileSync(
       path.join(process.cwd(), "components", "FeedbackSection.tsx"),
@@ -685,5 +716,188 @@ test("Community Feedback (Zero-AI): supports threads, replies, editorial respons
   } finally {
     process.env.FEEDBACK_API_TOKEN = prevToken;
     resetDbForTests();
+  }
+});
+
+test("Multilingual Markdown parsers & path resolver support vi, en, and zh", () => {
+  assert.equal(resolveLocaleRepoPath("level-1-full-text/book-1-genesis-and-light.md", "en"), "locales/en/level-1-full-text/book-1-genesis-and-light.md");
+  assert.equal(resolveLocaleRepoPath("assets/images/canh-01-khoi-nguyen-va-cuoc-chien-anh-sang.png", "zh"), "assets/images/canh-01-khoi-nguyen-va-cuoc-chien-anh-sang.png");
+  assert.deepEqual(getCandidateRepoBaseUrls(undefined, { includeLocalApi: true }), [
+    LOCAL_REPO_API_BASE_URL,
+    GENESIS_JSDELIVR_BASE_URL,
+    GENESIS_RAW_BASE_URL,
+  ]);
+
+  const sampleEnL0 = `# Level 0 — Book I
+## 1. Cultural Atmosphere & Core Spirit
+Book I carries listeners back to the earliest mythic age of Light and Music.
+## 2. Distinctive Storytelling Rhythm (Ages 9–10)
+- **Opening Voice:** Resonant and unhurried.
+## 3. Touchpoints & Metaphors for Ages 9–10
+- **Core Metaphor:** Like a flower reaching toward light.
+## 4. Pronunciation Guide for Proper Names & Ancient Places
+| Name in Text | Natural Read-Aloud Pronunciation (English) | Story Context |
+| :--- | :--- | :--- |
+| **Michael** | *MIKE-ul* | Archangel bearing the sword of light |
+`;
+  const parsedEnL0 = parseLevel0BookMarkdown(sampleEnL0, "en");
+  assert.ok(parsedEnL0.culturalSpirit.includes("Light and Music"));
+  assert.equal(parsedEnL0.pronunciations.length, 1);
+  assert.equal(parsedEnL0.pronunciations[0].term, "Michael");
+
+  const sampleZhL0 = `# Level 0 — 第一卷
+## 1. 文化背景与核心精神
+第一卷把听众带回到最原初的神话时代。
+## 2. 9–10岁适用讲述节奏与声线
+- **开篇序曲：** 声音洪亮而舒缓。
+## 3. 9–10岁孩子的共鸣触点与核心隐喻
+- **核心隐喻：** 人站在光明与黑暗之间，正像一朵花。
+## 4. 专有名词与古地名读音指南
+| 标准中文译名 | 拼音与朗读提示 | 出场语境 |
+| :--- | :--- | :--- |
+| **米迦勒**（Michael） | \`Mǐjiālè\` | 手持光明宝剑的总领天使 |
+`;
+  const parsedZhL0 = parseLevel0BookMarkdown(sampleZhL0, "zh");
+  assert.ok(parsedZhL0.culturalSpirit.includes("神话时代"));
+  assert.equal(parsedZhL0.pronunciations.length, 1);
+  assert.ok(parsedZhL0.pronunciations[0].term.includes("米迦勒"));
+
+  const sampleEnL1 = `### Chapter 1: The World's Beginning
+Long, long ago, there was heaven above.
+#### Storytelling Notes
+- **Epic opening:** Read slowly.
+---
+### Chapter 2: Michael and the Dragon
+Down in the dark abyss, evil spirits plotted.
+#### Storytelling Notes
+- **Contrast:** Clear voice for Michael.
+`;
+  const parsedEnL1 = parseLevel1Markdown(sampleEnL1, "en");
+  assert.ok(parsedEnL1[1].passage.includes("Long, long ago"));
+  assert.ok(parsedEnL1[1].voiceNote.includes("Read slowly"));
+  assert.ok(parsedEnL1[2].passage.includes("dark abyss"));
+
+  const sampleZhL1 = `### 第1章：世界的起源
+很久很久以前，那时已经有一座天堂。
+#### 讲演提示
+- **开篇节奏：** 读得舒缓从容。
+`;
+  const parsedZhL1 = parseLevel1Markdown(sampleZhL1, "zh");
+  assert.ok(parsedZhL1[1].passage.includes("很久很久以前"));
+  assert.ok(parsedZhL1[1].voiceNote.includes("舒缓从容"));
+
+  const sampleEnL2 = `### Chapter 1: The World's Beginning
+- **Characters & Central Symbols:** The Creator, Lucifer, Michael, the scar on heaven's wall.
+- **Detailed Plot Beats:**
+  - In the beginning there was only heaven.
+  - Michael drove Lucifer out.
+- **Meaning / Storytelling Focus:** Explains pride and light.
+`;
+  const parsedEnL2 = parseLevel2Markdown(sampleEnL2, "en");
+  assert.equal(parsedEnL2[1].characters.length, 4);
+  assert.equal(parsedEnL2[1].beats.length, 2);
+  assert.ok(parsedEnL2[1].emotionalRhythm.includes("pride and light"));
+
+  const sampleZhL2 = `### 第1章：世界的起源
+- **核心人物与象征意象：** 造物主、路西法、大天使们（米迦勒、加百列）、闪电之剑。
+- **详细情节脉络：**
+  - 太初之时唯有天堂。
+  - 米迦勒击退路西法。
+- **故事寓意与讲述重点：** 阐释光明与黑暗的分野。
+`;
+  const parsedZhL2 = parseLevel2Markdown(sampleZhL2, "zh");
+  assert.deepEqual(parsedZhL2[1].characters, ["造物主", "路西法", "大天使们（米迦勒、加百列）", "闪电之剑"]);
+  assert.equal(parsedZhL2[1].beats.length, 2);
+  assert.ok(parsedZhL2[1].emotionalRhythm.includes("光明与黑暗"));
+
+  const sampleMultiL3 = `## Book I: In the Beginning (67 Chapters)
+### Chapter 1: The World's Beginning
+- Heaven shone with light.
+- Michael defended the wall.
+
+## 第五卷（外传）：冬夜里爱的种子（10章）
+### 第10章：从米拉城的红袍到平安夜的圣诞老人
+- 圣尼古拉的传说化作圣诞老人。
+`;
+  const parsedMultiL3 = parseLevel3Markdown(sampleMultiL3);
+  assert.equal(parsedMultiL3["quyen-1-chuong-01"].length, 2);
+  assert.equal(parsedMultiL3["quyen-5-chuong-10"][0], "圣尼古拉的传说化作圣诞老人。");
+});
+
+test("Local repo bridge & integration: safely resolves sibling from-genesis-to-nativity multilingual corpus and 28 PNGs", () => {
+  const repoDir = getLocalGenesisRepoDir();
+  if (!fs.existsSync(repoDir)) {
+    return;
+  }
+
+  // Path traversal and private/hidden file rejection
+  assert.equal(resolveSafeLocalRepoFile(["..", "ViWaldorf-harness", "DAO.md"], repoDir), null);
+  assert.equal(resolveSafeLocalRepoFile([".git", "HEAD"], repoDir), null);
+  assert.equal(resolveSafeLocalRepoFile(["private", "notes.md"], repoDir), null);
+  assert.equal(resolveSafeLocalRepoFile(["locales", "vi", ".DS_Store"], repoDir), null);
+
+  const langManifest = resolveSafeLocalRepoFile(["languages.json"], repoDir);
+  assert.ok(langManifest, "languages.json must be resolvable via local repo bridge");
+  const manifestJson = JSON.parse(fs.readFileSync(langManifest.filePath, "utf8")) as {
+    total_books: number;
+    total_chapters: number;
+    total_illustrations: number;
+    languages: Array<{ code: string; index_file: string }>;
+  };
+  assert.equal(manifestJson.total_books, 5);
+  assert.equal(manifestJson.total_chapters, 180);
+  assert.equal(manifestJson.total_illustrations, 28);
+  assert.deepEqual(
+    manifestJson.languages.map((l) => l.code),
+    ["vi", "en", "zh"]
+  );
+
+  for (const langCode of ["vi", "en", "zh"] as const) {
+    const indexSafe = resolveSafeLocalRepoFile(["locales", langCode, "story-index.json"], repoDir);
+    assert.ok(indexSafe, `Missing story-index.json for ${langCode}`);
+    const indexJson = JSON.parse(fs.readFileSync(indexSafe.filePath, "utf8")) as {
+      levels: Array<{ ancient_books?: Array<{ file: string }> }>;
+      books: Array<{ level_0_file: string; level_1_file: string; level_2_file: string; total_chapters: number }>;
+      illustrations: Array<{ id: string; image: string; image_generated: boolean }>;
+      chapters: Array<{ id: string }>;
+    };
+
+    assert.equal(indexJson.chapters.length, 180, `${langCode}: expected 180 chapters`);
+    assert.equal(indexJson.illustrations.length, 28, `${langCode}: expected 28 illustrations`);
+    assert.equal(indexJson.levels[0].ancient_books?.length, 25, `${langCode}: expected 25 ancient books`);
+
+    for (const ill of indexJson.illustrations) {
+      assert.equal(ill.image_generated, true, `${langCode} ${ill.id}: expected image_generated=true`);
+      const imgSegs = ill.image.split("/");
+      assert.ok(resolveSafeLocalRepoFile(imgSegs, repoDir), `Missing image asset ${ill.image}`);
+    }
+
+    for (const bk of indexJson.books) {
+      const l0Path = resolveLocaleRepoPath(bk.level_0_file, langCode);
+      const l1Path = resolveLocaleRepoPath(bk.level_1_file, langCode);
+      const l2Path = resolveLocaleRepoPath(bk.level_2_file, langCode);
+
+      const l0Safe = resolveSafeLocalRepoFile(l0Path.split("/"), repoDir);
+      const l1Safe = resolveSafeLocalRepoFile(l1Path.split("/"), repoDir);
+      const l2Safe = resolveSafeLocalRepoFile(l2Path.split("/"), repoDir);
+      assert.ok(l0Safe && l1Safe && l2Safe, `${langCode}: missing markdown files for ${bk.level_1_file}`);
+
+      const parsedL0 = parseLevel0BookMarkdown(fs.readFileSync(l0Safe.filePath, "utf8"), langCode);
+      assert.ok(parsedL0.pronunciations.length >= 2, `${langCode} ${bk.level_0_file}: expected pronunciations`);
+
+      const parsedL1 = parseLevel1Markdown(fs.readFileSync(l1Safe.filePath, "utf8"), langCode);
+      assert.equal(Object.keys(parsedL1).length, bk.total_chapters, `${langCode} ${bk.level_1_file}: chapter count mismatch`);
+
+      const parsedL2 = parseLevel2Markdown(fs.readFileSync(l2Safe.filePath, "utf8"), langCode);
+      assert.equal(Object.keys(parsedL2).length, bk.total_chapters, `${langCode} ${bk.level_2_file}: chapter count mismatch`);
+    }
+
+    const l3Safe = resolveSafeLocalRepoFile(
+      ["locales", langCode, "level-3-summary-outline", "chapter-summaries.md"],
+      repoDir
+    );
+    assert.ok(l3Safe, `${langCode}: missing Level 3 chapter-summaries.md`);
+    const parsedL3 = parseLevel3Markdown(fs.readFileSync(l3Safe.filePath, "utf8"));
+    assert.equal(Object.keys(parsedL3).length, 180, `${langCode}: expected 180 chapters in Level 3`);
   }
 });

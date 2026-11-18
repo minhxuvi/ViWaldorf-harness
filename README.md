@@ -1,21 +1,21 @@
 # ViWaldorf — Ứng dụng Luyện Kể Chuyện Sư Phạm: *Từ Sáng Thế Đến Giáng Sinh* (Zero-AI)
 
-> **Mục tiêu cốt lõi:** Ứng dụng web gọn nhẹ, không AI, phục vụ duy nhất bộ sử thi **Từ Sáng Thế Đến Giáng Sinh** (5 Quyển · 180 Chương · 28 Tranh gợi nhớ theo Cụm Chương, nguồn `xuvivn/from-genesis-to-nativity`), với **4 cấp độ luyện kể chuyện (Level 1–4)**, **mục đọc thêm Bối cảnh & Linh hồn câu chuyện**, chức năng **xuất bản PDF toàn văn (tùy chọn kèm 28 tranh minh họa Level 4 hoặc không kèm ảnh)**, **tự động ghi nhớ chương và vị trí đang đọc**, **đăng nhập thành viên (Email & Google SSO) để đồng bộ tiến độ**, **không gian Góp ý cộng đồng**, và **Thu âm & Nghe lại** thuần túy không AI. Được dẫn đường bởi [DAO.md](DAO.md).
+> **Mục tiêu cốt lõi:** Ứng dụng web gọn nhẹ, không AI, phục vụ duy nhất bộ sử thi **Từ Sáng Thế Đến Giáng Sinh** (5 Quyển · 180 Chương · 28 Tranh gợi nhớ theo Cụm Chương, nguồn `xuvivn/from-genesis-to-nativity`, hỗ trợ 3 ngôn ngữ **Tiếng Việt `vi` · English `en` · 简体中文 `zh`**), với **4 cấp độ luyện kể chuyện (Level 1–4)**, **mục đọc thêm Bối cảnh & Linh hồn câu chuyện**, chức năng **xuất bản PDF toàn văn (tùy chọn kèm 28 tranh minh họa Level 4 hoặc không kèm ảnh)**, **tự động ghi nhớ chương và vị trí đang đọc**, **đăng nhập thành viên (Email & Google SSO) để đồng bộ tiến độ**, **không gian Góp ý cộng đồng**, và **Thu âm & Nghe lại** thuần túy không AI. Được dẫn đường bởi [DAO.md](DAO.md).
 
 ---
 
 ## 1. Mục Đọc Thêm & Bốn Cấp Độ Luyện Tập
 
-- **Đọc thêm — Bối cảnh & Linh hồn câu chuyện (`level-0-khong-gian-boi-canh/`)**:
-  Nắm tinh thần văn hóa, nhịp điệu kể (9–10 tuổi theo phong cách Jakob Streit), điểm chạm ẩn dụ, hướng dẫn phát âm tên cổ theo từng Quyển, tổng quan sử thi và thư viện 25 văn bản cổ đọc thêm.
+- **Đọc thêm — Bối cảnh & Linh hồn câu chuyện (`locales/{lang}/level-0-context/`)**:
+  Nắm tinh thần văn hóa, nhịp điệu kể (9–10 tuổi theo phong cách Jakob Streit), điểm chạm ẩn dụ, hướng dẫn phát âm tên cổ theo từng Quyển, tổng quan sử thi và thư viện 25 văn bản cổ đọc thêm (`ancient-texts/`).
 1. **Level 1 — Toàn văn câu chuyện**:
    Văn phong kể chuyện đọc thành tiếng hoàn chỉnh cho toàn bộ **180 Chương**, đi kèm *Lưu ý giọng kể* riêng từng chương và chức năng **Tải bản PDF Toàn văn (tùy chọn kèm 28 tranh Level 4 hoặc không kèm ảnh)**.
 2. **Level 2 — Dàn ý chi tiết**:
    Luyện kể không nhìn toàn văn nhưng giữ trọn nhân vật, hình tượng trung tâm, diễn biến chi tiết và ý nghĩa kể chuyện của từng chương.
 3. **Level 3 — Dàn ý tóm tắt**:
-   1 bản khung xương duy nhất bám sát cốt truyện gốc của cả **180 Chương**.
+   1 bản khung xương duy nhất bám sát cốt truyện gốc của cả **180 Chương** (`locales/{lang}/level-3-summary-outline/chapter-summaries.md`).
 4. **Level 4 — Tranh gợi nhớ thuần hình ảnh**:
-   **28 bức tranh vẽ tay truyền thống theo Cụm Chương** (`level-4-tranh-goi-nho/images/` hoặc SVG thuần hình ảnh dự phòng theo *Màu nước ướt-trên-ướt*, *Màu sáp ong*, *Phấn bảng đen*), **không chữ gợi ý**, giúp người kể tự tuôn chảy bằng ngôn ngữ sống của mình.
+   **28 bức tranh vẽ tay truyền thống theo Cụm Chương** (`assets/images/canh-01..28.png` hoặc SVG thuần hình ảnh dự phòng theo *Màu nước ướt-trên-ướt*, *Màu sáp ong*, *Phấn bảng đen*), **không chữ gợi ý**, giúp người kể tự tuôn chảy bằng ngôn ngữ sống của mình.
 
 ---
 
@@ -51,11 +51,11 @@
 ## 5. Phát triển & Kiểm thử Cục bộ
 
 ```bash
-# Cài đặt phụ thuộc & cấu hình môi trường mẫu (tùy chọn cho Google SSO / Ban biên tập)
+# Cài đặt phụ thuộc & cấu hình môi trường mẫu (tùy chọn cho Google SSO / Ban biên tập / Repo local)
 pnpm install
 cp .env.example .env
 
-# Chạy máy chủ phát triển
+# Chạy máy chủ phát triển (khi chạy ở localhost, /api/local-repo tự đọc trực tiếp từ ../from-genesis-to-nativity để test trước khi push)
 pnpm dev
 # Mở http://localhost:3000
 

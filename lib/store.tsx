@@ -38,7 +38,7 @@ interface AppContextType {
   isSyncingRepo: boolean;
   syncError: string;
   syncNotice: string;
-  syncFromRepo: (options?: { force?: boolean }) => Promise<WaldorfStory | null>;
+  syncFromRepo: (options?: { force?: boolean; lang?: Language }) => Promise<WaldorfStory | null>;
   // Auth & Navigation
   user: AuthUser | null;
   isAuthLoading: boolean;
@@ -60,15 +60,20 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const STORAGE_KEY = "viwaldorf_storytelling_v4_genesis_180";
+const STORAGE_KEY = "viwaldorf_storytelling_v5_genesis_180";
 const LEGACY_STORAGE_KEYS = [
+  "viwaldorf_storytelling_v4_genesis_180",
   "viwaldorf_storytelling_v3_genesis",
   "viwaldorf_storytelling_v2",
   "viwaldorf_storytelling_v1",
 ];
 const LANG_STORAGE_KEY = "viwaldorf_lang_v2";
 
-function isValidStoryV4(story: unknown): story is WaldorfStory {
+function isSupportedLang(value: unknown): value is Language {
+  return value === "vi" || value === "en" || value === "zh";
+}
+
+function isValidStoryV5(story: unknown): story is WaldorfStory {
   if (!story || typeof story !== "object") return false;
   const s = story as Partial<WaldorfStory>;
   return (
@@ -140,15 +145,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isProgressLoaded, setIsProgressLoaded] = useState<boolean>(false);
   const [progressVersion, setProgressVersion] = useState<number>(0);
 
-  const isSyncingInFlightRef = useRef<boolean>(false);
-  const activeSyncPromiseRef = useRef<Promise<WaldorfStory | null> | null>(null);
-  const lastSyncAttemptRef = useRef<number>(0);
+  const inFlightSyncByLangRef = useRef<Partial<Record<Language, Promise<WaldorfStory | null>>>>({});
+  const lastSyncAttemptByLangRef = useRef<Partial<Record<Language, number>>>({});
+  const langRef = useRef<Language>("vi");
+  const dataRef = useRef<WaldorfData>(data);
 
   const userRef = useRef<AuthUser | null>(null);
   const readingProgressRef = useRef<ReadingProgress | null>(null);
   const selectedStoryRef = useRef<WaldorfStory | undefined>(data.stories[0]);
   const progressSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  langRef.current = lang;
+  dataRef.current = data;
   selectedStoryRef.current = data.stories[0];
 
   useEffect(() => {
@@ -247,33 +255,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const syncFromRepo = useCallback(
-    async (options?: { force?: boolean }): Promise<WaldorfStory | null> => {
-      if (isSyncingInFlightRef.current && activeSyncPromiseRef.current) {
-        return activeSyncPromiseRef.current;
+    async (options?: { force?: boolean; lang?: Language }): Promise<WaldorfStory | null> => {
+      const targetLang: Language = options?.lang || langRef.current;
+      const existingInFlight = inFlightSyncByLangRef.current[targetLang];
+      if (existingInFlight) {
+        return existingInFlight;
       }
 
       const now = Date.now();
-      const hasFullStory = hasFullStoryPassages(selectedStoryRef.current);
+      const cachedForLang =
+        dataRef.current.storiesByLang?.[targetLang] ||
+        (selectedStoryRef.current?.language === targetLang ? selectedStoryRef.current : undefined);
+      const hasFullStory = hasFullStoryPassages(cachedForLang);
+      const lastAttemptMs = lastSyncAttemptByLangRef.current[targetLang] || 0;
+
       if (
         options?.force &&
         hasFullStory &&
-        lastSyncAttemptRef.current > 0 &&
-        now - lastSyncAttemptRef.current < REPO_MANUAL_COOLDOWN_MS
+        lastAttemptMs > 0 &&
+        now - lastAttemptMs < REPO_MANUAL_COOLDOWN_MS
       ) {
         const waitSec = Math.max(
           1,
-          Math.ceil((REPO_MANUAL_COOLDOWN_MS - (now - lastSyncAttemptRef.current)) / 1000)
+          Math.ceil((REPO_MANUAL_COOLDOWN_MS - (now - lastAttemptMs)) / 1000)
         );
         setSyncError("");
         setSyncNotice(
-          lang === "en"
+          targetLang === "en"
             ? `Recently synced — please wait ${waitSec}s before syncing again.`
+            : targetLang === "zh"
+            ? `刚刚已同步完成 — 请等待 ${waitSec} 秒后再重新加载。`
             : `Vừa đồng bộ xong — vui lòng chờ ${waitSec} giây trước khi tải lại để tránh giới hạn truy cập.`
         );
         return null;
       }
 
-      isSyncingInFlightRef.current = true;
       setIsSyncingRepo(true);
       setSyncError("");
       setSyncNotice("");
@@ -282,18 +298,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
         try {
           const syncedStory = await fetchGenesisStoryFromRepo(GENESIS_JSDELIVR_BASE_URL, {
             preferFresh: Boolean(options?.force),
+            lang: targetLang,
           });
-          lastSyncAttemptRef.current = Date.now();
+          lastSyncAttemptByLangRef.current[targetLang] = Date.now();
           let resolvedStory: WaldorfStory = syncedStory;
           setInternalData((prev) => {
-            const existingRepoStory = prev.stories.find((s) => s.id === GENESIS_STORY_ID);
+            const existingRepoStory =
+              prev.storiesByLang?.[targetLang] ||
+              prev.stories.find(
+                (s) => s.id === GENESIS_STORY_ID && (s.language || "vi") === targetLang
+              );
             const merged = mergeRepoStoryWithLocalPrefs(syncedStory, existingRepoStory);
             resolvedStory = merged;
+            const nextStoriesByLang: Partial<Record<Language, WaldorfStory>> = {
+              ...(prev.storiesByLang || {}),
+              [targetLang]: merged,
+            };
+            const isCurrentActiveLang = targetLang === langRef.current;
             const updated: WaldorfData = {
               ...prev,
-              stories: [merged],
+              stories: isCurrentActiveLang ? [merged] : prev.stories,
+              storiesByLang: nextStoriesByLang,
               updatedAt: new Date().toISOString(),
-              version: "4.0-genesis-180",
+              version: "5.0-genesis-multilang",
             };
             persist(updated);
             return updated;
@@ -304,19 +331,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setSyncError(msg);
           return null;
         } finally {
-          isSyncingInFlightRef.current = false;
-          activeSyncPromiseRef.current = null;
-          setIsSyncingRepo(false);
+          delete inFlightSyncByLangRef.current[targetLang];
+          if (Object.keys(inFlightSyncByLangRef.current).length === 0) {
+            setIsSyncingRepo(false);
+          }
         }
       })();
 
-      activeSyncPromiseRef.current = runPromise;
+      inFlightSyncByLangRef.current[targetLang] = runPromise;
       return runPromise;
     },
-    [lang, persist]
+    [persist]
   );
 
   useEffect(() => {
+    let activeLang: Language = "vi";
     let repoLastSyncedAt: string | undefined;
     let hasRepoStoryInCache = false;
 
@@ -325,25 +354,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(oldKey);
       });
 
-      const savedLang = localStorage.getItem(LANG_STORAGE_KEY) as Language | null;
-      if (savedLang === "vi" || savedLang === "en") {
+      const savedLang = localStorage.getItem(LANG_STORAGE_KEY);
+      if (isSupportedLang(savedLang)) {
+        activeLang = savedLang;
+        langRef.current = savedLang;
         setLangState(savedLang);
       }
 
       const savedRaw = localStorage.getItem(STORAGE_KEY);
       if (savedRaw) {
         const parsed = JSON.parse(savedRaw) as WaldorfData;
-        if (
-          parsed &&
-          Array.isArray(parsed.stories) &&
-          parsed.stories.length > 0 &&
-          isValidStoryV4(parsed.stories[0])
-        ) {
-          selectedStoryRef.current = parsed.stories[0];
-          setInternalData({ ...parsed, stories: [parsed.stories[0]] });
-          hasRepoStoryInCache = true;
-          repoLastSyncedAt = parsed.stories[0].lastSyncedAt;
+        const validByLang: Partial<Record<Language, WaldorfStory>> = {};
+
+        if (parsed?.storiesByLang && typeof parsed.storiesByLang === "object") {
+          (["vi", "en", "zh"] as const).forEach((code) => {
+            const candidate = parsed.storiesByLang?.[code];
+            if (isValidStoryV5(candidate)) {
+              validByLang[code] = { ...candidate, language: candidate.language || code };
+            }
+          });
         }
+
+        if (
+          Array.isArray(parsed?.stories) &&
+          parsed.stories.length > 0 &&
+          isValidStoryV5(parsed.stories[0])
+        ) {
+          const primary = parsed.stories[0];
+          const primaryLang: Language = isSupportedLang(primary.language)
+            ? primary.language
+            : activeLang;
+          if (!validByLang[primaryLang]) {
+            validByLang[primaryLang] = { ...primary, language: primaryLang };
+          }
+        }
+
+        const cachedForActive = validByLang[activeLang];
+        const fallbackSeed = getSeedData(activeLang).stories[0];
+        const activeStory = cachedForActive || fallbackSeed;
+
+        selectedStoryRef.current = activeStory;
+        setInternalData({
+          ...parsed,
+          stories: [activeStory],
+          storiesByLang: validByLang,
+        });
+
+        if (cachedForActive && hasFullStoryPassages(cachedForActive)) {
+          hasRepoStoryInCache = true;
+          repoLastSyncedAt = cachedForActive.lastSyncedAt;
+        }
+      } else if (activeLang !== "vi") {
+        const seedForLang = getSeedData(activeLang);
+        selectedStoryRef.current = seedForLang.stories[0];
+        setInternalData(seedForLang);
       }
     } catch (err) {
       console.warn("Local storage load warning:", err);
@@ -395,11 +459,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })();
 
     if (!hasRepoStoryInCache || shouldAutoSyncRepo(repoLastSyncedAt)) {
-      void syncFromRepo();
+      void syncFromRepo({ lang: activeLang });
     } else if (repoLastSyncedAt) {
       const parsedMs = Date.parse(repoLastSyncedAt);
       if (!Number.isNaN(parsedMs)) {
-        lastSyncAttemptRef.current = parsedMs;
+        lastSyncAttemptByLangRef.current[activeLang] = parsedMs;
       }
     }
 
@@ -425,8 +489,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateData = (updater: (prev: WaldorfData) => WaldorfData) => {
     setInternalData((prev) => {
-      const updated = {
-        ...updater(prev),
+      const next = updater(prev);
+      const activeLang = langRef.current;
+      const activeStory = next.stories[0];
+      const updated: WaldorfData = {
+        ...next,
+        storiesByLang: activeStory
+          ? { ...(next.storiesByLang || prev.storiesByLang || {}), [activeLang]: activeStory }
+          : next.storiesByLang || prev.storiesByLang,
         updatedAt: new Date().toISOString(),
       };
       persist(updated);
@@ -435,10 +505,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const setLang = (newLang: Language) => {
+    if (newLang === langRef.current) return;
+    langRef.current = newLang;
     setLangState(newLang);
     try {
       localStorage.setItem(LANG_STORAGE_KEY, newLang);
     } catch {}
+
+    const cachedForLang = dataRef.current.storiesByLang?.[newLang];
+    const nextStory = cachedForLang || getSeedData(newLang).stories[0];
+    setInternalData((prev) => ({
+      ...prev,
+      stories: [nextStory],
+    }));
+
+    if (
+      !cachedForLang ||
+      !hasFullStoryPassages(cachedForLang) ||
+      shouldAutoSyncRepo(cachedForLang.lastSyncedAt)
+    ) {
+      void syncFromRepo({ lang: newLang });
+    }
   };
 
   const t = (translations[lang] || translations.vi) as (typeof translations)["vi"];
