@@ -101,7 +101,7 @@ export const translations = {
     story: {
       pageTitle: "Từ Sáng Thế Đến Giáng Sinh",
       pageSubtitle:
-        "Không gian luyện kể chuyện chuyên biệt cho bộ sử thi 5 Quyển · 180 Chương · 28 Tranh minh họa (phong cách Jakob Streit, độ tuổi 9–10). Luyện tập theo 4 cấp độ từ toàn văn đến tranh thuần hình ảnh, đọc thêm bối cảnh, xuất bản PDF toàn văn kèm tranh và thu âm nghe lại cục bộ — không AI.",
+        "Không gian luyện kể chuyện chuyên biệt cho bộ sử thi 5 Quyển · 180 Chương · 28 Tranh minh họa (phong cách Jakob Streit, độ tuổi 9–10). Luyện tập theo 4 cấp độ từ toàn văn đến tranh thuần hình ảnh, đọc thêm bối cảnh, xuất bản PDF toàn văn kèm tranh, cùng thu âm và nghe lại giọng kể ngay trên thiết bị của bạn.",
       booksCountSuffix: "Quyển",
       chaptersCountSuffix: "Chương",
       illustrationsCountSuffix: "Tranh gợi nhớ",
@@ -350,7 +350,7 @@ export const translations = {
     story: {
       pageTitle: "From Genesis to Nativity",
       pageSubtitle:
-        "Dedicated storytelling practice studio for the 5-Book · 180-Chapter · 28-Illustration epic (Jakob Streit style, ages 9–10). Practice across 4 levels from full text to wordless visual art, read optional background context, download the full story as PDF with Level 4 illustrations, and record locally — zero AI.",
+        "Dedicated storytelling practice studio for the 5-Book · 180-Chapter · 28-Illustration epic (Jakob Streit style, ages 9–10). Practice across 4 levels from full text to wordless visual art, read optional background context, download the full story as PDF with Level 4 illustrations, and record and play back your telling right on your own device.",
       booksCountSuffix: "Books",
       chaptersCountSuffix: "Chapters",
       illustrationsCountSuffix: "Illustrations",
