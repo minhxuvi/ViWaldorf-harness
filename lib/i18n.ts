@@ -92,10 +92,8 @@ export const translations = {
         textSizeMedium: "Vừa",
         textSizeLarge: "Lớn",
         openIllustrationBtn: "Mở tranh minh họa cụm này (Level 4)",
-        pageLabel: "Trang",
-        prevPage: "Trang trước",
-        nextPage: "Trang tiếp",
-        tapOrSwipeHint: "Chạm màn hình (trái: lùi, phải: tiếp) hoặc vuốt ngang để lật trang",
+        tapOrSwipeHint:
+          "Chạm nửa phải màn hình để cuộn xuống 1 trang màn hình, nửa trái để cuộn lên · Vuốt ngang để chuyển chương",
       },
       level2: {
         charactersLabel: "Nhân vật & Hình tượng trung tâm",
@@ -248,10 +246,8 @@ export const translations = {
         textSizeMedium: "M",
         textSizeLarge: "L",
         openIllustrationBtn: "Open Cluster Art (Level 4)",
-        pageLabel: "Page",
-        prevPage: "Previous Page",
-        nextPage: "Next Page",
-        tapOrSwipeHint: "Tap screen (left: previous, right: next) or swipe horizontally to turn pages",
+        tapOrSwipeHint:
+          "Tap right half of screen to scroll down one screen, left half to scroll up · Swipe horizontally to switch chapters",
       },
       level2: {
         charactersLabel: "Characters & Central Motifs",

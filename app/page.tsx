@@ -21,7 +21,6 @@ import {
   GENESIS_JSDELIVR_BASE_URL,
   GENESIS_REPO_URL,
   getCandidateRepoBaseUrls,
-  paginatePassage,
 } from "@/lib/repoStoryLoader";
 import {
   Mic,
@@ -135,7 +134,6 @@ export default function StorytellingPracticePage() {
   // Trạng thái luyện tập 4 cấp độ (Level 1 -> Level 4)
   const [activeLevel, setActiveLevel] = useState<PracticeLevel>(1);
   const [activeSceneIndex, setActiveSceneIndex] = useState<number>(0);
-  const [activePageIndex, setActivePageIndex] = useState<number>(0);
   const [activeIllustrationIndex, setActiveIllustrationIndex] = useState<number>(0);
   const [level1FlowMode, setLevel1FlowMode] = useState<"scene" | "full">("scene");
   const [level1TextSize, setLevel1TextSize] = useState<Level1TextSize>("md");
@@ -236,14 +234,6 @@ export default function StorytellingPracticePage() {
   const currentIllustration: StoryIllustration | undefined =
     visibleIllustrations[safeIllustrationIndex] || visibleIllustrations[0];
 
-  const chapterPages = useMemo(
-    () => paginatePassage(currentScene?.passage || "", level1TextSize),
-    [currentScene?.passage, level1TextSize]
-  );
-  const totalPages = chapterPages.length;
-  const safePageIndex = Math.min(activePageIndex, Math.max(0, totalPages - 1));
-  const currentPageText = chapterPages[safePageIndex] ?? "";
-
   const scrollReadingSurfaceIfNeeded = useCallback(() => {
     if (typeof window === "undefined") return;
     const el = readingSurfaceRef.current;
@@ -255,10 +245,9 @@ export default function StorytellingPracticePage() {
   }, []);
 
   const goToScene = useCallback(
-    (index: number, pageIndex = 0) => {
+    (index: number) => {
       const clamped = Math.max(0, Math.min(Math.max(0, totalScenes - 1), index));
       setActiveSceneIndex(clamped);
-      setActivePageIndex(pageIndex);
       if (!isRecording) setIsRecorderExpanded(false);
       scrollReadingSurfaceIfNeeded();
     },
@@ -268,7 +257,6 @@ export default function StorytellingPracticePage() {
   const handleSelectLevel = useCallback(
     (lvl: PracticeLevel) => {
       setActiveLevel(lvl);
-      setActivePageIndex(0);
       if (!isRecording) setIsRecorderExpanded(false);
     },
     [isRecording]
@@ -278,16 +266,15 @@ export default function StorytellingPracticePage() {
     setSelectedBookId(bookId);
     setActiveSceneIndex(0);
     setActiveIllustrationIndex(0);
-    setActivePageIndex(0);
     if (!isRecording) setIsRecorderExpanded(false);
   };
 
   const handlePrevScene = useCallback(() => {
-    goToScene(safeSceneIndex - 1, 0);
+    goToScene(safeSceneIndex - 1);
   }, [goToScene, safeSceneIndex]);
 
   const handleNextScene = useCallback(() => {
-    goToScene(safeSceneIndex + 1, 0);
+    goToScene(safeSceneIndex + 1);
   }, [goToScene, safeSceneIndex]);
 
   const handlePrevIllustration = useCallback(() => {
@@ -302,70 +289,6 @@ export default function StorytellingPracticePage() {
     if (!isRecording) setIsRecorderExpanded(false);
   }, [totalIllustrations, isRecording]);
 
-  const handlePrevPage = useCallback(() => {
-    if (activeLevel === 4) {
-      handlePrevIllustration();
-      return;
-    }
-    if (activeLevel === 1 && level1FlowMode === "scene") {
-      if (safePageIndex > 0) {
-        setActivePageIndex(safePageIndex - 1);
-        if (!isRecording) setIsRecorderExpanded(false);
-        scrollReadingSurfaceIfNeeded();
-      } else if (safeSceneIndex > 0) {
-        const prevScene = visibleScenes[safeSceneIndex - 1];
-        const prevTotalPages = prevScene
-          ? paginatePassage(prevScene.passage, level1TextSize).length
-          : 1;
-        goToScene(safeSceneIndex - 1, Math.max(0, prevTotalPages - 1));
-      }
-      return;
-    }
-    handlePrevScene();
-  }, [
-    activeLevel,
-    level1FlowMode,
-    safePageIndex,
-    safeSceneIndex,
-    visibleScenes,
-    level1TextSize,
-    isRecording,
-    goToScene,
-    handlePrevIllustration,
-    handlePrevScene,
-    scrollReadingSurfaceIfNeeded,
-  ]);
-
-  const handleNextPage = useCallback(() => {
-    if (activeLevel === 4) {
-      handleNextIllustration();
-      return;
-    }
-    if (activeLevel === 1 && level1FlowMode === "scene") {
-      if (safePageIndex < totalPages - 1) {
-        setActivePageIndex(safePageIndex + 1);
-        if (!isRecording) setIsRecorderExpanded(false);
-        scrollReadingSurfaceIfNeeded();
-      } else if (safeSceneIndex < totalScenes - 1) {
-        goToScene(safeSceneIndex + 1, 0);
-      }
-      return;
-    }
-    handleNextScene();
-  }, [
-    activeLevel,
-    level1FlowMode,
-    safePageIndex,
-    totalPages,
-    safeSceneIndex,
-    totalScenes,
-    isRecording,
-    goToScene,
-    handleNextIllustration,
-    handleNextScene,
-    scrollReadingSurfaceIfNeeded,
-  ]);
-
   const handleJumpToIllustration = (illustrationId?: string) => {
     if (illustrationId) {
       const idx = visibleIllustrations.findIndex((il) => il.id === illustrationId);
@@ -376,20 +299,22 @@ export default function StorytellingPracticePage() {
     handleSelectLevel(4);
   };
 
-  // Điều hướng bàn phím ← / →
+  // Điều hướng bàn phím ← / → để chuyển chương hoặc chuyển tranh
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (e.key === "ArrowLeft") {
-        handlePrevPage();
-      } else if (e.key === "ArrowRight") {
-        handleNextPage();
+      if (activeLevel === 4) {
+        if (e.key === "ArrowLeft") handlePrevIllustration();
+        else if (e.key === "ArrowRight") handleNextIllustration();
+      } else {
+        if (e.key === "ArrowLeft") handlePrevScene();
+        else if (e.key === "ArrowRight") handleNextScene();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handlePrevPage, handleNextPage]);
+  }, [activeLevel, handlePrevIllustration, handleNextIllustration, handlePrevScene, handleNextScene]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.targetTouches.length !== 1) return;
@@ -419,23 +344,47 @@ export default function StorytellingPracticePage() {
     const deltaY = start.y - end.y;
     if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
       lastSwipeAtRef.current = Date.now();
-      if (deltaX > 0) handleNextPage();
-      else handlePrevPage();
+      if (activeLevel === 4) {
+        if (deltaX > 0) handleNextIllustration();
+        else handlePrevIllustration();
+      } else {
+        if (deltaX > 0) handleNextScene();
+        else handlePrevScene();
+      }
     }
   };
 
-  const handleReadingSurfaceClick = (e: React.MouseEvent<HTMLElement>) => {
-    if (Date.now() - lastSwipeAtRef.current < 350) return;
+  const isInteractiveTap = (e: React.MouseEvent<HTMLElement>): boolean => {
+    if (Date.now() - lastSwipeAtRef.current < 350) return true;
     const target = e.target as HTMLElement | null;
-    if (target?.closest("button, a, select, input, label, audio, summary, textarea")) return;
+    if (target?.closest("button, a, select, input, label, audio, summary, textarea")) return true;
     const selection = typeof window !== "undefined" ? window.getSelection()?.toString() : "";
-    if (selection && selection.trim().length > 0) return;
+    return Boolean(selection && selection.trim().length > 0);
+  };
 
+  // Chạm nửa phải màn hình: cuộn xuống 1 trang màn hình; chạm nửa trái: cuộn lên 1 trang màn hình
+  const handleReadingSurfaceClick = (e: React.MouseEvent<HTMLElement>) => {
+    if (isInteractiveTap(e) || typeof window === "undefined") return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relX =
+      rect.width > 0
+        ? (e.clientX - rect.left) / rect.width
+        : e.clientX / Math.max(1, window.innerWidth);
+    const scrollStep = Math.max(240, Math.round(window.innerHeight * 0.85));
+    window.scrollBy({
+      top: relX < 0.5 ? -scrollStep : scrollStep,
+      behavior: "smooth",
+    });
+  };
+
+  // Chạm nửa trái / phải khung tranh Level 4 để chuyển tranh trước / sau
+  const handleIllustrationCanvasClick = (e: React.MouseEvent<HTMLElement>) => {
+    if (isInteractiveTap(e)) return;
     const rect = e.currentTarget.getBoundingClientRect();
     if (rect.width <= 0) return;
     const relX = (e.clientX - rect.left) / rect.width;
-    if (relX < 0.35) handlePrevPage();
-    else handleNextPage();
+    if (relX < 0.5) handlePrevIllustration();
+    else handleNextIllustration();
   };
 
   const handleSyncRepoClick = async () => {
@@ -1258,10 +1207,7 @@ export default function StorytellingPracticePage() {
                   <div className="flex rounded-xl bg-[#F7ECD8]/70 p-1 border border-line">
                     <button
                       type="button"
-                      onClick={() => {
-                        setLevel1FlowMode("scene");
-                        setActivePageIndex(0);
-                      }}
+                      onClick={() => setLevel1FlowMode("scene")}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                         level1FlowMode === "scene"
                           ? "bg-forest text-white shadow-sm"
@@ -1337,7 +1283,7 @@ export default function StorytellingPracticePage() {
                     scenes={visibleScenes}
                     onPrev={handlePrevScene}
                     onNext={handleNextScene}
-                    onSelect={(idx) => goToScene(idx, 0)}
+                    onSelect={goToScene}
                     sceneLabel={t.story.nav.sceneLabel}
                     prevLabel={t.story.nav.prevScene}
                     nextLabel={t.story.nav.nextScene}
@@ -1378,74 +1324,32 @@ export default function StorytellingPracticePage() {
                     )}
                   </div>
 
-                  {/* Đặt Lưu ý giọng kể ở trang đầu của mỗi chương để người kể lấy hơi & tông giọng */}
-                  {safePageIndex === 0 && (
-                    <div className="p-3.5 sm:p-4 rounded-xl bg-[#E3EFE0]/70 border border-[#C5DEC0] space-y-1">
-                      <div className="text-xs font-bold uppercase tracking-wider text-forest flex items-center gap-1.5">
-                        <Volume2 className="w-4 h-4" />
-                        <span>{t.story.level1.voiceNoteLabel}</span>
-                      </div>
-                      <p className="text-sm text-forestDark leading-relaxed italic whitespace-pre-line">
-                        {currentScene.voiceNote}
-                      </p>
+                  {/* Đặt Lưu ý giọng kể lên đầu để người kể lấy hơi & tông giọng trước khi đọc */}
+                  <div className="p-3.5 sm:p-4 rounded-xl bg-[#E3EFE0]/70 border border-[#C5DEC0] space-y-1">
+                    <div className="text-xs font-bold uppercase tracking-wider text-forest flex items-center gap-1.5">
+                      <Volume2 className="w-4 h-4" />
+                      <span>{t.story.level1.voiceNoteLabel}</span>
                     </div>
-                  )}
-
-                  <div className="min-h-[42vh] flex flex-col justify-between gap-4">
-                    <p
-                      className={`font-serif text-ink whitespace-pre-line ${
-                        level1TextSize === "sm"
-                          ? "text-[15px] sm:text-base leading-[1.8]"
-                          : level1TextSize === "lg"
-                          ? "text-lg sm:text-xl leading-[1.9]"
-                          : "text-base sm:text-lg leading-[1.85]"
-                      }`}
-                    >
-                      {currentPageText}
+                    <p className="text-sm text-forestDark leading-relaxed italic whitespace-pre-line">
+                      {currentScene.voiceNote}
                     </p>
-
-                    <div className="pt-3 border-t border-line/60 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handlePrevPage();
-                          }}
-                          disabled={safePageIndex <= 0 && safeSceneIndex <= 0}
-                          className="btn-ghost text-xs py-1.5 px-3 disabled:opacity-30 disabled:pointer-events-none"
-                          aria-label={t.story.level1.prevPage}
-                        >
-                          <ChevronLeft className="w-3.5 h-3.5" />
-                          <span>{t.story.level1.prevPage}</span>
-                        </button>
-
-                        <span className="text-xs font-serif font-bold text-forestDark whitespace-nowrap">
-                          {t.story.level1.pageLabel} {safePageIndex + 1} / {totalPages}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleNextPage();
-                          }}
-                          disabled={
-                            safePageIndex >= totalPages - 1 && safeSceneIndex >= totalScenes - 1
-                          }
-                          className="btn-ghost text-xs py-1.5 px-3 disabled:opacity-30 disabled:pointer-events-none"
-                          aria-label={t.story.level1.nextPage}
-                        >
-                          <span>{t.story.level1.nextPage}</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <p className="text-center text-[11px] text-inkSoft italic">
-                        {t.story.level1.tapOrSwipeHint}
-                      </p>
-                    </div>
                   </div>
+
+                  <p
+                    className={`font-serif text-ink whitespace-pre-line ${
+                      level1TextSize === "sm"
+                        ? "text-[15px] sm:text-base leading-[1.8]"
+                        : level1TextSize === "lg"
+                        ? "text-lg sm:text-xl leading-[1.9]"
+                        : "text-base sm:text-lg leading-[1.85]"
+                    }`}
+                  >
+                    {currentScene.passage}
+                  </p>
+
+                  <p className="text-center text-[11px] text-inkSoft italic pt-2 border-t border-line/60">
+                    {t.story.level1.tapOrSwipeHint}
+                  </p>
 
                   <div className="flex justify-center pt-1">
                     <ChapterNavControls
@@ -1454,7 +1358,7 @@ export default function StorytellingPracticePage() {
                       scenes={visibleScenes}
                       onPrev={handlePrevScene}
                       onNext={handleNextScene}
-                      onSelect={(idx) => goToScene(idx, 0)}
+                      onSelect={goToScene}
                       sceneLabel={t.story.nav.sceneLabel}
                       prevLabel={t.story.nav.prevScene}
                       nextLabel={t.story.nav.nextScene}
@@ -1462,7 +1366,10 @@ export default function StorytellingPracticePage() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-6 max-w-none sm:max-w-[68ch] mx-auto py-2">
+                <div
+                  className="space-y-6 max-w-none sm:max-w-[68ch] mx-auto py-2 cursor-pointer select-text"
+                  onClick={handleReadingSurfaceClick}
+                >
                   {visibleScenes.map((sc, idx) => (
                     <div
                       key={sc.id}
@@ -1547,7 +1454,7 @@ export default function StorytellingPracticePage() {
                   scenes={visibleScenes}
                   onPrev={handlePrevScene}
                   onNext={handleNextScene}
-                  onSelect={(idx) => goToScene(idx, 0)}
+                  onSelect={goToScene}
                   sceneLabel={t.story.nav.sceneLabel}
                   prevLabel={t.story.nav.prevScene}
                   nextLabel={t.story.nav.nextScene}
@@ -1620,7 +1527,7 @@ export default function StorytellingPracticePage() {
                   scenes={visibleScenes}
                   onPrev={handlePrevScene}
                   onNext={handleNextScene}
-                  onSelect={(idx) => goToScene(idx, 0)}
+                  onSelect={goToScene}
                   sceneLabel={t.story.nav.sceneLabel}
                   prevLabel={t.story.nav.prevScene}
                   nextLabel={t.story.nav.nextScene}
@@ -1698,7 +1605,7 @@ export default function StorytellingPracticePage() {
                       scenes={visibleScenes}
                       onPrev={handlePrevScene}
                       onNext={handleNextScene}
-                      onSelect={(idx) => goToScene(idx, 0)}
+                      onSelect={goToScene}
                       sceneLabel={t.story.nav.sceneLabel}
                       prevLabel={t.story.nav.prevScene}
                       nextLabel={t.story.nav.nextScene}
@@ -1716,7 +1623,7 @@ export default function StorytellingPracticePage() {
                   return (
                     <div
                       key={sc.id}
-                      onClick={level3Scope === "all" ? () => goToScene(idx, 0) : undefined}
+                      onClick={level3Scope === "all" ? () => goToScene(idx) : undefined}
                       className={`p-4 rounded-xl border transition-all ${
                         level3Scope === "all" ? "cursor-pointer " : ""
                       }${
@@ -1745,7 +1652,7 @@ export default function StorytellingPracticePage() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                goToScene(idx, 0);
+                                goToScene(idx);
                                 handleJumpToIllustration(sc.illustrationId);
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-forest text-white text-xs font-semibold hover:bg-forestDark transition"
@@ -1895,7 +1802,7 @@ export default function StorytellingPracticePage() {
 
               {/* Khung tranh thuần hình ảnh — tuyệt đối không chữ gợi ý */}
               <div
-                onClick={handleReadingSurfaceClick}
+                onClick={handleIllustrationCanvasClick}
                 className={`relative w-full mx-auto aspect-[16/10] rounded-2xl overflow-hidden border-2 border-line bg-[#FAF6EC] shadow-md group transition-all cursor-pointer ${
                   isLevel4StageMode ? "max-w-5xl" : "max-w-3xl"
                 }`}

@@ -11,7 +11,6 @@ import {
   REPO_SYNC_TTL_MS,
   getCandidateRepoBaseUrls,
   mapWithConcurrency,
-  paginatePassage,
   parseLevel0BookMarkdown,
   parseLevel1Markdown,
   parseLevel2Markdown,
@@ -285,38 +284,4 @@ test("Rate-limit-safe repo sync: TTL guard, multi-CDN fallback order, and bounde
 test("ProceduralIllustrator.escapeXml: safely escapes XML metacharacters", () => {
   const escaped = ProceduralIllustrator.escapeXml(`<script>alert("XSS")</script> & 'test'`);
   assert.equal(escaped, "&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt; &amp; &apos;test&apos;");
-});
-
-test("paginatePassage: splits chapters into screen-sized pages respecting text size budgets and preserving all text", () => {
-  assert.deepEqual(paginatePassage("   ", "md"), [""]);
-
-  const shortText = "Ngày xưa thật xưa, ánh sáng tỏa rạng khắp tầng không.";
-  assert.deepEqual(paginatePassage(shortText, "md"), [shortText]);
-
-  const paragraphs = Array.from({ length: 6 }, (_, i) =>
-    `Đoạn ${i + 1}: Ngày xưa khi mặt đất còn chưa có hình hài, ánh sáng ấm áp lan tỏa qua từng tầng mây bạc. Những cơn gió nhẹ thổi qua triền đồi xanh mướt và đánh thức muôn loài dậy đón bình minh rực rỡ.`
-  );
-  const longPassage = paragraphs.join("\n\n");
-
-  const smPages = paginatePassage(longPassage, "sm");
-  const mdPages = paginatePassage(longPassage, "md");
-  const lgPages = paginatePassage(longPassage, "lg");
-
-  assert.ok(mdPages.length >= 2, `Expected multiple pages for md, got ${mdPages.length}`);
-  assert.ok(lgPages.length >= mdPages.length, "Large text size should produce >= pages than medium");
-  assert.ok(mdPages.length >= smPages.length, "Medium text size should produce >= pages than small");
-
-  const normalizeWs = (s: string) => s.replace(/\s+/g, " ").trim();
-  assert.equal(normalizeWs(smPages.join(" ")), normalizeWs(longPassage));
-  assert.equal(normalizeWs(mdPages.join(" ")), normalizeWs(longPassage));
-  assert.equal(normalizeWs(lgPages.join(" ")), normalizeWs(longPassage));
-
-  // Long single paragraph split at sentence boundaries
-  const singleLongPara = Array.from(
-    { length: 12 },
-    (_, i) => `Câu thứ ${i + 1} kể về hành trình vượt qua thung lũng ánh sáng trong buổi sớm mai.`
-  ).join(" ");
-  const sentencePages = paginatePassage(singleLongPara, "md");
-  assert.ok(sentencePages.length >= 2, "Expected long paragraph to split across pages at sentence boundaries");
-  assert.equal(normalizeWs(sentencePages.join(" ")), normalizeWs(singleLongPara));
 });
