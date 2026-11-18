@@ -4,7 +4,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { getSeedData } from "../lib/seedData";
 import { ProceduralIllustrator } from "../lib/art/proceduralIllustrator";
-import { buildFullStoryPrintableHtml } from "../lib/pdfExporter";
+import {
+  PRINT_ROOT_ID,
+  buildEmbeddedPrintStyles,
+  buildFullStoryPrintableHtml,
+  hasFullStoryPassages,
+} from "../lib/pdfExporter";
 import { translations } from "../lib/i18n";
 import {
   computeScrollRatio,
@@ -297,6 +302,38 @@ test("PDF Exporter: buildFullStoryPrintableHtml includes all 180 chapters and em
   assert.ok(textOnlyEnHtml.includes("Text-Only Edition (No Images)"));
   assert.ok(!textOnlyEnHtml.includes("data-illustration-id="));
   assert.ok(!textOnlyEnHtml.includes("<img "));
+
+  // Full-passage guard must reject unsynced seed placeholders
+  assert.equal(hasFullStoryPassages(story), false);
+  assert.equal(
+    hasFullStoryPassages({ ...story, lastSyncedAt: "2026-11-18T10:00:00.000Z" }),
+    false
+  );
+
+  // Valid synced 180-chapter story passes full-passage guard
+  const syncedStory = {
+    ...story,
+    lastSyncedAt: "2026-11-18T10:00:00.000Z",
+    scenes: story.scenes.map((sc) => ({
+      ...sc,
+      passage: `Toàn văn đầy đủ của ${sc.title}. Câu chuyện được kể bằng nhịp điệu ấm áp.`,
+    })),
+  };
+  assert.equal(hasFullStoryPassages(syncedStory), true);
+
+  // Incomplete chapter count fails full-passage guard
+  assert.equal(
+    hasFullStoryPassages({ ...syncedStory, scenes: syncedStory.scenes.slice(0, 179) }),
+    false
+  );
+
+  // Embedded top-level print root stylesheet isolates printing on mobile and desktop browsers
+  const embeddedCss = buildEmbeddedPrintStyles();
+  assert.ok(embeddedCss.includes(`#${PRINT_ROOT_ID}`));
+  assert.ok(embeddedCss.includes(`body > *:not(#${PRINT_ROOT_ID})`));
+  assert.ok(embeddedCss.includes("@media print"));
+  assert.ok(embeddedCss.includes("@media screen"));
+  assert.ok(embeddedCss.includes("list-style: decimal"));
 });
 
 test("Rate-limit-safe repo sync: TTL guard, multi-CDN fallback order, and bounded concurrency", async () => {

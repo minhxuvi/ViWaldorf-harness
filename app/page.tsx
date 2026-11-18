@@ -20,7 +20,7 @@ import {
   VoiceRecording,
 } from "@/lib/types";
 import { ProceduralIllustrator } from "@/lib/art/proceduralIllustrator";
-import { exportStoryToPdf } from "@/lib/pdfExporter";
+import { exportStoryToPdf, hasFullStoryPassages } from "@/lib/pdfExporter";
 import {
   buildGitHubBlobUrl,
   buildRepoFileUrl,
@@ -664,11 +664,15 @@ export default function StorytellingPracticePage() {
     setIsExportingPdf(true);
     try {
       let targetStory = selectedStory;
-      if (!targetStory.lastSyncedAt) {
-        const synced = await syncFromRepo({ force: false });
+      if (!hasFullStoryPassages(targetStory)) {
+        const synced = await syncFromRepo({ force: true });
         if (synced) {
           targetStory = synced;
         }
+      }
+      if (!hasFullStoryPassages(targetStory)) {
+        setPdfError(t.story.pdf.syncRequiredNotice);
+        return;
       }
       await exportStoryToPdf(targetStory, {
         bookId: "all",
@@ -2539,6 +2543,7 @@ function IllustrationNavControls({
 
 interface PdfMenuCopy {
   downloadBtn: string;
+  mobileShortBtn: string;
   downloadingBtn: string;
   withImagesOption: string;
   withImagesDesc: string;
@@ -2614,7 +2619,11 @@ function PdfExportDropdown({
         <span className={variant === "level1" ? "hidden sm:inline" : ""}>
           {isExporting ? copy.downloadingBtn : copy.downloadBtn}
         </span>
-        {variant === "level1" && <span className="sm:hidden">PDF</span>}
+        {variant === "level1" && (
+          <span className="sm:hidden">
+            {isExporting ? copy.downloadingBtn : copy.mobileShortBtn}
+          </span>
+        )}
         <ChevronDown
           className={`w-3.5 h-3.5 transition-transform ${
             isOpen ? "rotate-180" : ""

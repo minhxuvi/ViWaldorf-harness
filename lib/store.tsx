@@ -24,6 +24,7 @@ import {
   mergeReadingProgress,
   saveLocalReadingProgress,
 } from "./readingProgress";
+import { hasFullStoryPassages } from "./pdfExporter";
 
 export type AppActiveView = "story" | "feedback";
 
@@ -145,7 +146,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const userRef = useRef<AuthUser | null>(null);
   const readingProgressRef = useRef<ReadingProgress | null>(null);
+  const selectedStoryRef = useRef<WaldorfStory | undefined>(data.stories[0]);
   const progressSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  selectedStoryRef.current = data.stories[0];
 
   useEffect(() => {
     userRef.current = user;
@@ -249,8 +253,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       const now = Date.now();
+      const hasFullStory = hasFullStoryPassages(selectedStoryRef.current);
       if (
         options?.force &&
+        hasFullStory &&
         lastSyncAttemptRef.current > 0 &&
         now - lastSyncAttemptRef.current < REPO_MANUAL_COOLDOWN_MS
       ) {
@@ -333,6 +339,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           parsed.stories.length > 0 &&
           isValidStoryV4(parsed.stories[0])
         ) {
+          selectedStoryRef.current = parsed.stories[0];
           setInternalData({ ...parsed, stories: [parsed.stories[0]] });
           hasRepoStoryInCache = true;
           repoLastSyncedAt = parsed.stories[0].lastSyncedAt;

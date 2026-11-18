@@ -107,11 +107,14 @@ export const translations = {
       illustrationsCountSuffix: "Tranh gợi nhớ",
       pdf: {
         downloadBtn: "Tải PDF Toàn văn",
+        mobileShortBtn: "Tải PDF Toàn văn",
         downloadingBtn: "Đang tạo bản PDF...",
         withImagesOption: "Kèm ảnh (28 tranh Level 4)",
-        withImagesDesc: "Đầy đủ 180 chương và 28 tranh minh họa cụm chương",
+        withImagesDesc: "Trọn bộ 5 Quyển · 180 chương và 28 tranh minh họa cụm chương",
         withoutImagesOption: "Không kèm ảnh (Bản thuần chữ)",
-        withoutImagesDesc: "Chỉ văn bản và lưu ý giọng kể, nhẹ & in nhanh",
+        withoutImagesDesc: "Trọn bộ 5 Quyển · 180 chương và lưu ý giọng kể, nhẹ & in nhanh",
+        syncRequiredNotice:
+          "Đang tải toàn văn 180 chương từ kho lưu trữ. Vui lòng thử lại sau vài giây khi kết nối mạng ổn định.",
         errorNotice: "Không thể khởi tạo bản PDF lúc này. Vui lòng thử lại.",
       },
       repo: {
@@ -356,11 +359,14 @@ export const translations = {
       illustrationsCountSuffix: "Illustrations",
       pdf: {
         downloadBtn: "Download Full Story PDF",
+        mobileShortBtn: "Full Story PDF",
         downloadingBtn: "Preparing PDF...",
         withImagesOption: "With Images (28 Level 4 Artworks)",
-        withImagesDesc: "All 180 chapters with 28 cluster illustrations",
+        withImagesDesc: "All 5 Books · 180 chapters with 28 cluster illustrations",
         withoutImagesOption: "Without Images (Text Only)",
-        withoutImagesDesc: "Full narrative & vocal notes only, lightweight & fast",
+        withoutImagesDesc: "All 5 Books · 180 chapters & vocal notes, lightweight & fast",
+        syncRequiredNotice:
+          "Full 180-chapter text is still syncing from the repository. Please try again in a moment.",
         errorNotice: "Could not prepare the PDF right now. Please try again.",
       },
       repo: {

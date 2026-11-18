@@ -2,12 +2,34 @@ import { ProceduralIllustrator } from "./art/proceduralIllustrator";
 import { buildRepoFileUrl, getCandidateRepoBaseUrls } from "./repoStoryLoader";
 import { StoryBookMeta, StoryIllustration, StoryScene, WaldorfStory } from "./types";
 
+export const PRINT_ROOT_ID = "viwaldorf-print-root";
+export const PRINT_STYLE_ID = "viwaldorf-print-styles";
+export const SEED_PASSAGE_PLACEHOLDER_MARKER =
+  "Nội dung toàn văn đang được đồng bộ từ kho GitHub";
+
 export interface PdfExportOptions {
   bookId?: string;
   failedImages?: Record<string, boolean>;
   preferProceduralArt?: boolean;
   lang?: "vi" | "en";
   includeImages?: boolean;
+}
+
+export function hasFullStoryPassages(
+  story: WaldorfStory | undefined | null
+): boolean {
+  if (!story || !Array.isArray(story.scenes) || story.scenes.length < 180) {
+    return false;
+  }
+  if (!story.lastSyncedAt) {
+    return false;
+  }
+  return story.scenes.every(
+    (sc) =>
+      typeof sc.passage === "string" &&
+      sc.passage.trim().length > 0 &&
+      !sc.passage.includes(SEED_PASSAGE_PLACEHOLDER_MARKER)
+  );
 }
 
 function escapeHtml(input: string): string {
@@ -82,10 +104,285 @@ function renderIllustrationFigureHtml(
 </figure>`;
 }
 
-export function buildFullStoryPrintableHtml(
+function buildSharedPdfDocumentStyles(scopePrefix: string): string {
+  const s = scopePrefix;
+  return `
+    ${s}.pdf-cover {
+      min-height: 230mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 20mm 12mm;
+      border: 1.5pt solid #d9cbb0;
+      background: #fdf8ee;
+      border-radius: 8pt;
+      text-align: center;
+      page-break-after: always;
+      break-after: page;
+    }
+    ${s}.pdf-cover-eyebrow {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 9pt;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #c45c4a;
+      margin-bottom: 10pt;
+    }
+    ${s}.pdf-cover h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 24pt;
+      font-weight: 700;
+      line-height: 1.25;
+      color: #1e4028;
+      margin: 0 0 12pt 0;
+    }
+    ${s}.pdf-cover-sub {
+      font-size: 12pt;
+      color: #4f5e52;
+      margin: 0 0 18pt 0;
+    }
+    ${s}.pdf-cover-meta {
+      display: inline-block;
+      margin: 0 auto 18pt auto;
+      padding: 6pt 14pt;
+      border-radius: 999px;
+      background: #e3efe0;
+      color: #1e4028;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 9.5pt;
+      font-weight: 600;
+    }
+    ${s}.pdf-cover-goal {
+      max-width: 130mm;
+      margin: 0 auto;
+      font-size: 10.5pt;
+      color: #4f5e52;
+      font-style: italic;
+    }
+    ${s}.pdf-toc {
+      page-break-after: always;
+      break-after: page;
+      padding-top: 6mm;
+    }
+    ${s}.pdf-toc h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 16pt;
+      font-weight: 700;
+      color: #1e4028;
+      border-bottom: 1pt solid #e7dcc4;
+      padding-bottom: 6pt;
+      margin: 0 0 12pt 0;
+    }
+    ${s}.pdf-toc ol {
+      list-style: decimal;
+      padding-left: 18pt;
+      margin: 0;
+    }
+    ${s}.pdf-toc li {
+      margin-bottom: 10pt;
+    }
+    ${s}.toc-title {
+      display: block;
+      font-weight: 700;
+      color: #1e4028;
+    }
+    ${s}.toc-meta {
+      display: block;
+      font-size: 9.5pt;
+      color: #6b7a6e;
+    }
+    ${s}.pdf-book {
+      page-break-before: always;
+      break-before: page;
+    }
+    ${s}.pdf-book-header {
+      padding: 10pt 12pt;
+      margin-bottom: 14pt;
+      background: #f7ecd8;
+      border-left: 3.5pt solid #2f5d3a;
+      border-radius: 4pt;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    ${s}.pdf-book-badge {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 8.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #c45c4a;
+      margin: 0 0 3pt 0;
+    }
+    ${s}.pdf-book-header h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      margin: 0 0 4pt 0;
+      font-size: 16pt;
+      font-weight: 700;
+      color: #1e4028;
+    }
+    ${s}.pdf-book-subtitle {
+      margin: 0;
+      font-size: 10.5pt;
+      color: #4f5e52;
+      font-style: italic;
+    }
+    ${s}.pdf-book-soul {
+      margin-top: 8pt;
+      padding-top: 8pt;
+      border-top: 0.5pt solid #d9cbb0;
+      font-size: 9.5pt;
+      color: #2b3a2e;
+    }
+    ${s}.pdf-book-soul p { margin: 0; }
+    ${s}.pdf-section-title {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 13pt;
+      font-weight: 700;
+      color: #c45c4a;
+      border-bottom: 0.75pt solid #e7dcc4;
+      padding-bottom: 3pt;
+      margin: 16pt 0 10pt 0;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    ${s}.pdf-illustration {
+      margin: 12pt 0 14pt 0;
+      padding: 8pt;
+      border: 1pt solid #e7dcc4;
+      background: #fdf8ee;
+      border-radius: 6pt;
+      text-align: center;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    ${s}.pdf-illustration-frame {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 4pt;
+    }
+    ${s}.pdf-illustration img {
+      display: block;
+      max-width: 100%;
+      max-height: 98mm;
+      width: auto;
+      height: auto;
+      margin: 0 auto;
+      object-fit: contain;
+    }
+    ${s}.pdf-illustration figcaption {
+      margin-top: 6pt;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 8.8pt;
+      color: #4f5e52;
+      font-style: italic;
+    }
+    ${s}.pdf-chapter {
+      margin-bottom: 16pt;
+      padding-bottom: 10pt;
+      border-bottom: 0.5pt dashed #e7dcc4;
+    }
+    ${s}.pdf-chapter-title {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 12.5pt;
+      font-weight: 700;
+      color: #1e4028;
+      margin: 10pt 0 6pt 0;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    ${s}.pdf-voice-note {
+      margin: 0 0 8pt 0;
+      padding: 6pt 10pt;
+      border-radius: 4pt;
+      background: #eef5ec;
+      border-left: 2.5pt solid #2f5d3a;
+      font-size: 9.4pt;
+      color: #26422c;
+      font-style: italic;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    ${s}.pdf-voice-label {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-style: normal;
+      font-weight: 700;
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #2f5d3a;
+    }
+    ${s}.pdf-voice-body p {
+      margin: 2pt 0 0 0;
+    }
+    ${s}.pdf-passage p {
+      margin: 0 0 7pt 0;
+      text-align: justify;
+    }`;
+}
+
+export function buildEmbeddedPrintStyles(): string {
+  return `
+    @page {
+      size: A4 portrait;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+    @media screen {
+      #${PRINT_ROOT_ID} {
+        position: fixed !important;
+        left: -20000px !important;
+        top: 0 !important;
+        width: 210mm !important;
+        height: 1px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        z-index: -1 !important;
+        overflow: hidden !important;
+      }
+    }
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #2b3a2e !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+      }
+      body > *:not(#${PRINT_ROOT_ID}) {
+        display: none !important;
+      }
+      #${PRINT_ROOT_ID} {
+        display: block !important;
+        position: static !important;
+        left: auto !important;
+        top: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        color: #2b3a2e !important;
+        background: #ffffff !important;
+        font-family: Georgia, "Times New Roman", serif !important;
+        font-size: 11.2pt !important;
+        line-height: 1.65 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+    #${PRINT_ROOT_ID} * {
+      box-sizing: border-box;
+    }
+    ${buildSharedPdfDocumentStyles(`#${PRINT_ROOT_ID} `)}
+  `;
+}
+
+function buildPrintableBodyContent(
   story: WaldorfStory,
   options?: PdfExportOptions
-): string {
+): { docTitle: string; bodyHtml: string; isEn: boolean; includeImages: boolean } {
   const isEn = options?.lang === "en";
   const includeImages = options?.includeImages !== false;
   const allBooks: StoryBookMeta[] = story.books || [];
@@ -184,227 +481,7 @@ export function buildFullStoryPrintableHtml(
     ? `${story.title} — ${targetBooks[0].title}`
     : story.title;
 
-  return `<!DOCTYPE html>
-<html lang="${isEn ? "en" : "vi"}">
-<head>
-  <meta charset="utf-8" />
-  <title>${escapeHtml(docTitle)}</title>
-  <style>
-    @page {
-      size: A4 portrait;
-      margin: 18mm 16mm 18mm 16mm;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      color: #2b3a2e;
-      background: #ffffff;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: 11.2pt;
-      line-height: 1.65;
-    }
-    .pdf-cover {
-      min-height: 230mm;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: 20mm 12mm;
-      border: 1.5pt solid #d9cbb0;
-      background: #fdf8ee;
-      border-radius: 8pt;
-      text-align: center;
-      page-break-after: always;
-    }
-    .pdf-cover-eyebrow {
-      font-family: system-ui, -apple-system, sans-serif;
-      font-size: 9pt;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: #c45c4a;
-      margin-bottom: 10pt;
-    }
-    .pdf-cover h1 {
-      font-size: 24pt;
-      line-height: 1.25;
-      color: #1e4028;
-      margin: 0 0 12pt 0;
-    }
-    .pdf-cover-sub {
-      font-size: 12pt;
-      color: #4f5e52;
-      margin: 0 0 18pt 0;
-    }
-    .pdf-cover-meta {
-      display: inline-block;
-      margin: 0 auto 18pt auto;
-      padding: 6pt 14pt;
-      border-radius: 999px;
-      background: #e3efe0;
-      color: #1e4028;
-      font-family: system-ui, -apple-system, sans-serif;
-      font-size: 9.5pt;
-      font-weight: 600;
-    }
-    .pdf-cover-goal {
-      max-width: 130mm;
-      margin: 0 auto;
-      font-size: 10.5pt;
-      color: #4f5e52;
-      font-style: italic;
-    }
-    .pdf-toc {
-      page-break-after: always;
-      padding-top: 6mm;
-    }
-    .pdf-toc h2 {
-      font-size: 16pt;
-      color: #1e4028;
-      border-bottom: 1pt solid #e7dcc4;
-      padding-bottom: 6pt;
-      margin-bottom: 12pt;
-    }
-    .pdf-toc ol {
-      padding-left: 16pt;
-      margin: 0;
-    }
-    .pdf-toc li {
-      margin-bottom: 10pt;
-    }
-    .toc-title {
-      display: block;
-      font-weight: 700;
-      color: #1e4028;
-    }
-    .toc-meta {
-      display: block;
-      font-size: 9.5pt;
-      color: #6b7a6e;
-    }
-    .pdf-book {
-      page-break-before: always;
-    }
-    .pdf-book-header {
-      padding: 10pt 12pt;
-      margin-bottom: 14pt;
-      background: #f7ecd8;
-      border-left: 3.5pt solid #2f5d3a;
-      border-radius: 4pt;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-    .pdf-book-badge {
-      font-family: system-ui, -apple-system, sans-serif;
-      font-size: 8.5pt;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #c45c4a;
-      margin: 0 0 3pt 0;
-    }
-    .pdf-book-header h2 {
-      margin: 0 0 4pt 0;
-      font-size: 16pt;
-      color: #1e4028;
-    }
-    .pdf-book-subtitle {
-      margin: 0;
-      font-size: 10.5pt;
-      color: #4f5e52;
-      font-style: italic;
-    }
-    .pdf-book-soul {
-      margin-top: 8pt;
-      padding-top: 8pt;
-      border-top: 0.5pt solid #d9cbb0;
-      font-size: 9.5pt;
-      color: #2b3a2e;
-    }
-    .pdf-book-soul p { margin: 0; }
-    .pdf-section-title {
-      font-size: 13pt;
-      color: #c45c4a;
-      border-bottom: 0.75pt solid #e7dcc4;
-      padding-bottom: 3pt;
-      margin: 16pt 0 10pt 0;
-      break-after: avoid;
-      page-break-after: avoid;
-    }
-    .pdf-illustration {
-      margin: 12pt 0 14pt 0;
-      padding: 8pt;
-      border: 1pt solid #e7dcc4;
-      background: #fdf8ee;
-      border-radius: 6pt;
-      text-align: center;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-    .pdf-illustration-frame {
-      width: 100%;
-      overflow: hidden;
-      border-radius: 4pt;
-    }
-    .pdf-illustration img {
-      display: block;
-      max-width: 100%;
-      max-height: 98mm;
-      width: auto;
-      height: auto;
-      margin: 0 auto;
-      object-fit: contain;
-    }
-    .pdf-illustration figcaption {
-      margin-top: 6pt;
-      font-family: system-ui, -apple-system, sans-serif;
-      font-size: 8.8pt;
-      color: #4f5e52;
-      font-style: italic;
-    }
-    .pdf-chapter {
-      margin-bottom: 16pt;
-      padding-bottom: 10pt;
-      border-bottom: 0.5pt dashed #e7dcc4;
-    }
-    .pdf-chapter-title {
-      font-size: 12.5pt;
-      color: #1e4028;
-      margin: 10pt 0 6pt 0;
-      break-after: avoid;
-      page-break-after: avoid;
-    }
-    .pdf-voice-note {
-      margin: 0 0 8pt 0;
-      padding: 6pt 10pt;
-      border-radius: 4pt;
-      background: #eef5ec;
-      border-left: 2.5pt solid #2f5d3a;
-      font-size: 9.4pt;
-      color: #26422c;
-      font-style: italic;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-    .pdf-voice-label {
-      font-family: system-ui, -apple-system, sans-serif;
-      font-style: normal;
-      font-weight: 700;
-      font-size: 8.5pt;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #2f5d3a;
-    }
-    .pdf-voice-body p {
-      margin: 2pt 0 0 0;
-    }
-    .pdf-passage p {
-      margin: 0 0 7pt 0;
-      text-align: justify;
-    }
-  </style>
-</head>
-<body>
-  <section class="pdf-cover">
+  const bodyHtml = `<section class="pdf-cover">
     <div class="pdf-cover-eyebrow">ViWaldorf · ${escapeHtml(story.styleReference || "Jakob Streit")} · ${escapeHtml(story.targetAge)}</div>
     <h1>${escapeHtml(docTitle)}</h1>
     ${story.titleEn ? `<p class="pdf-cover-sub">${escapeHtml(story.titleEn)}</p>` : ""}
@@ -427,13 +504,47 @@ export function buildFullStoryPrintableHtml(
     </ol>
   </section>
 
-  ${booksBodyHtml}
+  ${booksBodyHtml}`;
+
+  return { docTitle, bodyHtml, isEn, includeImages };
+}
+
+export function buildFullStoryPrintableHtml(
+  story: WaldorfStory,
+  options?: PdfExportOptions
+): string {
+  const { docTitle, bodyHtml, isEn } = buildPrintableBodyContent(story, options);
+
+  return `<!DOCTYPE html>
+<html lang="${isEn ? "en" : "vi"}">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(docTitle)}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 18mm 16mm 18mm 16mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #2b3a2e;
+      background: #ffffff;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11.2pt;
+      line-height: 1.65;
+    }
+    ${buildSharedPdfDocumentStyles("")}
+  </style>
+</head>
+<body>
+  ${bodyHtml}
 </body>
 </html>`;
 }
 
-function waitForImagesInDocument(doc: Document, timeoutMs = 15000): Promise<void> {
-  const imgs = Array.from(doc.querySelectorAll("img"));
+function waitForImagesInDocument(root: ParentNode, timeoutMs = 15000): Promise<void> {
+  const imgs = Array.from(root.querySelectorAll("img"));
   if (imgs.length === 0) return Promise.resolve();
 
   return new Promise((resolve) => {
@@ -486,6 +597,8 @@ function waitForImagesInDocument(doc: Document, timeoutMs = 15000): Promise<void
   });
 }
 
+let activePrintCleanup: (() => void) | null = null;
+
 export async function exportStoryToPdf(
   story: WaldorfStory,
   options?: PdfExportOptions
@@ -494,19 +607,26 @@ export async function exportStoryToPdf(
     throw new Error("PDF export is only available in the browser.");
   }
 
-  const includeImages = options?.includeImages !== false;
-  const html = buildFullStoryPrintableHtml(story, options);
-  const iframe = document.createElement("iframe");
-  iframe.setAttribute("aria-hidden", "true");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
-  iframe.style.opacity = "0";
-  iframe.style.pointerEvents = "none";
-  document.body.appendChild(iframe);
+  // Dọn dẹp phiên in trước nếu còn tồn tại để tránh giữ nhầm tiêu đề cũ
+  if (activePrintCleanup) {
+    activePrintCleanup();
+  }
+  document.getElementById(PRINT_ROOT_ID)?.remove();
+  document.getElementById(PRINT_STYLE_ID)?.remove();
+
+  const { bodyHtml, isEn, includeImages } = buildPrintableBodyContent(story, options);
+  const styleEl = document.createElement("style");
+  styleEl.id = PRINT_STYLE_ID;
+  styleEl.textContent = buildEmbeddedPrintStyles();
+
+  const printRoot = document.createElement("div");
+  printRoot.id = PRINT_ROOT_ID;
+  printRoot.lang = isEn ? "en" : "vi";
+  printRoot.setAttribute("aria-hidden", "true");
+  printRoot.innerHTML = bodyHtml;
+
+  document.head.appendChild(styleEl);
+  document.body.appendChild(printRoot);
 
   const prevTitle = document.title;
   const basePrefix =
@@ -515,38 +635,53 @@ export async function exportStoryToPdf(
       : "Tu-Sang-The-Den-Giang-Sinh-Toan-Van";
   const pdfBaseName = includeImages ? basePrefix : `${basePrefix}-Khong-Anh`;
 
+  let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  let afterPrintTimer: ReturnType<typeof setTimeout> | null = null;
+
   const cleanup = () => {
+    if (fallbackTimer) {
+      clearTimeout(fallbackTimer);
+      fallbackTimer = null;
+    }
+    if (afterPrintTimer) {
+      clearTimeout(afterPrintTimer);
+      afterPrintTimer = null;
+    }
+    window.removeEventListener("afterprint", onAfterPrint);
+    if (activePrintCleanup === cleanup) {
+      activePrintCleanup = null;
+    }
     document.title = prevTitle;
     try {
-      iframe.remove();
+      printRoot.remove();
+      styleEl.remove();
     } catch {}
   };
 
-  try {
-    const doc = iframe.contentDocument;
-    if (!doc) {
-      throw new Error("Không thể khởi tạo khung in PDF trên trình duyệt.");
-    }
-    doc.open();
-    doc.write(html);
-    doc.close();
+  const onAfterPrint = () => {
+    // Giữ vùng in thêm 1.5s đề phòng iOS Safari phát afterprint sớm khi đang kết xuất PDF nhiều trang
+    if (afterPrintTimer) clearTimeout(afterPrintTimer);
+    afterPrintTimer = setTimeout(cleanup, 1500);
+  };
 
+  activePrintCleanup = cleanup;
+
+  try {
     if (includeImages) {
-      await waitForImagesInDocument(doc, 15000);
+      await waitForImagesInDocument(printRoot, 12000);
+    } else if (typeof window.requestAnimationFrame === "function") {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
     }
 
     document.title = pdfBaseName;
-    const win = iframe.contentWindow;
-    if (!win) {
-      throw new Error("Không thể mở hộp thoại in PDF.");
-    }
-
-    win.addEventListener("afterprint", cleanup, { once: true });
-    win.focus();
-    win.print();
+    window.addEventListener("afterprint", onAfterPrint, { once: true });
+    window.focus();
+    window.print();
 
     // Phòng trường hợp trình duyệt không phát sự kiện afterprint
-    setTimeout(cleanup, 60000);
+    fallbackTimer = setTimeout(cleanup, 60000);
   } catch (err) {
     cleanup();
     throw err;
