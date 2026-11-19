@@ -65,6 +65,56 @@ import {
 import { getLocalGenesisRepoDir, resolveSafeLocalRepoFile } from "../lib/server/localRepo";
 import { WaldorfArtStyle } from "../lib/types";
 
+test("Minimal UI shell exposes compact practice controls and expandable utility panels in vi/en/zh", () => {
+  const pageSource = fs.readFileSync(path.join(process.cwd(), "app/page.tsx"), "utf8");
+  assert.ok(!pageSource.includes("<PageHeader"), "Story page must not render the legacy PageHeader");
+  assert.ok(
+    !pageSource.includes('<section className="hidden">'),
+    "Story page must not keep dead hidden legacy header cards"
+  );
+  assert.equal(
+    (pageSource.match(/<PdfExportDropdown\b/g) || []).length,
+    1,
+    "PDF export dropdown must have strictly one entry point inside Guide & Tools"
+  );
+  assert.ok(
+    pageSource.includes("const [showContextSection, setShowContextSection] = useState<boolean>(false);"),
+    "Context panel must stay collapsed by default"
+  );
+  assert.ok(
+    pageSource.includes("const [showUtilitiesSection, setShowUtilitiesSection] = useState<boolean>(false);"),
+    "Guide & Tools panel must stay collapsed by default"
+  );
+  assert.equal(
+    (pageSource.match(/<LevelSelectDropdown\b/g) || []).length,
+    1,
+    "Top control row must render one compact practice-level dropdown"
+  );
+  assert.ok(
+    !pageSource.includes("grid-cols-2 sm:grid-cols-4"),
+    "Legacy 4-button level grid must be replaced by compact dropdown"
+  );
+  assert.ok(
+    (pageSource.match(/<BookSelectDropdown\b/g) || []).length >= 4,
+    "Compact BookSelectDropdown should serve all 4 practice levels"
+  );
+  assert.ok(!pageSource.includes("tapOrSwipeHint"), "Legacy fixed tap/swipe hints must not remain visible");
+  assert.ok(!pageSource.includes("jumpToSceneHint"), "Legacy fixed level-3 hint must not remain visible");
+  assert.ok(!pageSource.includes("swipeHint"), "Legacy fixed level-4 hint must not remain visible");
+
+  for (const langCode of ["vi", "en", "zh"] as const) {
+    const copy = translations[langCode].story.utilities;
+    assert.ok(translations[langCode].story.nav.levelSelectLabel.length > 0);
+    assert.ok(copy.openButton.length > 0);
+    assert.ok(copy.contextButton.length > 0);
+    assert.ok(copy.epicSummary.includes("180"));
+    assert.ok(
+      !/\bai\b|trợ lý ai|人工智能/i.test(JSON.stringify(copy)),
+      `${langCode} utilities copy must not mention AI`
+    );
+  }
+});
+
 test("Default seed serves exclusively xuvivn/from-genesis-to-nativity (5 Books, 180 Chapters, 28 Illustrations)", () => {
   const seed = getSeedData();
   assert.equal(seed.stories.length, 1, "Library must contain only the single epic story");
@@ -846,7 +896,10 @@ test("Local repo bridge & integration: safely resolves sibling from-genesis-to-n
   };
   assert.equal(manifestJson.total_books, 5);
   assert.equal(manifestJson.total_chapters, 180);
-  assert.equal(manifestJson.total_illustrations, 28);
+  assert.ok(
+    manifestJson.total_illustrations === 28 || manifestJson.total_illustrations === 180,
+    "Expected the cluster or chapter-level illustration schema"
+  );
   assert.deepEqual(
     manifestJson.languages.map((l) => l.code),
     ["vi", "en", "zh"]
@@ -858,15 +911,20 @@ test("Local repo bridge & integration: safely resolves sibling from-genesis-to-n
     const indexJson = JSON.parse(fs.readFileSync(indexSafe.filePath, "utf8")) as {
       levels: Array<{ ancient_books?: Array<{ file: string }> }>;
       books: Array<{ level_0_file: string; level_1_file: string; level_2_file: string; total_chapters: number }>;
+      total_illustrations: number;
       illustrations: Array<{ id: string; image: string; image_generated: boolean }>;
       chapters: Array<{ id: string }>;
     };
 
     assert.equal(indexJson.chapters.length, 180, `${langCode}: expected 180 chapters`);
-    assert.equal(indexJson.illustrations.length, 28, `${langCode}: expected 28 illustrations`);
+    const clusterIllustrations =
+      indexJson.total_illustrations > 28
+        ? indexJson.illustrations.filter((ill) => /(?:^|\/)canh-\d{2}-[^/]+\.png$/i.test(ill.image))
+        : indexJson.illustrations;
+    assert.equal(clusterIllustrations.length, 28, `${langCode}: expected 28 cluster illustrations`);
     assert.equal(indexJson.levels[0].ancient_books?.length, 25, `${langCode}: expected 25 ancient books`);
 
-    for (const ill of indexJson.illustrations) {
+    for (const ill of clusterIllustrations) {
       assert.equal(ill.image_generated, true, `${langCode} ${ill.id}: expected image_generated=true`);
       const imgSegs = ill.image.split("/");
       assert.ok(resolveSafeLocalRepoFile(imgSegs, repoDir), `Missing image asset ${ill.image}`);

@@ -187,6 +187,10 @@ export interface ParsedLevel1Chapter {
   voiceNote: string;
 }
 
+function isClusterIllustration(illustration: RepoIndexIllustration): boolean {
+  return /(?:^|\/)canh-\d{2}-[^/]+\.png$/i.test(illustration.image);
+}
+
 export function cleanInlineMarkdown(input: string): string {
   return input
     .replace(/\r\n/g, "\n")
@@ -800,7 +804,11 @@ export async function fetchGenesisStoryFromRepo(
 
   const level3Map = fileCache[level3File] ? parseLevel3Markdown(fileCache[level3File]) : {};
 
-  const illustrations: StoryIllustration[] = (indexData.illustrations || []).map((ill) => {
+  const indexedIllustrations =
+    indexData.total_illustrations > 28
+      ? (indexData.illustrations || []).filter(isClusterIllustration)
+      : indexData.illustrations || [];
+  const illustrations: StoryIllustration[] = indexedIllustrations.map((ill) => {
     const bk = bookMap.get(ill.book_id);
     return {
       id: ill.id,
@@ -920,10 +928,10 @@ export async function fetchGenesisStoryFromRepo(
 
   const localizedSourceInfo =
     lang === "en"
-      ? `Source: xuvivn/from-genesis-to-nativity · ${indexData.total_books} Books · ${indexData.total_chapters} Chapters · ${indexData.total_illustrations} Illustrations`
+      ? `Source: xuvivn/from-genesis-to-nativity · ${indexData.total_books} Books · ${indexData.total_chapters} Chapters · ${illustrations.length} Illustrations`
       : lang === "zh"
-      ? `语料来源：xuvivn/from-genesis-to-nativity · ${indexData.total_books}卷 · ${indexData.total_chapters}章 · ${indexData.total_illustrations}幅插画`
-      : `Nguồn từ repo xuvivn/from-genesis-to-nativity · ${indexData.total_books} Quyển · ${indexData.total_chapters} Chương · ${indexData.total_illustrations} Tranh`;
+      ? `语料来源：xuvivn/from-genesis-to-nativity · ${indexData.total_books}卷 · ${indexData.total_chapters}章 · ${illustrations.length}幅插画`
+      : `Nguồn từ repo xuvivn/from-genesis-to-nativity · ${indexData.total_books} Quyển · ${indexData.total_chapters} Chương · ${illustrations.length} Tranh`;
 
   const localizedGoal =
     lang === "en"

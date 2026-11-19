@@ -116,6 +116,19 @@ export const translations = {
           "Đang tải toàn văn 180 chương từ kho lưu trữ. Vui lòng thử lại sau vài giây khi kết nối mạng ổn định.",
         errorNotice: "Không thể khởi tạo bản PDF lúc này. Vui lòng thử lại.",
       },
+      utilities: {
+        openButton: "Hướng dẫn & Tiện ích",
+        closeButton: "Thu gọn Hướng dẫn & Tiện ích",
+        contextButton: "Bối cảnh & Cổ thư",
+        introTitle: "Giới thiệu & Hướng dẫn sử dụng",
+        epicSummary: "5 Quyển · 180 Chương · 28 Tranh gợi nhớ · 9–10 tuổi",
+        levelGuide: "Luyện theo 4 cấp độ: đọc toàn văn → dàn ý chi tiết → dàn ý tóm tắt → nhìn tranh không chữ.",
+        tapGuide: "Chạm nửa trái/phải để cuộn trang; vuốt ngang hoặc dùng ← / → để chuyển chương; thu âm và nghe lại ở góc phải dưới.",
+        toolsTitle: "Tiện ích & Tính năng nâng cao",
+        level1ModeLabel: "Chế độ đọc Level 1",
+        artTitle: "Tùy chỉnh tranh Level 4",
+        sourceTitle: "Đồng bộ & Nguồn dữ liệu",
+      },
       repo: {
         syncBtn: "Đồng bộ từ Repo",
         syncing: "Đang tải từ CDN...",
@@ -189,8 +202,6 @@ export const translations = {
         textSizeMedium: "Vừa",
         textSizeLarge: "Lớn",
         openIllustrationBtn: "Mở tranh minh họa cụm này (Level 4)",
-        tapOrSwipeHint:
-          "Chạm nửa phải màn hình để cuộn xuống 1 trang màn hình, nửa trái để cuộn lên · Vuốt ngang để chuyển chương",
       },
       level2: {
         charactersLabel: "Nhân vật & Hình tượng trung tâm",
@@ -201,7 +212,6 @@ export const translations = {
       level3: {
         skeletonHeader: "Khung xương cốt truyện gốc",
         pointsBadge: "ý cốt lõi",
-        jumpToSceneHint: "Nhấp vào chương để đánh dấu vị trí đang kể",
         filterCurrentScene: "Tập trung chương đang chọn",
         filterAllScenes: "Tất cả chương",
         openInLevel4Btn: "Mở tranh cụm này (Level 4)",
@@ -220,10 +230,9 @@ export const translations = {
         stageModeExit: "Thu gọn khung tranh",
         artModeRepoBadge: "Tranh vẽ từ Repo",
         artModeProceduralBadge: "Tranh SVG thuần hình ảnh cục bộ",
-        swipeHint:
-          "Dùng nút Trước/Sau, phím mũi tên ← / → hoặc vuốt ngang để chuyển tranh gợi nhớ (không hiển thị chữ gợi ý)",
       },
       nav: {
+        levelSelectLabel: "Chọn mức luyện tập",
         sceneLabel: "Chương",
         ofWord: "/",
         prevScene: "Chương trước",
@@ -367,6 +376,19 @@ export const translations = {
           "Full 180-chapter text is still syncing from the repository. Please try again in a moment.",
         errorNotice: "Could not prepare the PDF right now. Please try again.",
       },
+      utilities: {
+        openButton: "Guide & Tools",
+        closeButton: "Collapse Guide & Tools",
+        contextButton: "Context & Ancient Texts",
+        introTitle: "Introduction & How to Practice",
+        epicSummary: "5 Books · 180 Chapters · 28 Visual Prompts · Ages 9–10",
+        levelGuide: "Practice in 4 stages: full text → detailed outline → summary outline → wordless visual recall.",
+        tapGuide: "Tap the left/right half to scroll; swipe or use ← / → to change chapters; record and replay from the lower-right dock.",
+        toolsTitle: "Tools & Advanced Features",
+        level1ModeLabel: "Level 1 Reading Mode",
+        artTitle: "Customize Level 4 Illustrations",
+        sourceTitle: "Sync & Source Data",
+      },
       repo: {
         syncBtn: "Sync from Repo",
         syncing: "Syncing via CDN...",
@@ -440,8 +462,6 @@ export const translations = {
         textSizeMedium: "M",
         textSizeLarge: "L",
         openIllustrationBtn: "Open Cluster Art (Level 4)",
-        tapOrSwipeHint:
-          "Tap right half of screen to scroll down one screen, left half to scroll up · Swipe horizontally to switch chapters",
       },
       level2: {
         charactersLabel: "Characters & Central Motifs",
@@ -452,7 +472,6 @@ export const translations = {
       level3: {
         skeletonHeader: "Unified Original Plot Skeleton",
         pointsBadge: "core points",
-        jumpToSceneHint: "Click any chapter to mark where you are telling",
         filterCurrentScene: "Focused Chapter",
         filterAllScenes: "All Chapters",
         openInLevel4Btn: "Open Cluster Art (Level 4)",
@@ -471,10 +490,9 @@ export const translations = {
         stageModeExit: "Standard Frame",
         artModeRepoBadge: "Repo Illustration",
         artModeProceduralBadge: "Local Wordless SVG Art",
-        swipeHint:
-          "Use Prev/Next, arrow keys ← / →, or swipe horizontally to switch illustrations (zero text hints)",
       },
       nav: {
+        levelSelectLabel: "Select Practice Level",
         sceneLabel: "Chapter",
         ofWord: "/",
         prevScene: "Previous Chapter",
@@ -616,6 +634,19 @@ export const translations = {
           "正在从资料库同步180章完整全文，请稍候几秒再试。",
         errorNotice: "暂时无法生成 PDF，请稍后重试。",
       },
+      utilities: {
+        openButton: "说明与工具",
+        closeButton: "收起说明与工具",
+        contextButton: "背景与古籍",
+        introTitle: "介绍与使用说明",
+        epicSummary: "5卷 · 180章 · 28幅记忆插画 · 适合9–10岁",
+        levelGuide: "按4级练习：全文朗读 → 详细大纲 → 精简脉络 → 无文字看图复述。",
+        tapGuide: "点击左右半屏可翻页；左右滑动或使用← / →切换章节；右下角可录音与回放。",
+        toolsTitle: "工具与高级功能",
+        level1ModeLabel: "Level 1阅读模式",
+        artTitle: "自定义Level 4插画",
+        sourceTitle: "同步与源数据",
+      },
       repo: {
         syncBtn: "从仓库同步",
         syncing: "正在同步...",
@@ -689,8 +720,6 @@ export const translations = {
         textSizeMedium: "中",
         textSizeLarge: "大",
         openIllustrationBtn: "查看本单元插画 (Level 4)",
-        tapOrSwipeHint:
-          "点击屏幕右半边向下翻屏，点击左半边向上翻屏 · 左右滑动切换章节",
       },
       level2: {
         charactersLabel: "核心人物与象征意象",
@@ -701,7 +730,6 @@ export const translations = {
       level3: {
         skeletonHeader: "原著核心情节脉络",
         pointsBadge: "个核心节点",
-        jumpToSceneHint: "点击任意章节即可标记当前讲述位置",
         filterCurrentScene: "聚焦当前章节",
         filterAllScenes: "全部章节",
         openInLevel4Btn: "查看本单元插画 (Level 4)",
@@ -720,10 +748,9 @@ export const translations = {
         stageModeExit: "标准画框",
         artModeRepoBadge: "仓库手绘插画",
         artModeProceduralBadge: "本地纯视觉 SVG 插画",
-        swipeHint:
-          "使用上一幅/下一幅按钮、键盘 ← / → 键或左右滑动切换记忆插画（无任何文字提示）",
       },
       nav: {
+        levelSelectLabel: "选择练习级别",
         sceneLabel: "章节",
         ofWord: "/",
         prevScene: "上一章",

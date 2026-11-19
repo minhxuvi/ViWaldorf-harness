@@ -6,6 +6,8 @@
 
 ## 1. Mục Đọc Thêm & Bốn Cấp Độ Luyện Tập
 
+- **Giao diện mở trang = không gian luyện kể**: Không hiển thị banner tiêu đề dài, thẻ thống kê, bộ lọc Quyển trải ngang, mô tả cấp độ hoặc hướng dẫn thao tác cố định. Thanh đầu gọn gồm 1 menu thả xuống chọn mức luyện tập (Level 1–4), nút **Bối cảnh & Cổ thư** và nút **Hướng dẫn & Tiện ích**; khung đọc dùng menu Quyển, điều hướng Chương/Tranh, cỡ chữ và bộ lọc phạm vi thu gọn.
+
 - **Đọc thêm — Bối cảnh & Linh hồn câu chuyện (`locales/{lang}/level-0-context/`)**:
   Nắm tinh thần văn hóa, nhịp điệu kể (9–10 tuổi theo phong cách Jakob Streit), điểm chạm ẩn dụ, hướng dẫn phát âm tên cổ theo từng Quyển, tổng quan sử thi và thư viện 25 văn bản cổ đọc thêm (`ancient-texts/`).
 1. **Level 1 — Toàn văn câu chuyện**:

@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useApp } from "@/lib/store";
-import { PageHeader } from "@/components/PageHeader";
 import { FeedbackSection } from "@/components/FeedbackSection";
 import {
   computeScrollRatio,
@@ -14,6 +13,7 @@ import {
   AncientBookItem,
   PracticeLevel,
   ReadingProgress,
+  StoryBookMeta,
   StoryIllustration,
   StoryScene,
   WaldorfArtStyle,
@@ -62,6 +62,7 @@ import {
   FileDown,
   ChevronDown,
   ChevronUp,
+  BookOpen,
 } from "lucide-react";
 
 const PRACTICE_LEVELS: PracticeLevel[] = [1, 2, 3, 4];
@@ -158,6 +159,7 @@ export default function StorytellingPracticePage() {
 
   // Mục đọc thêm: Bối cảnh & Linh hồn câu chuyện (thay cho Level 0 trước đây)
   const [showContextSection, setShowContextSection] = useState<boolean>(false);
+  const [showUtilitiesSection, setShowUtilitiesSection] = useState<boolean>(false);
   const [showEpicOverview, setShowEpicOverview] = useState<boolean>(false);
   const [ancientCategory, setAncientCategory] = useState<AncientCategoryFilter>("all");
   const [activeAncientBook, setActiveAncientBook] = useState<AncientBookItem | null>(null);
@@ -171,6 +173,8 @@ export default function StorytellingPracticePage() {
   const [pdfError, setPdfError] = useState<string>("");
   const [isPdfMenuOpen, setIsPdfMenuOpen] = useState<boolean>(false);
   const pdfMenuRef = useRef<HTMLDivElement | null>(null);
+  const [isLevelMenuOpen, setIsLevelMenuOpen] = useState<boolean>(false);
+  const levelMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Level 4: theo dõi URL ảnh từ repo bị lỗi & chế độ SVG dự phòng
   const [failedRepoImages, setFailedRepoImages] = useState<Record<string, boolean>>({});
@@ -214,16 +218,22 @@ export default function StorytellingPracticePage() {
     };
   }, []);
 
-  // Đóng menu tùy chọn PDF khi bấm ra ngoài hoặc nhấn Escape
+  // Đóng menu dropdown (chọn mức luyện tập / tùy chọn PDF) khi bấm ra ngoài hoặc nhấn Escape
   useEffect(() => {
-    if (!isPdfMenuOpen) return;
+    if (!isPdfMenuOpen && !isLevelMenuOpen) return;
     const handlePointerDown = (e: MouseEvent) => {
-      if (pdfMenuRef.current?.contains(e.target as Node | null)) return;
-      setIsPdfMenuOpen(false);
+      const target = e.target as Node | null;
+      if (isPdfMenuOpen && !pdfMenuRef.current?.contains(target)) {
+        setIsPdfMenuOpen(false);
+      }
+      if (isLevelMenuOpen && !levelMenuRef.current?.contains(target)) {
+        setIsLevelMenuOpen(false);
+      }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsPdfMenuOpen(false);
+        setIsLevelMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handlePointerDown);
@@ -232,7 +242,7 @@ export default function StorytellingPracticePage() {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isPdfMenuOpen]);
+  }, [isPdfMenuOpen, isLevelMenuOpen]);
 
   // Làm mới bộ nhớ đệm ảnh lỗi & văn bản cổ khi vừa đồng bộ xong hoặc đổi ngôn ngữ
   useEffect(() => {
@@ -919,8 +929,6 @@ export default function StorytellingPracticePage() {
       : selectedStory.title
     : "";
 
-  const currentLevelMeta = t.story.levels[activeLevel];
-
   // Bối cảnh & Linh hồn câu chuyện theo Quyển đang chọn
   const activeBookIdForSoul =
     selectedBookId !== "all" ? selectedBookId : currentScene?.bookId || "quyen-1";
@@ -983,56 +991,120 @@ export default function StorytellingPracticePage() {
   }
 
   return (
-    <div className="space-y-6 pb-24 sm:pb-28">
-      <PageHeader title={t.story.pageTitle} subtitle={t.story.pageSubtitle} />
-
-      {/* Thẻ thông tin bộ sử thi duy nhất, nút Bối cảnh, Tải PDF, Đồng bộ CDN & Chọn Quyển */}
+    <div className="space-y-4 pb-20 sm:pb-24">
       {selectedStory && (
-        <section className="garden-card space-y-3.5">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="badge-leaf font-semibold">{selectedStory.targetAge}</span>
-              <span className="badge-sand">
-                {books.length} {t.story.booksCountSuffix}
-              </span>
-              <span className="badge-sand">
-                {allScenes.length} {t.story.chaptersCountSuffix}
-              </span>
-              <span className="badge-sand">
-                {allIllustrations.length} {t.story.illustrationsCountSuffix}
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#E3EFE0]/85 text-forestDark text-xs font-medium">
-                <CheckCircle2 className="w-3.5 h-3.5 text-forest" />
-                <span>{t.story.repo.syncedLabel}</span>
-                {lastSyncedText && (
-                  <span className="text-[11px] text-inkSoft font-normal">
-                    · {t.story.repo.lastSyncedPrefix}: {lastSyncedText}
-                  </span>
-                )}
-              </span>
+        <section className="flex flex-wrap items-center gap-2">
+          <LevelSelectDropdown
+            activeLevel={activeLevel}
+            levels={t.story.levels}
+            isOpen={isLevelMenuOpen}
+            onToggle={() => setIsLevelMenuOpen((v) => !v)}
+            onSelect={(lvl) => {
+              handleSelectLevel(lvl);
+              setIsLevelMenuOpen(false);
+            }}
+            menuRef={levelMenuRef}
+            label={t.story.nav.levelSelectLabel}
+          />
+
+          <button
+            type="button"
+            aria-expanded={showContextSection}
+            onClick={() => {
+              setIsLevelMenuOpen(false);
+              setShowContextSection((prev) => {
+                const next = !prev;
+                if (next) setShowUtilitiesSection(false);
+                return next;
+              });
+            }}
+            className={`btn-ghost text-xs py-2 px-3 ${
+              showContextSection ? "bg-[#E3EFE0] border-forest" : ""
+            }`}
+          >
+            <Compass className="w-3.5 h-3.5" />
+            <span>{t.story.utilities.contextButton}</span>
+            {showContextSection ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            aria-expanded={showUtilitiesSection}
+            onClick={() => {
+              setIsLevelMenuOpen(false);
+              setShowUtilitiesSection((prev) => {
+                const next = !prev;
+                if (next) setShowContextSection(false);
+                return next;
+              });
+            }}
+            className={`btn-ghost text-xs py-2 px-3 ${
+              showUtilitiesSection ? "bg-[#E3EFE0] border-forest" : ""
+            }`}
+          >
+            <ScrollText className="w-3.5 h-3.5" />
+            <span>{t.story.utilities.openButton}</span>
+            {showUtilitiesSection ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+        </section>
+      )}
+
+      {(syncError || pdfError) && (
+        <div
+          role="alert"
+          className="text-xs text-terra bg-[#FDF2F0] border border-terra/30 rounded-lg px-3 py-2"
+        >
+          {pdfError || syncError}
+        </div>
+      )}
+
+      {selectedStory && showUtilitiesSection && (
+        <section
+          aria-label={t.story.utilities.openButton}
+          className="garden-card bg-[#FCF9F2] border-2 border-forest/20 space-y-4"
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-line pb-2.5">
+            <h2 className="font-serif text-lg font-bold text-forestDark flex items-center gap-2">
+              <ScrollText className="w-4 h-4 text-forest" />
+              <span>{t.story.utilities.openButton}</span>
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowUtilitiesSection(false)}
+              className="btn-ghost text-xs py-1 px-2.5"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>{t.story.utilities.closeButton}</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-3.5 rounded-xl border border-line bg-[#FFFDF8] space-y-2">
+              <h3 className="font-serif font-bold text-forestDark">
+                {t.story.utilities.introTitle}
+              </h3>
+              <p className="text-xs font-semibold text-forest">{displayTitle}</p>
+              <p className="text-xs text-inkSoft">{t.story.utilities.epicSummary}</p>
+              <p className="text-sm text-ink leading-relaxed">
+                {t.story.utilities.levelGuide}
+              </p>
+              <p className="text-xs text-inkSoft leading-relaxed">
+                {t.story.utilities.tapGuide}
+              </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                aria-expanded={showContextSection}
-                onClick={() => setShowContextSection((v) => !v)}
-                className={`text-xs py-2 px-3 ${
-                  showContextSection ? "btn-primary" : "btn-ghost border-forest/30"
-                }`}
-              >
-                <Compass className="w-3.5 h-3.5" />
-                <span>
-                  {showContextSection
-                    ? t.story.contextSection.closeBtn
-                    : t.story.contextSection.openBtn}
-                </span>
-                {showContextSection ? (
-                  <ChevronUp className="w-3.5 h-3.5" />
-                ) : (
-                  <ChevronDown className="w-3.5 h-3.5" />
-                )}
-              </button>
+            <div className="p-3.5 rounded-xl border border-line bg-[#FFFDF8] space-y-3">
+              <h3 className="font-serif font-bold text-forestDark">
+                {t.story.utilities.toolsTitle}
+              </h3>
 
               <PdfExportDropdown
                 isOpen={isPdfMenuOpen}
@@ -1043,87 +1115,134 @@ export default function StorytellingPracticePage() {
                 copy={t.story.pdf}
               />
 
-              {selectedStory.repoUrl && (
-                <button
-                  type="button"
-                  onClick={handleSyncRepoClick}
-                  disabled={isSyncingRepo}
-                  className="btn-ghost text-xs py-2 px-3 border-forest/30"
-                >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 text-forest ${
-                      isSyncingRepo ? "animate-spin" : ""
-                    }`}
-                  />
-                  <span>
-                    {isSyncingRepo ? t.story.repo.syncing : t.story.repo.syncBtn}
-                  </span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {syncNotice && !syncError && (
-            <div className="text-xs text-forestDark bg-[#E3EFE0]/70 border border-forest/25 rounded-lg px-3 py-1.5">
-              {syncNotice}
-            </div>
-          )}
-
-          {(syncError || pdfError) && (
-            <div className="text-xs text-terra bg-[#FDF2F0] border border-terra/30 rounded-lg px-3 py-1.5">
-              {pdfError || syncError}
-            </div>
-          )}
-
-          {/* Bộ lọc Quyển (Quyển I – V) & Đường dẫn GitHub */}
-          {books.length > 0 && (
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-2.5 border-t border-line/60">
-              <div
-                className="flex flex-wrap items-center gap-1.5"
-                role="group"
-                aria-label={t.story.repo.bookFilterLabel}
-              >
-                <span className="text-xs font-semibold text-forestDark mr-1">
-                  {t.story.repo.bookFilterLabel}:
-                </span>
-                <button
-                  type="button"
-                  aria-pressed={selectedBookId === "all"}
-                  onClick={() => handleBookSelect("all")}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
-                    selectedBookId === "all"
-                      ? "bg-forest text-white border-forest shadow-sm"
-                      : "bg-white text-ink border-line hover:bg-[#FAF3E3]"
-                  }`}
-                >
-                  {t.story.repo.allBooksOption} ({allScenes.length})
-                </button>
-                {books.map((bk) => (
+              <div className="space-y-1.5 pt-1 border-t border-line/60">
+                <p className="text-xs font-semibold text-forestDark">
+                  {t.story.utilities.level1ModeLabel}
+                </p>
+                <div className="inline-flex flex-wrap rounded-lg border border-line bg-white p-1 gap-1">
                   <button
                     type="button"
-                    key={bk.id}
-                    aria-pressed={selectedBookId === bk.id}
-                    onClick={() => handleBookSelect(bk.id)}
-                    title={bk.title}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
-                      selectedBookId === bk.id
-                        ? "bg-forest text-white border-forest shadow-sm"
-                        : "bg-white text-ink border-line hover:bg-[#FAF3E3]"
+                    aria-pressed={level1FlowMode === "scene"}
+                    onClick={() => setLevel1FlowMode("scene")}
+                    className={`px-2 py-1 text-xs rounded ${
+                      level1FlowMode === "scene"
+                        ? "bg-forest text-white"
+                        : "text-forestDark hover:bg-[#FAF3E3]"
                     }`}
                   >
-                    {bk.isEpilogue
-                      ? lang === "en"
-                        ? `Book V · Epilogue (${bk.totalChapters})`
-                        : lang === "zh"
-                        ? `第五卷 · 外传 (${bk.totalChapters})`
-                        : `Quyển V · Ngoại truyện (${bk.totalChapters})`
-                      : lang === "en"
-                      ? `Book ${bk.number} (${bk.totalChapters})`
-                      : lang === "zh"
-                      ? `第${bk.number}卷 (${bk.totalChapters})`
-                      : `Quyển ${bk.number} (${bk.totalChapters})`}
+                    {t.story.level1.viewByScene}
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    aria-pressed={level1FlowMode === "full"}
+                    onClick={() => setLevel1FlowMode("full")}
+                    className={`px-2 py-1 text-xs rounded ${
+                      level1FlowMode === "full"
+                        ? "bg-forest text-white"
+                        : "text-forestDark hover:bg-[#FAF3E3]"
+                    }`}
+                  >
+                    {t.story.level1.viewFullFlow}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-1 border-t border-line/60">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <p className="text-xs font-semibold text-forestDark">
+                    {t.story.utilities.artTitle}
+                  </p>
+                  <span className="badge-sand text-[10px]">
+                    {shouldShowRepoImg || currentIllustration?.imagePath
+                      ? t.story.level4.artModeRepoBadge
+                      : t.story.level4.artModeProceduralBadge}
+                  </span>
+                </div>
+                <select
+                  aria-label={t.story.level4.artStyleLabel}
+                  value={currentIllustration?.artStyle || "wet-on-wet"}
+                  onChange={(e) => {
+                    setPreferProceduralArt(true);
+                    handleIllustrationArtStyleChange(e.target.value as WaldorfArtStyle);
+                  }}
+                  className="w-full px-2 py-1.5 rounded-lg border border-line bg-white text-xs text-ink"
+                >
+                  <option value="wet-on-wet">{t.story.level4.styleWetOnWet}</option>
+                  <option value="crayon">{t.story.level4.styleCrayon}</option>
+                  <option value="chalkboard">{t.story.level4.styleChalkboard}</option>
+                </select>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    type="file"
+                    ref={customImageInputRef}
+                    accept="image/*"
+                    onChange={handleCustomImageUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => customImageInputRef.current?.click()}
+                    className="btn-ghost text-xs py-1.5 px-2.5"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{t.story.level4.uploadCustomImageBtn}</span>
+                  </button>
+                  {(currentIllustration?.imagePath || preferProceduralArt) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreferProceduralArt(false);
+                        handleResetIllustrationImage();
+                      }}
+                      className="btn-ghost text-xs py-1.5 px-2.5 text-terra"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>{t.story.level4.resetProceduralBtn}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-line bg-[#FFFDF8] space-y-2.5">
+              <h3 className="font-serif font-bold text-forestDark">
+                {t.story.utilities.sourceTitle}
+              </h3>
+
+              <div className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E3EFE0]/85 text-forestDark text-xs font-medium">
+                <CheckCircle2 className="w-3.5 h-3.5 text-forest flex-shrink-0" />
+                <span>{t.story.repo.syncedLabel}</span>
+                {lastSyncedText && (
+                  <span className="text-[11px] text-inkSoft font-normal">
+                    · {lastSyncedText}
+                  </span>
+                )}
+              </div>
+
+              {syncNotice && !syncError && (
+                <p className="text-xs text-forestDark bg-[#E3EFE0]/60 border border-forest/20 rounded-lg px-2.5 py-1.5">
+                  {syncNotice}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedStory.repoUrl && (
+                  <button
+                    type="button"
+                    onClick={handleSyncRepoClick}
+                    disabled={isSyncingRepo}
+                    className="btn-ghost text-xs py-1.5 px-2.5"
+                  >
+                    <RefreshCw
+                      className={`w-3.5 h-3.5 text-forest ${
+                        isSyncingRepo ? "animate-spin" : ""
+                      }`}
+                    />
+                    <span>
+                      {isSyncingRepo ? t.story.repo.syncing : t.story.repo.syncBtn}
+                    </span>
+                  </button>
+                )}
               </div>
 
               {activeRepoPath && selectedStory.repoUrl && (
@@ -1134,18 +1253,17 @@ export default function StorytellingPracticePage() {
                   )}
                   target="_blank"
                   rel="noreferrer"
-                  title={`${t.story.repo.folderPathLabel}: ${activeRepoPath}`}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FAF4E8] border border-line text-[11px] text-forestDark hover:border-forest/50 hover:underline max-w-full self-start lg:self-center"
+                  className="inline-flex items-center gap-1.5 text-xs text-forestDark hover:underline break-all"
                 >
-                  <FolderGit2 className="w-3 h-3 text-forest flex-shrink-0" />
-                  <code className="text-terra truncate max-w-[190px] sm:max-w-[280px]">
+                  <FolderGit2 className="w-3.5 h-3.5 text-forest flex-shrink-0" />
+                  <code className="text-terra text-[11px] truncate max-w-[210px]">
                     {activeRepoPath}
                   </code>
-                  <ExternalLink className="w-3 h-3 text-forest flex-shrink-0" />
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
                 </a>
               )}
             </div>
-          )}
+          </div>
         </section>
       )}
 
@@ -1422,92 +1540,22 @@ export default function StorytellingPracticePage() {
       {/* ================================================================== */}
       {selectedStory && (
         <section className="space-y-4">
-          <div
-            className="grid grid-cols-2 sm:grid-cols-4 gap-2"
-            role="tablist"
-            aria-label={t.story.pageTitle}
-          >
-            {PRACTICE_LEVELS.map((lvl) => {
-              const meta = t.story.levels[lvl];
-              const isActive = activeLevel === lvl;
-              return (
-                <button
-                  key={lvl}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => handleSelectLevel(lvl)}
-                  className={`text-left p-3 rounded-xl border transition-all ${
-                    isActive
-                      ? "bg-forest text-white border-forest shadow-md"
-                      : "bg-card text-ink border-line hover:border-forest/50 hover:bg-[#FAF3E3]"
-                  }`}
-                >
-                  <div
-                    className={`text-[11px] font-bold uppercase tracking-wider ${
-                      isActive ? "text-[#E9C46A]" : "text-terra"
-                    }`}
-                  >
-                    {meta.badge}
-                  </div>
-                  <div
-                    className={`text-xs sm:text-sm font-serif font-bold mt-0.5 leading-snug ${
-                      isActive ? "text-white" : "text-forestDark"
-                    }`}
-                  >
-                    {meta.shortTitle}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Mô tả cấp độ đang chọn */}
-          <div className="p-4 rounded-2xl bg-[#F7ECD8]/70 border border-line flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h2 className="font-serif text-base sm:text-lg font-bold text-forestDark">
-                {currentLevelMeta.title}
-              </h2>
-              <p className="text-xs sm:text-sm text-inkSoft mt-0.5 leading-relaxed">
-                {currentLevelMeta.description}
-              </p>
-            </div>
-            <span className="text-xs font-serif font-semibold text-forest self-start sm:self-center flex-shrink-0">
-              {displayTitle}
-            </span>
-          </div>
-
           {/* ============================================================== */}
           {/* LEVEL 1: TOÀN VĂN CÂU CHUYỆN + LƯU Ý GIỌNG KỂ                  */}
           {/* ============================================================== */}
           {activeLevel === 1 && (
             <div ref={readingSurfaceRef} className="reading-surface space-y-4 sm:space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-line pb-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex rounded-xl bg-[#F7ECD8]/70 p-1 border border-line">
-                    <button
-                      type="button"
-                      onClick={() => setLevel1FlowMode("scene")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                        level1FlowMode === "scene"
-                          ? "bg-forest text-white shadow-sm"
-                          : "text-forestDark hover:bg-white/60"
-                      }`}
-                    >
-                      {t.story.level1.viewByScene}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLevel1FlowMode("full")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                        level1FlowMode === "full"
-                          ? "bg-forest text-white shadow-sm"
-                          : "text-forestDark hover:bg-white/60"
-                      }`}
-                    >
-                      {t.story.level1.viewFullFlow}
-                    </button>
-                  </div>
+                  <BookSelectDropdown
+                    books={books}
+                    totalChapters={allScenes.length}
+                    selectedBookId={selectedBookId}
+                    onSelect={handleBookSelect}
+                    lang={lang}
+                    ariaLabel={t.story.repo.bookFilterLabel}
+                    allBooksLabel={t.story.repo.allBooksOption}
+                  />
 
                   {/* Bộ chọn cỡ chữ đọc thành tiếng */}
                   <div
@@ -1540,7 +1588,7 @@ export default function StorytellingPracticePage() {
                   </div>
                 </div>
 
-                {level1FlowMode === "scene" && (
+                {level1FlowMode === "scene" ? (
                   <ChapterNavControls
                     activeIndex={safeSceneIndex}
                     total={totalScenes}
@@ -1552,6 +1600,14 @@ export default function StorytellingPracticePage() {
                     prevLabel={t.story.nav.prevScene}
                     nextLabel={t.story.nav.nextScene}
                   />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setLevel1FlowMode("scene")}
+                    className="btn-ghost text-xs py-1.5 px-2.5"
+                  >
+                    {t.story.level1.viewByScene}
+                  </button>
                 )}
               </div>
 
@@ -1609,10 +1665,6 @@ export default function StorytellingPracticePage() {
                     }`}
                   >
                     {currentScene.passage}
-                  </p>
-
-                  <p className="text-center text-[11px] text-inkSoft italic pt-2 border-t border-line/60">
-                    {t.story.level1.tapOrSwipeHint}
                   </p>
 
                   <div className="flex justify-center pt-1">
@@ -1700,17 +1752,28 @@ export default function StorytellingPracticePage() {
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
             >
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-                <div>
-                  {currentScene.section && (
-                    <div className="text-xs font-semibold text-terra uppercase tracking-wide mb-0.5">
-                      {books.find((b) => b.id === currentScene.bookId)?.title} ·{" "}
-                      {currentScene.section}
-                    </div>
-                  )}
-                  <h3 className="font-serif text-lg sm:text-xl font-bold text-forestDark">
-                    {currentScene.title}
-                  </h3>
+              <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-line pb-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <BookSelectDropdown
+                    books={books}
+                    totalChapters={allScenes.length}
+                    selectedBookId={selectedBookId}
+                    onSelect={handleBookSelect}
+                    lang={lang}
+                    ariaLabel={t.story.repo.bookFilterLabel}
+                    allBooksLabel={t.story.repo.allBooksOption}
+                  />
+                  <div>
+                    {currentScene.section && (
+                      <div className="text-xs font-semibold text-terra uppercase tracking-wide mb-0.5">
+                        {books.find((b) => b.id === currentScene.bookId)?.title} ·{" "}
+                        {currentScene.section}
+                      </div>
+                    )}
+                    <h3 className="font-serif text-lg sm:text-xl font-bold text-forestDark">
+                      {currentScene.title}
+                    </h3>
+                  </div>
                 </div>
                 <ChapterNavControls
                   activeIndex={safeSceneIndex}
@@ -1821,16 +1884,22 @@ export default function StorytellingPracticePage() {
               onTouchMove={level3Scope === "current" ? handleTouchMove : undefined}
               onTouchEnd={level3Scope === "current" ? handleTouchEnd : undefined}
             >
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-line pb-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <BookSelectDropdown
+                    books={books}
+                    totalChapters={allScenes.length}
+                    selectedBookId={selectedBookId}
+                    onSelect={handleBookSelect}
+                    lang={lang}
+                    ariaLabel={t.story.repo.bookFilterLabel}
+                    allBooksLabel={t.story.repo.allBooksOption}
+                  />
                   <ListChecks className="w-5 h-5 text-forest" />
                   <div>
                     <h3 className="font-serif text-lg font-bold text-forestDark">
                       {t.story.level3.skeletonHeader}: {displayTitle}
                     </h3>
-                    <p className="text-xs text-inkSoft italic">
-                      {t.story.level3.jumpToSceneHint}
-                    </p>
                   </div>
                 </div>
 
@@ -1962,8 +2031,17 @@ export default function StorytellingPracticePage() {
               onTouchEnd={handleTouchEnd}
             >
               {/* Thanh công cụ tối giản — tuyệt đối không hiển thị tiêu đề hay chữ gợi ý cốt truyện */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+              <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-line pb-3">
                 <div className="flex flex-wrap items-center gap-2">
+                  <BookSelectDropdown
+                    books={books}
+                    totalChapters={allScenes.length}
+                    selectedBookId={selectedBookId}
+                    onSelect={handleBookSelect}
+                    lang={lang}
+                    ariaLabel={t.story.repo.bookFilterLabel}
+                    allBooksLabel={t.story.repo.allBooksOption}
+                  />
                   <IllustrationNavControls
                     activeIndex={safeIllustrationIndex}
                     total={totalIllustrations}
@@ -1975,54 +2053,14 @@ export default function StorytellingPracticePage() {
                     prevLabel={t.story.level4.prevIllustration}
                     nextLabel={t.story.level4.nextIllustration}
                   />
-                  <span className="badge-sand text-[11px]">
-                    {shouldShowRepoImg || currentIllustration.imagePath
-                      ? t.story.level4.artModeRepoBadge
-                      : t.story.level4.artModeProceduralBadge}
-                  </span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <label
-                    htmlFor="level4-art-style"
-                    className="text-xs font-semibold text-forestDark flex items-center gap-1.5"
-                  >
-                    <ImageIcon className="w-3.5 h-3.5 text-forest" />
-                    <span>{t.story.level4.artStyleLabel}:</span>
-                  </label>
-                  <select
-                    id="level4-art-style"
-                    value={currentIllustration.artStyle}
-                    onChange={(e) => {
-                      setPreferProceduralArt(true);
-                      handleIllustrationArtStyleChange(e.target.value as WaldorfArtStyle);
-                    }}
-                    className="px-2.5 py-1.5 rounded-lg border border-line bg-white text-xs font-medium text-ink"
-                  >
-                    <option value="wet-on-wet">{t.story.level4.styleWetOnWet}</option>
-                    <option value="crayon">{t.story.level4.styleCrayon}</option>
-                    <option value="chalkboard">{t.story.level4.styleChalkboard}</option>
-                  </select>
-
-                  <input
-                    type="file"
-                    ref={customImageInputRef}
-                    accept="image/*"
-                    onChange={handleCustomImageUpload}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => customImageInputRef.current?.click()}
-                    className="btn-ghost text-xs py-1.5 px-2.5"
-                    title={t.story.level4.uploadCustomImageBtn}
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">
-                      {t.story.level4.uploadCustomImageBtn}
+                  {!shouldShowRepoImg && !currentIllustration.imagePath && (
+                    <span className="badge-sand text-[11px]">
+                      {t.story.level4.artModeProceduralBadge}
                     </span>
-                  </button>
-
+                  )}
                   <button
                     type="button"
                     aria-pressed={isLevel4StageMode}
@@ -2047,20 +2085,6 @@ export default function StorytellingPracticePage() {
                         : t.story.level4.stageModeEnter}
                     </span>
                   </button>
-
-                  {(currentIllustration.imagePath || preferProceduralArt) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPreferProceduralArt(false);
-                        handleResetIllustrationImage();
-                      }}
-                      className="btn-ghost text-xs py-1.5 px-2.5 text-terra"
-                      title={t.story.level4.resetProceduralBtn}
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -2109,10 +2133,6 @@ export default function StorytellingPracticePage() {
                   </button>
                 )}
               </div>
-
-              <p className="text-center text-xs text-inkSoft italic">
-                {t.story.level4.swipeHint}
-              </p>
 
               <LevelStepFooter
                 activeLevel={activeLevel}
@@ -2366,6 +2386,56 @@ function LevelStepFooter({
   );
 }
 
+/** Bộ chọn Quyển thu gọn dùng chung trên thanh điều hướng của các Level. */
+function BookSelectDropdown({
+  books,
+  totalChapters,
+  selectedBookId,
+  onSelect,
+  lang,
+  ariaLabel,
+  allBooksLabel,
+}: {
+  books: StoryBookMeta[];
+  totalChapters: number;
+  selectedBookId: string;
+  onSelect: (bookId: string) => void;
+  lang: string;
+  ariaLabel: string;
+  allBooksLabel: string;
+}) {
+  if (books.length === 0) return null;
+
+  const formatBookLabel = (bk: StoryBookMeta): string => {
+    if (bk.isEpilogue) {
+      if (lang === "en") return `Book V · Epilogue (${bk.totalChapters})`;
+      if (lang === "zh") return `第五卷 · 外传 (${bk.totalChapters})`;
+      return `Quyển V · Ngoại truyện (${bk.totalChapters})`;
+    }
+    if (lang === "en") return `Book ${bk.number} (${bk.totalChapters})`;
+    if (lang === "zh") return `第${bk.number}卷 (${bk.totalChapters})`;
+    return `Quyển ${bk.number} (${bk.totalChapters})`;
+  };
+
+  return (
+    <select
+      aria-label={ariaLabel}
+      value={selectedBookId}
+      onChange={(e) => onSelect(e.target.value)}
+      className="px-2.5 py-1.5 rounded-lg border border-line bg-white text-xs font-semibold text-forestDark max-w-[155px] sm:max-w-[195px] truncate"
+    >
+      <option value="all">
+        {allBooksLabel} ({totalChapters})
+      </option>
+      {books.map((bk) => (
+        <option key={bk.id} value={bk.id} title={bk.title}>
+          {formatBookLabel(bk)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function ChapterNavControls({
   activeIndex,
   total,
@@ -2524,6 +2594,91 @@ function IllustrationNavControls({
       >
         <ChevronRight className="w-3.5 h-3.5" />
       </button>
+    </div>
+  );
+}
+
+interface LevelMenuEntry {
+  badge: string;
+  shortTitle: string;
+}
+
+/** Dropdown chọn 1 trong 4 mức luyện tập (Level 1–4) gọn gàng cạnh hai nút mở rộng. */
+function LevelSelectDropdown({
+  activeLevel,
+  levels,
+  isOpen,
+  onToggle,
+  onSelect,
+  menuRef,
+  label,
+}: {
+  activeLevel: PracticeLevel;
+  levels: Record<PracticeLevel, LevelMenuEntry>;
+  isOpen: boolean;
+  onToggle: () => void;
+  onSelect: (level: PracticeLevel) => void;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  label: string;
+}) {
+  const current = levels[activeLevel];
+
+  return (
+    <div ref={menuRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        aria-label={`${label}: ${activeLevel}. ${current.shortTitle}`}
+        className={`btn-ghost text-xs py-2 px-3 ${
+          isOpen ? "bg-[#E3EFE0] border-forest" : ""
+        }`}
+      >
+        <BookOpen className="w-3.5 h-3.5 text-forest" />
+        <span>
+          {activeLevel}. {current.shortTitle}
+        </span>
+        {isOpen ? (
+          <ChevronUp className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronDown className="w-3.5 h-3.5" />
+        )}
+      </button>
+
+      {isOpen && (
+        <div
+          role="menu"
+          aria-label={label}
+          className="absolute left-0 top-full mt-1.5 z-30 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-[#FFFDF7] p-1.5 shadow-lg space-y-0.5"
+        >
+          {PRACTICE_LEVELS.map((lvl) => {
+            const meta = levels[lvl];
+            const isSelected = activeLevel === lvl;
+            return (
+              <button
+                key={lvl}
+                type="button"
+                role="menuitemradio"
+                aria-checked={isSelected}
+                onClick={() => onSelect(lvl)}
+                className={`w-full text-left flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-xs transition ${
+                  isSelected
+                    ? "bg-[#E3EFE0] text-forestDark font-semibold"
+                    : "text-ink hover:bg-[#F7ECD8]/70 font-medium"
+                }`}
+              >
+                <span>
+                  {lvl}. {meta.shortTitle}
+                </span>
+                {isSelected && (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-forest flex-shrink-0" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
