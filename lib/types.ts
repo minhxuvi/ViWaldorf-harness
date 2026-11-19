@@ -132,6 +132,7 @@ export interface VoiceRecording {
   sceneOrd: number;
   label: string;
   audioUrl: string;
+  mimeType?: string;
   durationSeconds: number;
   createdAt: string;
 }

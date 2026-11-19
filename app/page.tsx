@@ -22,6 +22,19 @@ import {
 import { ProceduralIllustrator } from "@/lib/art/proceduralIllustrator";
 import { exportStoryToPdf, hasFullStoryPassages } from "@/lib/pdfExporter";
 import {
+  createIdleTimerState,
+  getAudioFileExtension,
+  getFinalRecordedDurationSeconds,
+  getRecordedDisplaySeconds,
+  pauseRecordingTimer,
+  pickSupportedAudioMimeType,
+  RecordingStatus,
+  RecordingTimerState,
+  resumeRecordingTimer,
+  startRecordingTimer,
+  supportsMediaRecorderPause,
+} from "@/lib/voiceRecorder";
+import {
   buildGitHubBlobUrl,
   buildRepoFileUrl,
   cleanInlineMarkdown,
@@ -32,6 +45,8 @@ import {
 } from "@/lib/repoStoryLoader";
 import {
   Mic,
+  Pause,
+  Play,
   Square,
   Upload,
   ChevronLeft,
@@ -188,7 +203,10 @@ export default function StorytellingPracticePage() {
 
   // Thu âm & Nghe lại thuần túy (MediaRecorder) - thu gọn ở góc phải dưới
   const [isRecorderExpanded, setIsRecorderExpanded] = useState<boolean>(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>("idle");
+  const isRecording = recordingStatus === "recording";
+  const isPaused = recordingStatus === "paused";
+  const isRecorderActive = recordingStatus !== "idle";
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordings, setRecordings] = useState<VoiceRecording[]>([]);
   const [activeRecordingId, setActiveRecordingId] = useState<string | null>(null);
@@ -197,26 +215,65 @@ export default function StorytellingPracticePage() {
 
   const customImageInputRef = useRef<HTMLInputElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const recordingStartMsRef = useRef<number>(0);
+  const timerStateRef = useRef<RecordingTimerState>(createIdleTimerState());
+  const isStartingRecordingRef = useRef<boolean>(false);
+  const isUnmountedRef = useRef<boolean>(false);
   const recordingsRef = useRef<VoiceRecording[]>([]);
 
   useEffect(() => {
     recordingsRef.current = recordings;
   }, [recordings]);
 
-  // Dọn dẹp timer và Blob URL khi thoát trang
+  const stopTickInterval = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const startTickInterval = useCallback(() => {
+    stopTickInterval();
+    timerRef.current = setInterval(() => {
+      setRecordingSeconds(getRecordedDisplaySeconds(timerStateRef.current, Date.now()));
+    }, 250);
+  }, [stopTickInterval]);
+
+  const releaseRecorderHandles = useCallback(() => {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    mediaRecorderRef.current = null;
+  }, []);
+
+  const resetActiveRecorderState = useCallback(() => {
+    stopTickInterval();
+    timerStateRef.current = createIdleTimerState();
+    setRecordingStatus("idle");
+    setRecordingSeconds(0);
+  }, [stopTickInterval]);
+
+  // Dọn dẹp timer, stream micro và Blob URL khi thoát trang
   useEffect(() => {
+    isUnmountedRef.current = false;
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      isUnmountedRef.current = true;
+      stopTickInterval();
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        try {
+          recorder.stop();
+        } catch {}
+      }
+      releaseRecorderHandles();
       recordingsRef.current.forEach((rec) => {
         try {
           URL.revokeObjectURL(rec.audioUrl);
         } catch {}
       });
     };
-  }, []);
+  }, [stopTickInterval, releaseRecorderHandles]);
 
   // Đóng menu dropdown (chọn mức luyện tập / tùy chọn PDF) khi bấm ra ngoài hoặc nhấn Escape
   useEffect(() => {
@@ -519,25 +576,25 @@ export default function StorytellingPracticePage() {
     (index: number) => {
       const clamped = Math.max(0, Math.min(Math.max(0, totalScenes - 1), index));
       setActiveSceneIndex(clamped);
-      if (!isRecording) setIsRecorderExpanded(false);
+      if (!isRecorderActive) setIsRecorderExpanded(false);
       scrollReadingSurfaceIfNeeded();
     },
-    [totalScenes, isRecording, scrollReadingSurfaceIfNeeded]
+    [totalScenes, isRecorderActive, scrollReadingSurfaceIfNeeded]
   );
 
   const handleSelectLevel = useCallback(
     (lvl: PracticeLevel) => {
       setActiveLevel(lvl);
-      if (!isRecording) setIsRecorderExpanded(false);
+      if (!isRecorderActive) setIsRecorderExpanded(false);
     },
-    [isRecording]
+    [isRecorderActive]
   );
 
   const handleBookSelect = (bookId: string) => {
     setSelectedBookId(bookId);
     setActiveSceneIndex(0);
     setActiveIllustrationIndex(0);
-    if (!isRecording) setIsRecorderExpanded(false);
+    if (!isRecorderActive) setIsRecorderExpanded(false);
   };
 
   const handlePrevScene = useCallback(() => {
@@ -550,15 +607,15 @@ export default function StorytellingPracticePage() {
 
   const handlePrevIllustration = useCallback(() => {
     setActiveIllustrationIndex((prev) => Math.max(0, prev - 1));
-    if (!isRecording) setIsRecorderExpanded(false);
-  }, [isRecording]);
+    if (!isRecorderActive) setIsRecorderExpanded(false);
+  }, [isRecorderActive]);
 
   const handleNextIllustration = useCallback(() => {
     setActiveIllustrationIndex((prev) =>
       Math.min(Math.max(0, totalIllustrations - 1), prev + 1)
     );
-    if (!isRecording) setIsRecorderExpanded(false);
-  }, [totalIllustrations, isRecording]);
+    if (!isRecorderActive) setIsRecorderExpanded(false);
+  }, [totalIllustrations, isRecorderActive]);
 
   const handleJumpToIllustration = (illustrationId?: string) => {
     if (illustrationId) {
@@ -795,9 +852,11 @@ export default function StorytellingPracticePage() {
     }));
   };
 
-  // Bắt đầu thu âm (chỉ thu âm và cho nghe lại, không phân tích/đánh giá AI)
+  // Bắt đầu thu âm (hỗ trợ tạm dừng/tiếp tục trong cùng một bản thu, không phân tích AI)
   const startRecording = async () => {
+    if (recordingStatus !== "idle" || isStartingRecordingRef.current) return;
     setMicError("");
+
     if (
       typeof navigator === "undefined" ||
       !navigator.mediaDevices?.getUserMedia ||
@@ -807,34 +866,56 @@ export default function StorytellingPracticePage() {
       return;
     }
 
+    isStartingRecordingRef.current = true;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (isUnmountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      mediaStreamRef.current = stream;
       audioChunksRef.current = [];
 
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "";
-
+      const mimeType = pickSupportedAudioMimeType((m) => MediaRecorder.isTypeSupported(m));
       const recorder = mimeType
         ? new MediaRecorder(stream, { mimeType })
         : new MediaRecorder(stream);
 
       mediaRecorderRef.current = recorder;
-      recordingStartMsRef.current = Date.now();
-      setIsRecording(true);
+      timerStateRef.current = startRecordingTimer(Date.now());
+      setRecordingStatus("recording");
       setRecordingSeconds(0);
-
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = setInterval(() => {
-        setRecordingSeconds(Math.floor((Date.now() - recordingStartMsRef.current) / 1000));
-      }, 500);
+      startTickInterval();
 
       recorder.ondataavailable = (ev) => {
         if (ev.data && ev.data.size > 0) {
           audioChunksRef.current.push(ev.data);
         }
+      };
+
+      recorder.onpause = () => {
+        if (timerStateRef.current.status === "recording") {
+          timerStateRef.current = pauseRecordingTimer(timerStateRef.current, Date.now());
+        }
+        stopTickInterval();
+        setRecordingSeconds(getRecordedDisplaySeconds(timerStateRef.current, Date.now()));
+        setRecordingStatus("paused");
+      };
+
+      recorder.onresume = () => {
+        if (timerStateRef.current.status === "paused") {
+          timerStateRef.current = resumeRecordingTimer(timerStateRef.current, Date.now());
+        }
+        setRecordingStatus("recording");
+        startTickInterval();
+      };
+
+      recorder.onerror = () => {
+        resetActiveRecorderState();
+        releaseRecorderHandles();
+        audioChunksRef.current = [];
+        setMicError(t.story.recorder.recordingErrorNotice);
       };
 
       const capturedLevel = activeLevel;
@@ -849,19 +930,24 @@ export default function StorytellingPracticePage() {
       const capturedStoryId = selectedStory?.id || "story";
 
       recorder.onstop = () => {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-        setIsRecording(false);
-        stream.getTracks().forEach((track) => track.stop());
-
-        const durationSeconds = Math.max(
-          1,
-          Math.round((Date.now() - recordingStartMsRef.current) / 1000)
+        const durationSeconds = getFinalRecordedDurationSeconds(
+          timerStateRef.current,
+          Date.now()
         );
-        const blobType = recorder.mimeType || "audio/webm";
-        const blob = new Blob(audioChunksRef.current, { type: blobType });
+        resetActiveRecorderState();
+        releaseRecorderHandles();
+
+        if (isUnmountedRef.current) {
+          audioChunksRef.current = [];
+          return;
+        }
+
+        const chunks = audioChunksRef.current;
+        audioChunksRef.current = [];
+        if (chunks.length === 0) return;
+
+        const blobType = recorder.mimeType || mimeType || "audio/webm";
+        const blob = new Blob(chunks, { type: blobType });
         const audioUrl = URL.createObjectURL(blob);
 
         const recId = `rec-${Date.now()}`;
@@ -873,6 +959,7 @@ export default function StorytellingPracticePage() {
           sceneOrd: capturedOrd,
           label,
           audioUrl,
+          mimeType: blobType,
           durationSeconds,
           createdAt: new Date().toLocaleTimeString([], {
             hour: "2-digit",
@@ -887,21 +974,62 @@ export default function StorytellingPracticePage() {
       recorder.start();
     } catch (err) {
       console.warn("Microphone error:", err);
-      setIsRecording(false);
+      resetActiveRecorderState();
+      releaseRecorderHandles();
       setMicError(t.story.recorder.micDeniedNotice);
+    } finally {
+      isStartingRecordingRef.current = false;
+    }
+  };
+
+  const pauseRecording = () => {
+    setMicError("");
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state !== "recording") return;
+    if (!supportsMediaRecorderPause(recorder)) {
+      setMicError(t.story.recorder.pauseUnsupportedNotice);
+      return;
+    }
+    try {
+      recorder.pause();
+      const now = Date.now();
+      timerStateRef.current = pauseRecordingTimer(timerStateRef.current, now);
+      stopTickInterval();
+      setRecordingSeconds(getRecordedDisplaySeconds(timerStateRef.current, now));
+      setRecordingStatus("paused");
+    } catch {
+      setMicError(t.story.recorder.pauseUnsupportedNotice);
+    }
+  };
+
+  const resumeRecording = () => {
+    setMicError("");
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state !== "paused") return;
+    if (!supportsMediaRecorderPause(recorder)) {
+      setMicError(t.story.recorder.pauseUnsupportedNotice);
+      return;
+    }
+    try {
+      recorder.resume();
+      timerStateRef.current = resumeRecordingTimer(timerStateRef.current, Date.now());
+      setRecordingStatus("recording");
+      startTickInterval();
+    } catch {
+      setMicError(t.story.recorder.pauseUnsupportedNotice);
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    } else {
-      setIsRecording(false);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+        return;
+      } catch {}
     }
+    resetActiveRecorderState();
+    releaseRecorderHandles();
   };
 
   const handleDeleteRecording = (id: string) => {
@@ -2162,17 +2290,23 @@ export default function StorytellingPracticePage() {
               title={t.story.recorder.expandBtnLabel}
               className={`relative flex items-center justify-center rounded-full shadow-xl border-2 transition active:scale-95 ${
                 isRecording
-                  ? "h-12 px-3.5 gap-2 bg-red-700 hover:bg-red-800 text-white border-red-200 animate-pulse"
+                  ? "h-12 px-3.5 gap-2 bg-red-700 hover:bg-red-800 text-white border-red-200 motion-safe:animate-pulse"
+                  : isPaused
+                  ? "h-12 px-3.5 gap-2 bg-amber-700 hover:bg-amber-800 text-white border-amber-200"
                   : "w-12 h-12 bg-terra hover:bg-[#a84736] text-white border-[#FFFDF7]/90"
               }`}
             >
-              <Mic className="w-5 h-5" />
-              {isRecording && (
-                <span className="font-mono text-xs font-semibold">
+              {isPaused ? (
+                <Pause className="w-5 h-5" aria-hidden="true" />
+              ) : (
+                <Mic className="w-5 h-5" aria-hidden="true" />
+              )}
+              {isRecorderActive && (
+                <span className="font-mono tabular-nums text-xs font-semibold">
                   {formatDuration(recordingSeconds)}
                 </span>
               )}
-              {!isRecording && recordings.length > 0 && (
+              {!isRecorderActive && recordings.length > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-forest text-white text-[10px] font-bold flex items-center justify-center border border-[#FFFDF7] shadow">
                   {recordings.length}
                 </span>
@@ -2221,19 +2355,21 @@ export default function StorytellingPracticePage() {
                         <div className="flex items-center gap-1">
                           <a
                             href={rec.audioUrl}
-                            download={`ke-chuyen-L${rec.level}-${rec.sceneOrd}.webm`}
+                            download={`ke-chuyen-L${rec.level}-${rec.sceneOrd}.${getAudioFileExtension(rec.mimeType)}`}
                             className="p-1.5 rounded-lg border border-line text-forest hover:bg-[#F7ECD8] transition"
                             title={t.story.recorder.downloadTake}
+                            aria-label={t.story.recorder.downloadTake}
                           >
-                            <Download className="w-3.5 h-3.5" />
+                            <Download className="w-3.5 h-3.5" aria-hidden="true" />
                           </a>
                           <button
                             type="button"
                             onClick={() => handleDeleteRecording(rec.id)}
                             className="p-1.5 rounded-lg border border-line text-terra hover:bg-[#F7DDD6]/50 transition"
                             title={t.story.recorder.deleteTake}
+                            aria-label={t.story.recorder.deleteTake}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                           </button>
                         </div>
                       </div>
@@ -2243,7 +2379,10 @@ export default function StorytellingPracticePage() {
               )}
 
               {micError && (
-                <div className="px-3 py-2 rounded-xl bg-[#FDF2F0] border border-terra/40 text-xs text-terra font-medium text-center shadow">
+                <div
+                  role="alert"
+                  className="px-3 py-2 rounded-xl bg-[#FDF2F0] border border-terra/40 text-xs text-terra font-medium text-center shadow"
+                >
                   {micError}
                 </div>
               )}
@@ -2278,33 +2417,85 @@ export default function StorytellingPracticePage() {
                     title={t.story.recorder.collapseBtnLabel}
                     className="btn-ghost text-xs py-1 px-2"
                   >
-                    <Minimize2 className="w-3.5 h-3.5" />
+                    <Minimize2 className="w-3.5 h-3.5" aria-hidden="true" />
                     <span>{t.story.recorder.collapseBtnLabel}</span>
                   </button>
                 </div>
 
+                {isRecorderActive && (
+                  <div
+                    className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border text-xs ${
+                      isRecording
+                        ? "bg-red-50 border-red-200 text-red-900"
+                        : "bg-amber-50 border-amber-200 text-amber-900"
+                    }`}
+                  >
+                    <span
+                      role="status"
+                      aria-live="polite"
+                      className="inline-flex items-center gap-1.5 font-semibold"
+                    >
+                      {isRecording ? (
+                        <span
+                          aria-hidden="true"
+                          className="w-2 h-2 rounded-full bg-red-600 motion-safe:animate-pulse"
+                        />
+                      ) : (
+                        <Pause className="w-3.5 h-3.5 text-amber-700" aria-hidden="true" />
+                      )}
+                      <span>
+                        {isRecording
+                          ? t.story.recorder.recordingStatus
+                          : t.story.recorder.pausedStatus}
+                      </span>
+                    </span>
+                    <span className="font-mono tabular-nums font-bold">
+                      {formatDuration(recordingSeconds)}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  {!isRecording ? (
+                  {!isRecorderActive ? (
                     <button
                       type="button"
                       onClick={startRecording}
                       className="px-4 py-2 rounded-xl bg-terra hover:bg-[#a84736] text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-md transition active:scale-95"
                     >
-                      <Mic className="w-4 h-4" />
+                      <Mic className="w-4 h-4" aria-hidden="true" />
                       <span>{t.story.recorder.recordBtn}</span>
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={stopRecording}
-                      className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-md animate-pulse transition active:scale-95"
-                    >
-                      <Square className="w-3.5 h-3.5 fill-white" />
-                      <span>{t.story.recorder.stopBtn}</span>
-                      <span className="font-mono text-xs bg-red-900/60 px-1.5 py-0.5 rounded">
-                        {formatDuration(recordingSeconds)}
-                      </span>
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isRecording ? (
+                        <button
+                          type="button"
+                          onClick={pauseRecording}
+                          className="px-3.5 py-2 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition active:scale-95"
+                        >
+                          <Pause className="w-4 h-4" aria-hidden="true" />
+                          <span>{t.story.recorder.pauseBtn}</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={resumeRecording}
+                          className="px-3.5 py-2 rounded-xl bg-forest hover:bg-[#254a2e] text-white font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition active:scale-95"
+                        >
+                          <Play className="w-4 h-4 fill-white" aria-hidden="true" />
+                          <span>{t.story.recorder.resumeBtn}</span>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={stopRecording}
+                        className="px-3.5 py-2 rounded-xl bg-red-700 hover:bg-red-800 text-white font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-md transition active:scale-95"
+                      >
+                        <Square className="w-3.5 h-3.5 fill-white" aria-hidden="true" />
+                        <span>{t.story.recorder.stopBtn}</span>
+                      </button>
+                    </div>
                   )}
 
                   {recordings.length > 0 && (
@@ -2315,16 +2506,16 @@ export default function StorytellingPracticePage() {
                       className="btn-ghost text-xs py-1.5 px-2.5"
                       title={t.story.recorder.showTakesBtn}
                     >
-                      <ListMusic className="w-3.5 h-3.5" />
+                      <ListMusic className="w-3.5 h-3.5" aria-hidden="true" />
                       <span>{recordings.length}</span>
                     </button>
                   )}
                 </div>
 
-                {activeRecording && !isRecording ? (
+                {activeRecording && !isRecorderActive ? (
                   <audio controls src={activeRecording.audioUrl} className="h-8 w-full" />
                 ) : (
-                  !isRecording && (
+                  !isRecorderActive && (
                     <p className="text-[11px] text-inkSoft leading-snug">
                       {t.story.recorder.noRecordingYet}
                     </p>

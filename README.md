@@ -32,7 +32,7 @@
 ## 3. Xuất Bản PDF Toàn Văn & Thu âm / Nghe lại
 
 - **Tải PDF Toàn văn (Kèm ảnh / Không kèm ảnh)**: Tạo tài liệu in ấn A4 cục bộ ngay trên trình duyệt gồm trang bìa, mục lục 5 Quyển và toàn văn 180 Chương (*Lưu ý giọng kể* + nội dung kể chuyện), với 2 lựa chọn: **Kèm ảnh** (nhúng 28 tranh minh họa Level 4 tại đầu mỗi cụm chương) hoặc **Không kèm ảnh** (bản thuần chữ nhẹ và in nhanh).
-- **Thu âm & Nghe lại thuần túy**: Thu âm trực tiếp từ micro (`MediaRecorder`) kèm đồng hồ thời lượng và nghe lại tức thì (`<audio controls>`).
+- **Thu âm & Nghe lại thuần túy**: Thu âm trực tiếp từ micro (`MediaRecorder`) hỗ trợ **Tạm dừng / Tiếp tục** liền mạch trong cùng một bản thu kèm đồng hồ đếm thời lượng thu thực tế, và nghe lại tức thì (`<audio controls>`).
 - **Không sử dụng AI**: Không gọi API AI, không chấm điểm, không phân tích tự động hay truyền bản ghi âm ra ngoài trình duyệt.
 
 ---

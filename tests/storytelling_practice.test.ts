@@ -64,6 +64,18 @@ import {
 } from "../lib/repoStoryLoader";
 import { getLocalGenesisRepoDir, resolveSafeLocalRepoFile } from "../lib/server/localRepo";
 import { WaldorfArtStyle } from "../lib/types";
+import {
+  createIdleTimerState,
+  getAudioFileExtension,
+  getFinalRecordedDurationSeconds,
+  getRecordedDisplaySeconds,
+  getRecordedElapsedMs,
+  pauseRecordingTimer,
+  pickSupportedAudioMimeType,
+  resumeRecordingTimer,
+  startRecordingTimer,
+  supportsMediaRecorderPause,
+} from "../lib/voiceRecorder";
 
 test("Minimal UI shell exposes compact practice controls and expandable utility panels in vi/en/zh", () => {
   const pageSource = fs.readFileSync(path.join(process.cwd(), "app/page.tsx"), "utf8");
@@ -957,5 +969,98 @@ test("Local repo bridge & integration: safely resolves sibling from-genesis-to-n
     assert.ok(l3Safe, `${langCode}: missing Level 3 chapter-summaries.md`);
     const parsedL3 = parseLevel3Markdown(fs.readFileSync(l3Safe.filePath, "utf8"));
     assert.equal(Object.keys(parsedL3).length, 180, `${langCode}: expected 180 chapters in Level 3`);
+  }
+});
+
+test("Voice Recorder Pause/Resume: excludes paused intervals, handles MIME/extensions, and wires UI & i18n without AI", () => {
+  // 1. Timer state transitions across multiple pause/resume cycles
+  const idle = createIdleTimerState();
+  assert.equal(idle.status, "idle");
+  assert.equal(getRecordedElapsedMs(idle, 5000), 0);
+
+  // Idempotent pause/resume on idle does nothing
+  assert.deepEqual(pauseRecordingTimer(idle, 5000), idle);
+  assert.deepEqual(resumeRecordingTimer(idle, 5000), idle);
+
+  // Start at t=1000, pause at t=4200 -> 3200ms active
+  const seg1 = startRecordingTimer(1000);
+  assert.equal(getRecordedDisplaySeconds(seg1, 4200), 3);
+  const paused1 = pauseRecordingTimer(seg1, 4200);
+  assert.equal(paused1.status, "paused");
+  assert.equal(paused1.accumulatedMs, 3200);
+  // Idempotent pause while already paused preserves accumulatedMs
+  assert.deepEqual(pauseRecordingTimer(paused1, 9000), paused1);
+  // Paused gap (4200 -> 64200 = 60s interruption) does not count
+  assert.equal(getRecordedElapsedMs(paused1, 64200), 3200);
+  assert.equal(getRecordedDisplaySeconds(paused1, 64200), 3);
+
+  // Resume at t=64200 -> idempotent resume when recording does nothing
+  const seg2 = resumeRecordingTimer(paused1, 64200);
+  assert.equal(seg2.status, "recording");
+  assert.deepEqual(resumeRecordingTimer(seg2, 65000), seg2);
+
+  // Pause again at t=68500 -> +4300ms = 7500ms active total
+  const paused2 = pauseRecordingTimer(seg2, 68500);
+  assert.equal(paused2.accumulatedMs, 7500);
+  assert.equal(getRecordedDisplaySeconds(paused2, 99999), 7);
+  // Stopping directly while paused preserves active duration (rounded 7.5s -> 8s)
+  assert.equal(getFinalRecordedDurationSeconds(paused2, 120000), 8);
+
+  // Short take (<500ms) clamps to minimum 1 second
+  const shortSeg = startRecordingTimer(1000);
+  assert.equal(getFinalRecordedDurationSeconds(shortSeg, 1200), 1);
+
+  // 2. MIME selection & file extension mapping
+  assert.equal(
+    pickSupportedAudioMimeType((m) => m === "audio/mp4"),
+    "audio/mp4"
+  );
+  assert.equal(
+    pickSupportedAudioMimeType((m) => m === "audio/webm" || m === "audio/webm;codecs=opus"),
+    "audio/webm;codecs=opus"
+  );
+  assert.equal(
+    pickSupportedAudioMimeType(() => {
+      throw new Error("unsupported");
+    }),
+    ""
+  );
+  assert.equal(getAudioFileExtension("audio/mp4"), "m4a");
+  assert.equal(getAudioFileExtension("audio/ogg;codecs=opus"), "ogg");
+  assert.equal(getAudioFileExtension("audio/webm;codecs=opus"), "webm");
+  assert.equal(getAudioFileExtension(undefined), "webm");
+
+  // 3. Capability check for MediaRecorder.pause/resume
+  assert.equal(supportsMediaRecorderPause(null), false);
+  assert.equal(supportsMediaRecorderPause({ pause: () => {}, resume: () => {} }), true);
+  assert.equal(
+    supportsMediaRecorderPause({ pause: () => {} } as unknown as Pick<MediaRecorder, "pause" | "resume">),
+    false
+  );
+
+  // 4. UI wiring & multilingual i18n checks (vi/en/zh, zero AI)
+  const pageSource = fs.readFileSync(path.join(process.cwd(), "app/page.tsx"), "utf8");
+  for (const token of [
+    "recordingStatus",
+    "pauseRecording",
+    "resumeRecording",
+    "stopRecording",
+    "motion-safe:animate-pulse",
+    "getAudioFileExtension",
+  ]) {
+    assert.ok(pageSource.includes(token), `app/page.tsx must wire ${token}`);
+  }
+
+  for (const langCode of ["vi", "en", "zh"] as const) {
+    const recCopy = translations[langCode].story.recorder;
+    assert.ok(recCopy.pauseBtn.length > 0, `${langCode}: missing pauseBtn`);
+    assert.ok(recCopy.resumeBtn.length > 0, `${langCode}: missing resumeBtn`);
+    assert.ok(recCopy.pausedStatus.length > 0, `${langCode}: missing pausedStatus`);
+    assert.ok(recCopy.pauseUnsupportedNotice.length > 0, `${langCode}: missing pauseUnsupportedNotice`);
+    assert.ok(recCopy.recordingErrorNotice.length > 0, `${langCode}: missing recordingErrorNotice`);
+    assert.ok(
+      !/\bai\b|trợ lý ai|人工智能/i.test(JSON.stringify(recCopy)),
+      `${langCode} recorder copy must not mention AI`
+    );
   }
 });

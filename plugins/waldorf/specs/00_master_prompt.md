@@ -17,7 +17,7 @@
   - Public feedback space allowing visitors to read feedback and development progress, and signed-in members to post new feedback threads, reply, and close their own threads.
   - Strictly free of any AI references, AI badges, or AI wording—designed to feel welcoming and respectful to Waldorf parents and educators.
 - **Pure Voice Recording & Playback**:
-  - Direct in-browser voice recording (`MediaRecorder`) and playback (`<audio controls>`) so the storyteller can listen back to their own voice naturally.
+  - Direct in-browser voice recording (`MediaRecorder`) with seamless Pause & Resume within a single take when interrupted mid-story, active duration tracking, and immediate playback (`<audio controls>`) so the storyteller can listen back to their own voice naturally.
 
 ## 2. Hard Constraints & Non-Goals
 - **Single-Story Focused UI**: No story switcher, age-group selector, file upload, custom story form, or library reset controls.

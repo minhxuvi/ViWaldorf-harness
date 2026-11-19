@@ -242,8 +242,11 @@ export const translations = {
       },
       recorder: {
         recordBtn: "Thu âm",
+        pauseBtn: "Tạm dừng",
+        resumeBtn: "Tiếp tục",
         stopBtn: "Dừng thu",
         recordingStatus: "Đang thu âm...",
+        pausedStatus: "Đã tạm dừng",
         noRecordingYet: "Nhấn Thu âm để ghi lại giọng kể của bạn và tự nghe lại.",
         latestTakeLabel: "Bản thu vừa ghi",
         takesCountLabel: "bản thu trong phiên",
@@ -258,6 +261,10 @@ export const translations = {
           "Trình duyệt chưa được cấp quyền Micro. Vui lòng cho phép sử dụng Micro để thu âm.",
         unsupportedNotice:
           "Trình duyệt này chưa hỗ trợ ghi âm trực tiếp (MediaRecorder).",
+        pauseUnsupportedNotice:
+          "Trình duyệt này chưa hỗ trợ tạm dừng khi đang thu âm.",
+        recordingErrorNotice:
+          "Đã xảy ra sự cố khi thu âm. Vui lòng thử thu lại.",
       },
     },
   },
@@ -502,8 +509,11 @@ export const translations = {
       },
       recorder: {
         recordBtn: "Record",
+        pauseBtn: "Pause",
+        resumeBtn: "Resume",
         stopBtn: "Stop",
         recordingStatus: "Recording...",
+        pausedStatus: "Paused",
         noRecordingYet: "Press Record to capture your voice and listen back immediately.",
         latestTakeLabel: "Latest Recording",
         takesCountLabel: "session takes",
@@ -518,6 +528,10 @@ export const translations = {
           "Microphone access was denied. Please grant permission in your browser to record.",
         unsupportedNotice:
           "This browser does not support direct audio recording (MediaRecorder).",
+        pauseUnsupportedNotice:
+          "This browser does not support pausing an active recording.",
+        recordingErrorNotice:
+          "A recording error occurred. Please try recording again.",
       },
     },
   },
@@ -760,8 +774,11 @@ export const translations = {
       },
       recorder: {
         recordBtn: "录音",
+        pauseBtn: "暂停",
+        resumeBtn: "继续",
         stopBtn: "停止",
         recordingStatus: "正在录音...",
+        pausedStatus: "已暂停",
         noRecordingYet: "点击“录音”即可录下您的讲述声音并即时回听。",
         latestTakeLabel: "最新录音",
         takesCountLabel: "条会话录音",
@@ -774,6 +791,8 @@ export const translations = {
         currentSceneBadge: "当前章节",
         micDeniedNotice: "浏览器未获得麦克风权限，请在设置中允许使用麦克风后再录音。",
         unsupportedNotice: "当前浏览器不支持直接网页录音（MediaRecorder）。",
+        pauseUnsupportedNotice: "当前浏览器不支持在录音过程中暂停。",
+        recordingErrorNotice: "录音过程中发生错误，请重新尝试。",
       },
     },
   },
