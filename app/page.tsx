@@ -434,7 +434,6 @@ export function StorytellingPracticePage({
       setLevel1FlowMode(readingProgress.level1FlowMode);
       setLevel1TextSize(readingProgress.level1TextSize);
       setLevel3Scope(readingProgress.level3Scope);
-      setShowContextSection(readingProgress.showContextSection);
 
       pendingScrollRestoreRef.current = {
         scrollY: readingProgress.scrollY,

@@ -109,6 +109,10 @@ test("Minimal UI shell exposes compact practice controls and expandable utility 
     "Context panel must stay collapsed by default"
   );
   assert.ok(
+    !pageSource.includes("setShowContextSection(readingProgress.showContextSection);"),
+    "Context panel must not reopen from saved reading progress"
+  );
+  assert.ok(
     pageSource.includes("const [showUtilitiesSection, setShowUtilitiesSection] = useState<boolean>(false);"),
     "Guide & Tools panel must stay collapsed by default"
   );
