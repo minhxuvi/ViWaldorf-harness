@@ -28,6 +28,7 @@ import {
   saveLocalReadingProgress,
 } from "./readingProgress";
 import { hasFullStoryPassages } from "./pdfExporter";
+import { resolveStoryPath } from "./seoRoutes";
 
 export type AppActiveView = "story" | "feedback";
 
@@ -261,11 +262,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         readingProgressRef.current = merged;
         setReadingProgress(merged);
         saveLocalReadingProgress(merged);
-        if (isSupportedStoryId(merged.storyId)) {
-          activeStoryIdRef.current = merged.storyId;
-          setActiveStoryIdState(merged.storyId);
+        const activeRouteTarget =
+          typeof window !== "undefined" ? resolveStoryPath(window.location.pathname) : undefined;
+        const routePinsDifferentStory =
+          Boolean(activeRouteTarget) && activeRouteTarget?.storyId !== merged.storyId;
+        if (!routePinsDifferentStory) {
+          if (isSupportedStoryId(merged.storyId)) {
+            activeStoryIdRef.current = merged.storyId;
+            setActiveStoryIdState(merged.storyId);
+          }
+          setProgressVersion((v) => v + 1);
         }
-        setProgressVersion((v) => v + 1);
       } else if (userRef.current) {
         pushProgressToServer(merged);
       }
@@ -461,7 +468,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.warn("Local storage load warning:", err);
     }
 
-    // 1. Restore browser reading progress immediately (and activeStoryId if saved)
+    // 1. Restore browser reading progress immediately (and activeStoryId if saved or pinned by URL)
     const localProg = loadLocalReadingProgress();
     let initialStoryId: string = EARTH_STORY_ID;
     if (localProg) {
@@ -471,6 +478,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         initialStoryId = localProg.storyId;
       }
       setProgressVersion((v) => v + 1);
+    }
+    const routeTarget =
+      typeof window !== "undefined" ? resolveStoryPath(window.location.pathname) : undefined;
+    if (routeTarget && isSupportedStoryId(routeTarget.storyId)) {
+      initialStoryId = routeTarget.storyId;
     }
     activeStoryIdRef.current = initialStoryId;
     setActiveStoryIdState(initialStoryId);

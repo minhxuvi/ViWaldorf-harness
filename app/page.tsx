@@ -81,7 +81,13 @@ import {
   ChevronUp,
   BookOpen,
 } from "lucide-react";
-import type { StoryRouteTarget } from "@/lib/seoRoutes";
+import {
+  buildCanonicalRouteUrl,
+  buildRouteDocumentTitle,
+  resolveStoryPath,
+  type StoryRouteGranularity,
+  type StoryRouteTarget,
+} from "@/lib/seoRoutes";
 
 const PRACTICE_LEVELS: PracticeLevel[] = [1, 2, 3, 4];
 const ANCIENT_CATEGORIES = [
@@ -126,6 +132,15 @@ function formatMarkdownForReading(markdown: string): string {
       .replace(/^---+\s*$/gm, "")
       .replace(/^\s*[-*]\s+/gm, "• ")
   );
+}
+
+function formatSceneSection(
+  bookTitle: string | undefined,
+  section: string | undefined
+): string {
+  if (!section) return bookTitle || "";
+  if (!bookTitle || bookTitle === section) return section;
+  return `${bookTitle} · ${section}`;
 }
 
 function getActiveRepoPath(params: {
@@ -239,12 +254,25 @@ export function StorytellingPracticePage({
   const isStartingRecordingRef = useRef<boolean>(false);
   const isUnmountedRef = useRef<boolean>(false);
   const recordingsRef = useRef<VoiceRecording[]>([]);
+  const initialRouteKey = initialRoute
+    ? `${initialRoute.storyId}|${initialRoute.bookId || ""}|${initialRoute.sceneId || ""}`
+    : "";
+  const [urlGranularity, setUrlGranularity] = useState<StoryRouteGranularity>(() =>
+    initialRoute?.sceneId ? "chapter" : initialRoute?.bookId ? "book" : "story"
+  );
+  const appliedInitialRouteStoryKeyRef = useRef<string>("");
+  const appliedInitialRouteKeyRef = useRef<string>("");
+  const pendingHistoryModeRef = useRef<"replace" | "push" | "skip">("replace");
+  const isUrlSyncReadyRef = useRef<boolean>(false);
+  const storiesRef = useRef(data.stories);
+  storiesRef.current = data.stories;
 
   useEffect(() => {
-    if (initialRoute?.storyId && initialRoute.storyId !== activeStoryId) {
-      setActiveStoryId(initialRoute.storyId);
-    }
-  }, [activeStoryId, initialRoute?.storyId, setActiveStoryId]);
+    if (!initialRoute?.storyId) return;
+    if (appliedInitialRouteStoryKeyRef.current === initialRouteKey) return;
+    appliedInitialRouteStoryKeyRef.current = initialRouteKey;
+    setActiveStoryId(initialRoute.storyId);
+  }, [initialRoute?.storyId, initialRouteKey, setActiveStoryId]);
 
   useEffect(() => {
     recordingsRef.current = recordings;
@@ -334,11 +362,6 @@ export function StorytellingPracticePage({
   }, [selectedStory?.lastSyncedAt, selectedStory?.language]);
 
   const allScenes: StoryScene[] = useMemo(() => selectedStory?.scenes || [], [selectedStory]);
-  useEffect(() => {
-    setActiveSceneIndex(0);
-    setActiveIllustrationIndex(0);
-    setSelectedBookId("all");
-  }, [selectedStory?.id]);
   const allIllustrations: StoryIllustration[] = useMemo(
     () => selectedStory?.illustrations || [],
     [selectedStory]
@@ -396,11 +419,87 @@ export function StorytellingPracticePage({
       }
     : null;
 
-  // Khôi phục vị trí từ localStorage (và từ tài khoản nếu có bản mới hơn)
+  // Khôi phục vị trí từ localStorage (và từ tài khoản nếu có bản mới hơn) hoặc áp dụng initialRoute
   useEffect(() => {
     if (!isProgressLoaded || !selectedStory) return;
-    if (appliedProgressVersionRef.current === progressVersion) return;
 
+    if (initialRoute) {
+      if (appliedInitialRouteKeyRef.current === initialRouteKey) {
+        appliedProgressVersionRef.current = progressVersion;
+        return;
+      }
+      if (selectedStory.id !== initialRoute.storyId) return;
+
+      appliedInitialRouteKeyRef.current = initialRouteKey;
+      appliedProgressVersionRef.current = progressVersion;
+
+      const targetBookId = initialRoute.bookId || "all";
+      const targetScenes =
+        targetBookId === "all"
+          ? allScenes
+          : allScenes.filter((scene) => scene.bookId === targetBookId);
+      const effectiveScenes = targetScenes.length > 0 ? targetScenes : allScenes;
+      const targetSceneIndex = initialRoute.sceneId
+        ? Math.max(
+            0,
+            effectiveScenes.findIndex((scene) => scene.id === initialRoute.sceneId)
+          )
+        : 0;
+
+      if (readingProgress) {
+        setLevel1FlowMode(readingProgress.level1FlowMode);
+        setLevel1TextSize(readingProgress.level1TextSize);
+        setLevel3Scope(readingProgress.level3Scope);
+      }
+
+      const sameStory = readingProgress?.storyId === selectedStory.id;
+      const matchesExact =
+        Boolean(sameStory && readingProgress) &&
+        (initialRoute.sceneId
+          ? readingProgress!.sceneId === initialRoute.sceneId
+          : initialRoute.bookId
+          ? readingProgress!.selectedBookId === initialRoute.bookId &&
+            readingProgress!.sceneIndex === 0
+          : readingProgress!.selectedBookId === "all" &&
+            readingProgress!.sceneIndex === 0);
+
+      setSelectedBookId(targetBookId);
+      setActiveSceneIndex(targetSceneIndex);
+      setShowContextSection(false);
+      setUrlGranularity(
+        initialRoute.sceneId ? "chapter" : initialRoute.bookId ? "book" : "story"
+      );
+
+      if (matchesExact && readingProgress) {
+        const targetIllustrations =
+          targetBookId === "all"
+            ? allIllustrations
+            : allIllustrations.filter((il) => il.bookId === targetBookId);
+        const effectiveIllustrations =
+          targetIllustrations.length > 0 ? targetIllustrations : allIllustrations;
+        const resolvedIllIdx = resolveIllustrationIndexFromProgress(
+          effectiveIllustrations,
+          readingProgress
+        );
+        setActiveLevel(readingProgress.activeLevel);
+        setActiveIllustrationIndex(resolvedIllIdx);
+        pendingScrollRestoreRef.current = {
+          scrollY: readingProgress.scrollY,
+          scrollRatio: readingProgress.scrollRatio,
+        };
+        suppressScrollCaptureUntilRef.current = Date.now() + 450;
+      } else {
+        setActiveLevel(1);
+        setActiveIllustrationIndex(0);
+        pendingScrollRestoreRef.current = null;
+      }
+
+      hasHydratedProgressRef.current = true;
+      isUrlSyncReadyRef.current = true;
+      return;
+    }
+
+    if (appliedProgressVersionRef.current === progressVersion) return;
     appliedProgressVersionRef.current = progressVersion;
 
     if (readingProgress && readingProgress.storyId === selectedStory.id) {
@@ -435,14 +534,29 @@ export function StorytellingPracticePage({
       setLevel1TextSize(readingProgress.level1TextSize);
       setLevel3Scope(readingProgress.level3Scope);
 
+      const restoredScene = effectiveScenes[resolvedSceneIdx];
+      if (
+        resolvedSceneIdx > 0 ||
+        (restoredScene && restoredScene.ord > 1 && nextBookId === "all")
+      ) {
+        setUrlGranularity("chapter");
+      } else if (nextBookId !== "all") {
+        setUrlGranularity("book");
+      } else {
+        setUrlGranularity("story");
+      }
+
       pendingScrollRestoreRef.current = {
         scrollY: readingProgress.scrollY,
         scrollRatio: readingProgress.scrollRatio,
       };
       suppressScrollCaptureUntilRef.current = Date.now() + 450;
+    } else {
+      setUrlGranularity("story");
     }
 
     hasHydratedProgressRef.current = true;
+    isUrlSyncReadyRef.current = true;
   }, [
     isProgressLoaded,
     progressVersion,
@@ -450,32 +564,97 @@ export function StorytellingPracticePage({
     selectedStory,
     allScenes,
     allIllustrations,
+    initialRoute,
+    initialRouteKey,
   ]);
 
+  // Đồng bộ URL trên thanh địa chỉ trình duyệt và tiêu đề trang (giữ nguyên trang, không làm gián đoạn thu âm)
   useEffect(() => {
-    if (!isProgressLoaded || !selectedStory || initialRoute?.storyId !== selectedStory.id) return;
-    const targetBookId = initialRoute.bookId || "all";
-    const targetScenes = targetBookId === "all"
-      ? allScenes
-      : allScenes.filter((scene) => scene.bookId === targetBookId);
-    const targetSceneIndex = initialRoute.sceneId
-      ? targetScenes.findIndex((scene) => scene.id === initialRoute.sceneId)
-      : -1;
-
-    setSelectedBookId(targetBookId);
-    if (targetSceneIndex >= 0) {
-      setActiveSceneIndex(targetSceneIndex);
-      setActiveLevel(1);
-      setShowContextSection(false);
+    if (
+      typeof window === "undefined" ||
+      !isProgressLoaded ||
+      !isUrlSyncReadyRef.current ||
+      activeView !== "story" ||
+      !selectedStory
+    ) {
+      return;
     }
+    if (initialRoute && appliedInitialRouteKeyRef.current !== initialRouteKey) {
+      return;
+    }
+
+    const targetPath = buildCanonicalRouteUrl({
+      storyId: selectedStory.id,
+      bookId: selectedBookId,
+      sceneId: currentScene?.id,
+      granularity: urlGranularity,
+    });
+
+    if (targetPath) {
+      const mode = pendingHistoryModeRef.current;
+      pendingHistoryModeRef.current = "replace";
+      if (mode !== "skip" && window.location.pathname !== targetPath) {
+        const nextUrl = `${targetPath}${window.location.search}${window.location.hash}`;
+        if (mode === "push") {
+          window.history.pushState(null, "", nextUrl);
+        } else {
+          window.history.replaceState(null, "", nextUrl);
+        }
+      }
+    }
+
+    document.title = buildRouteDocumentTitle({
+      story: selectedStory,
+      bookId: selectedBookId,
+      scene: currentScene,
+      granularity: urlGranularity,
+      lang,
+    });
   }, [
-    allScenes,
-    initialRoute?.bookId,
-    initialRoute?.sceneId,
-    initialRoute?.storyId,
+    activeView,
+    currentScene,
+    initialRoute,
+    initialRouteKey,
     isProgressLoaded,
+    lang,
+    selectedBookId,
     selectedStory,
+    urlGranularity,
   ]);
+
+  // Hỗ trợ nút Quay lại / Tiến tới (Back/Forward) của trình duyệt
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePopState = () => {
+      const resolved = resolveStoryPath(window.location.pathname);
+      if (!resolved) return;
+
+      pendingHistoryModeRef.current = "skip";
+      const targetStory = storiesRef.current.find((s) => s.id === resolved.storyId);
+      const targetBookId = resolved.bookId || "all";
+      const scenes = targetStory
+        ? targetBookId === "all"
+          ? targetStory.scenes
+          : targetStory.scenes.filter((sc) => sc.bookId === targetBookId)
+        : [];
+      const effectiveScenes = scenes.length > 0 ? scenes : targetStory?.scenes || [];
+      const nextSceneIdx = resolved.sceneId
+        ? Math.max(0, effectiveScenes.findIndex((sc) => sc.id === resolved.sceneId))
+        : 0;
+
+      setActiveStoryId(resolved.storyId);
+      setSelectedBookId(targetBookId);
+      setActiveSceneIndex(nextSceneIdx);
+      setActiveAncientBook(null);
+      setShowContextSection(false);
+      setUrlGranularity(
+        resolved.sceneId ? "chapter" : resolved.bookId ? "book" : "story"
+      );
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [setActiveStoryId]);
 
   // Chuyển giữa trang đọc truyện và trang Góp ý
   useEffect(() => {
@@ -627,6 +806,8 @@ export function StorytellingPracticePage({
   const goToScene = useCallback(
     (index: number) => {
       const clamped = Math.max(0, Math.min(Math.max(0, totalScenes - 1), index));
+      pendingHistoryModeRef.current = "push";
+      setUrlGranularity("chapter");
       setActiveSceneIndex(clamped);
       if (!isRecorderActive) setIsRecorderExpanded(false);
       scrollReadingSurfaceIfNeeded();
@@ -642,7 +823,24 @@ export function StorytellingPracticePage({
     [isRecorderActive]
   );
 
+  const handleStorySelect = useCallback(
+    (nextStoryId: string) => {
+      if (nextStoryId === activeStoryId) return;
+      pendingHistoryModeRef.current = "push";
+      setUrlGranularity("story");
+      setSelectedBookId("all");
+      setActiveSceneIndex(0);
+      setActiveIllustrationIndex(0);
+      setActiveAncientBook(null);
+      setActiveStoryId(nextStoryId);
+      if (!isRecorderActive) setIsRecorderExpanded(false);
+    },
+    [activeStoryId, isRecorderActive, setActiveStoryId]
+  );
+
   const handleBookSelect = (bookId: string) => {
+    pendingHistoryModeRef.current = "push";
+    setUrlGranularity(bookId === "all" ? "story" : "book");
     setSelectedBookId(bookId);
     setActiveSceneIndex(0);
     setActiveIllustrationIndex(0);
@@ -1206,7 +1404,7 @@ export function StorytellingPracticePage({
               <BookOpen className="w-3.5 h-3.5" />
               <select
                 value={activeStoryId}
-                onChange={(event) => setActiveStoryId(event.target.value)}
+                onChange={(event) => handleStorySelect(event.target.value)}
                 className="bg-transparent text-ink outline-none max-w-[13rem]"
                 aria-label={lang === "vi" ? "Chọn truyện" : "Choose story"}
               >
@@ -1846,8 +2044,10 @@ export function StorytellingPracticePage({
                     <div>
                       {currentScene.section && (
                         <div className="text-xs font-semibold text-terra uppercase tracking-wide mb-0.5">
-                          {books.find((b) => b.id === currentScene.bookId)?.title} ·{" "}
-                          {currentScene.section}
+                          {formatSceneSection(
+                            books.find((b) => b.id === currentScene.bookId)?.title,
+                            currentScene.section
+                          )}
                         </div>
                       )}
                       <h3 className="font-serif text-xl font-bold text-forestDark">
@@ -1990,8 +2190,10 @@ export function StorytellingPracticePage({
                   <div>
                     {currentScene.section && (
                       <div className="text-xs font-semibold text-terra uppercase tracking-wide mb-0.5">
-                        {books.find((b) => b.id === currentScene.bookId)?.title} ·{" "}
-                        {currentScene.section}
+                        {formatSceneSection(
+                          books.find((b) => b.id === currentScene.bookId)?.title,
+                          currentScene.section
+                        )}
                       </div>
                     )}
                     <h3 className="font-serif text-lg sm:text-xl font-bold text-forestDark">
@@ -2194,7 +2396,10 @@ export function StorytellingPracticePage({
                         <div>
                           {sc.section && (
                             <div className="text-[11px] font-semibold text-terra uppercase tracking-wide">
-                              {books.find((b) => b.id === sc.bookId)?.title} · {sc.section}
+                              {formatSceneSection(
+                                books.find((b) => b.id === sc.bookId)?.title,
+                                sc.section
+                              )}
                             </div>
                           )}
                           <h4 className="font-serif font-bold text-base text-forestDark">

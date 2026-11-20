@@ -83,12 +83,16 @@ import {
   supportsMediaRecorderPause,
 } from "../lib/voiceRecorder";
 import {
+  buildCanonicalRouteUrl,
+  buildRouteDocumentTitle,
   getBookRoute,
   getChapterRoute,
+  getChapterSegment,
   getChapterSlug,
   getSeedStories,
   getStoryRoute,
   resolveChapterRoute,
+  resolveStoryPath,
   resolveStoryRoute,
 } from "../lib/seoRoutes";
 
@@ -206,26 +210,139 @@ test("Default seed opens Đẻ Đất Đẻ Nước and includes Từ Sáng Th�
   assert.equal(chapterCountByBook.get("quyen-5"), 10);
 });
 
-test("SEO routes resolve stable story, book, and chapter slugs", () => {
+test("SEO routes resolve stable story, book, and chapter slugs across vi/en/zh without prefix duplication or collisions", () => {
   const stories = getSeedStories();
-  const story = stories.find((candidate) => candidate.id === GENESIS_STORY_ID);
-  assert.ok(story);
-  const book = story.books?.[0];
-  const scene = story.scenes[0];
-  assert.ok(book);
+  const earth = stories.find((candidate) => candidate.id === EARTH_STORY_ID);
+  const genesis = stories.find((candidate) => candidate.id === GENESIS_STORY_ID);
+  assert.ok(earth);
+  assert.ok(genesis);
 
-  assert.equal(getStoryRoute(story), "/truyen/tu-sang-the-den-giang-sinh");
-  assert.equal(getBookRoute(story, book), `/truyen/tu-sang-the-den-giang-sinh/${book.slug}`);
+  const genesisBook = genesis.books?.[0];
+  const genesisScene = genesis.scenes[0];
+  const earthScene = earth.scenes[0];
+  assert.ok(genesisBook);
+
+  // Clean chapter slugs without doubled chuong-N-chuong-N- prefix
+  assert.equal(getStoryRoute(earth), "/truyen/de-dat-de-nuoc");
+  assert.equal(getStoryRoute(genesis), "/truyen/tu-sang-the-den-giang-sinh");
+  assert.equal(getBookRoute(genesis, genesisBook), `/truyen/tu-sang-the-den-giang-sinh/${genesisBook.slug}`);
   assert.equal(
-    getChapterRoute(story, scene),
-    `/truyen/tu-sang-the-den-giang-sinh/chuong-${scene.ord}-${getChapterSlug(scene)}`
+    getChapterRoute(earth, earthScene),
+    "/truyen/de-dat-de-nuoc/chuong-1-mo-dau-noi-mot-chuyen-doi-xua"
   );
-  assert.equal(resolveStoryRoute("tu-sang-the-den-giang-sinh")?.id, story.id);
   assert.equal(
-    resolveChapterRoute(story, `${scene.ord}-${getChapterSlug(scene)}`)?.id,
-    scene.id
+    getChapterRoute(genesis, genesisScene),
+    "/truyen/tu-sang-the-den-giang-sinh/chuong-1-khoi-nguyen-cua-the-gioi"
   );
-  assert.equal(resolveChapterRoute(story, "not-a-chapter"), undefined);
+  assert.ok(!getChapterRoute(earth, earthScene).includes("chuong-1-chuong-1-"));
+  assert.ok(!getChapterRoute(genesis, genesisScene).includes("chuong-1-chuong-1-"));
+
+  // Zero slug collisions across all 28 + 180 chapters and multilingual canonical stability
+  for (const story of [earth, genesis]) {
+    const seen = new Set<string>();
+    for (const sc of story.scenes) {
+      const route = getChapterRoute(story, sc);
+      assert.ok(!seen.has(route), `Duplicate chapter route detected: ${route}`);
+      seen.add(route);
+      assert.equal(resolveStoryPath(route)?.sceneId, sc.id);
+    }
+    for (const bk of story.books || []) {
+      const bookRoute = getBookRoute(story, bk);
+      assert.equal(resolveStoryPath(bookRoute)?.bookId, bk.id);
+      assert.equal(resolveStoryPath(bookRoute)?.sceneId, undefined);
+    }
+    assert.deepEqual(resolveStoryPath(getStoryRoute(story)), { storyId: story.id });
+  }
+
+  for (const langCode of ["en", "zh"] as const) {
+    const localized = getSeedData(langCode).stories;
+    const localizedEarth = localized.find((candidate) => candidate.id === EARTH_STORY_ID);
+    const localizedGenesis = localized.find((candidate) => candidate.id === GENESIS_STORY_ID);
+    assert.ok(localizedEarth && localizedGenesis);
+    assert.equal(getStoryRoute(localizedEarth), getStoryRoute(earth));
+    assert.equal(getBookRoute(localizedGenesis, localizedGenesis.books![0]), getBookRoute(genesis, genesisBook));
+    assert.equal(getChapterRoute(localizedEarth, localizedEarth.scenes[0]), getChapterRoute(earth, earthScene));
+    assert.equal(getChapterRoute(localizedGenesis, localizedGenesis.scenes[0]), getChapterRoute(genesis, genesisScene));
+  }
+
+  // Backward-compatible and full-segment resolution + invalid path rejection
+  assert.equal(resolveStoryRoute("tu-sang-the-den-giang-sinh")?.id, genesis.id);
+  assert.equal(
+    resolveChapterRoute(genesis, `${genesisScene.ord}-${getChapterSlug(genesisScene)}`)?.id,
+    genesisScene.id
+  );
+  assert.equal(
+    resolveChapterRoute(genesis, getChapterSegment(genesisScene))?.id,
+    genesisScene.id
+  );
+  assert.equal(resolveChapterRoute(genesis, "not-a-chapter"), undefined);
+  assert.equal(resolveStoryPath("/truyen/de-dat-de-nuoc/1-mo-dau-noi-mot-chuyen-doi-xua"), undefined);
+  assert.equal(resolveStoryPath("/truyen/unknown/chuong-1-x"), undefined);
+  assert.equal(resolveStoryPath("/"), undefined);
+
+  // Granular URL & document title helpers
+  assert.equal(
+    buildCanonicalRouteUrl({
+      storyId: earth.id,
+      bookId: earth.books?.[1]?.id,
+      sceneId: earth.scenes[2]?.id,
+      granularity: "story",
+    }),
+    "/truyen/de-dat-de-nuoc"
+  );
+  assert.equal(
+    buildCanonicalRouteUrl({
+      storyId: earth.id,
+      bookId: earth.books?.[1]?.id,
+      sceneId: earth.scenes[2]?.id,
+      granularity: "book",
+    }),
+    `/truyen/de-dat-de-nuoc/${earth.books?.[1]?.slug}`
+  );
+  assert.equal(
+    buildCanonicalRouteUrl({
+      storyId: earth.id,
+      bookId: earth.books?.[1]?.id,
+      sceneId: earth.scenes[2]?.id,
+      granularity: "chapter",
+    }),
+    getChapterRoute(earth, earth.scenes[2]!)
+  );
+  assert.ok(
+    buildRouteDocumentTitle({
+      story: earth,
+      bookId: earth.books?.[0]?.id,
+      scene: earthScene,
+      granularity: "chapter",
+      lang: "vi",
+    }).includes(earthScene.title)
+  );
+
+  // Structural App Router & live History API wiring checks
+  assert.ok(
+    !fs.existsSync(path.join(process.cwd(), "app/truyen/[storySlug]/chuong-[chapterKey]/page.tsx")),
+    "Colliding chuong-[chapterKey] route must be removed"
+  );
+  assert.ok(
+    !fs.existsSync(path.join(process.cwd(), "app/truyen/[storySlug]/[bookSlug]/page.tsx")),
+    "Separate [bookSlug] route must be replaced by unified [segment]"
+  );
+  const segmentRoutePath = path.join(process.cwd(), "app/truyen/[storySlug]/[segment]/page.tsx");
+  assert.ok(fs.existsSync(segmentRoutePath), "Unified [segment] route must exist");
+  const segmentRouteSrc = fs.readFileSync(segmentRoutePath, "utf8");
+  assert.ok(segmentRouteSrc.includes("generateStaticParams"));
+  assert.ok(segmentRouteSrc.includes("generateMetadata"));
+
+  const pageSrc = fs.readFileSync(path.join(process.cwd(), "app/page.tsx"), "utf8");
+  assert.ok(pageSrc.includes("buildCanonicalRouteUrl"));
+  assert.ok(pageSrc.includes("window.history.pushState"));
+  assert.ok(pageSrc.includes("window.history.replaceState"));
+  assert.ok(pageSrc.includes('"popstate"'));
+  assert.ok(pageSrc.includes("handleStorySelect"));
+  assert.ok(
+    !pageSrc.includes("}, [activeStoryId, initialRoute?.storyId, setActiveStoryId]);"),
+    "Legacy activeStoryId feedback loop must be removed"
+  );
 });
 
 test("Background & Practice levels: All 5 books, 180 chapters, and 28 illustrations have valid repo paths across vi/en/zh", () => {
