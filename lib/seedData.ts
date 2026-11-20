@@ -11,6 +11,9 @@ import {
 } from "./types";
 import { Language } from "./i18n";
 import {
+  EARTH_JSDELIVR_BASE_URL,
+  EARTH_REPO_URL,
+  EARTH_STORY_ID,
   GENESIS_JSDELIVR_BASE_URL,
   GENESIS_REPO_URL,
   GENESIS_STORY_ID,
@@ -624,11 +627,410 @@ export function getSeedData(lang: Language = "vi"): WaldorfData {
     scenes,
   };
 
+  const earthStory = buildEarthSeedStory(lang);
+
   return {
-    stories: [genesisStory],
-    storiesByLang: { [lang]: genesisStory },
+    stories: [earthStory, genesisStory],
+    storiesByLang: { [lang]: earthStory },
+    storiesByStoryAndLang: {
+      [EARTH_STORY_ID]: { [lang]: earthStory },
+      [GENESIS_STORY_ID]: { [lang]: genesisStory },
+    },
     updatedAt: new Date().toISOString(),
-    version: "5.0-genesis-multilang",
+    version: "6.0-two-epics-multilang",
+  };
+}
+
+const EARTH_BOOK_CONFIGS: SeedBookConfig[] = [
+  {
+    id: "quyen-1",
+    number: 1,
+    slug: "hoi-1-khai-thien-lap-dia",
+    title: {
+      vi: "Hồi I: Khai Thiên Lập Địa Và Khởi Nguồn Giống Nòi",
+      en: "Act I: Opening Heaven and Earth and Origin of Race",
+      zh: "第一幕：开天辟地与族群起源",
+    },
+    subtitle: {
+      vi: "Từ hư không đến muôn loài, muôn mường và giống người",
+      en: "From nothingness come all species, all Muongs and humankind",
+      zh: "从虚无混沌到万物、百芒与人类的诞生",
+    },
+    isEpilogue: false,
+    illustrationStyle: "charcoal_indigo_terracotta_chalk_pastel",
+    totalChapters: 7,
+    fileSlug: "hoi-1-khai-thien-lap-dia.md",
+  },
+  {
+    id: "quyen-2",
+    number: 2,
+    slug: "hoi-2-lap-lang-dung-muong",
+    title: {
+      vi: "Hồi II: Lập Lang Dựng Mường Và Sáng Tạo Văn Hóa",
+      en: "Act II: Establishing Lang, Building Muong and Creating Culture",
+      zh: "第二幕：立郎建芒与创造文化",
+    },
+    subtitle: {
+      vi: "Chọn người giữ mường, dựng nhà, tìm lửa, tìm lúa, tìm trâu",
+      en: "Choosing a leader, building a house, finding fire, rice, and buffalo",
+      zh: "推举守村之郎、建高脚屋、寻火寻水、求稻酿酒与驯牛",
+    },
+    isEpilogue: false,
+    illustrationStyle: "charcoal_indigo_terracotta_chalk_pastel",
+    totalChapters: 9,
+    fileSlug: "hoi-2-lap-lang-dung-muong.md",
+  },
+  {
+    id: "quyen-3",
+    number: 3,
+    slug: "hoi-3-lap-gia-duc-trong-dong",
+    title: {
+      vi: "Hồi III: Lập Gia, Đúc Trống Đồng Và Chia Đất",
+      en: "Act III: Starting a Family, Casting a Bronze Drum and Dividing the Land",
+      zh: "第三幕：成家、铸铜鼓与分地",
+    },
+    subtitle: {
+      vi: "Dựng vợ gả chồng, sinh trống đồng, chia đất cho các mường",
+      en: "Marriage, casting the bronze drum, and dividing the land",
+      zh: "娶妻成家、铸造铜鼓、为诸子分配土地",
+    },
+    isEpilogue: false,
+    illustrationStyle: "charcoal_indigo_terracotta_chalk_pastel",
+    totalChapters: 3,
+    fileSlug: "hoi-3-lap-gia-duc-trong-dong.md",
+  },
+  {
+    id: "quyen-4",
+    number: 4,
+    slug: "hoi-4-chu-ky-cay-chu",
+    title: {
+      vi: "Hồi IV: Chu Kỳ Cây Chu — Tìm, Chặt, Dựng Và Đốt",
+      en: "Act IV: The Chu Tree Cycle — Find, Cut, Build and Burn",
+      zh: "第四幕：Chu 树周期——寻树、砍树、建屋与焚屋",
+    },
+    subtitle: {
+      vi: "Cuộc kéo cây chu thần và ngôi nhà chu giữa đại ngàn",
+      en: "The sacred Chu tree, the great house, and the fire",
+      zh: "寻获神圣 Chu 树、牵木归村、建 Chu 屋与焚毁之劫",
+    },
+    isEpilogue: false,
+    illustrationStyle: "charcoal_indigo_terracotta_chalk_pastel",
+    totalChapters: 4,
+    fileSlug: "hoi-4-chu-ky-cay-chu.md",
+  },
+  {
+    id: "quyen-5",
+    number: 5,
+    slug: "hoi-5-tru-thu-du-diep-giac-ma",
+    title: {
+      vi: "Hồi V: Trừ Thú Dữ Và Dẹp Loạn Giặc Ma",
+      en: "Act V: Exorcising Beasts and Suppressing Rebellions",
+      zh: "第五幕：除猛兽与平息鬼乱",
+    },
+    subtitle: {
+      vi: "Săn Moong Lồ, dẹp cá điên, quạ điên và ba đạo giặc ma",
+      en: "Hunting Moong Lo, crazy fish, crazy crows and demonic rebellions",
+      zh: "围猎 Moong Lồ、清剿疯鱼疯鸦与平息三路鬼敌",
+    },
+    isEpilogue: false,
+    illustrationStyle: "charcoal_indigo_terracotta_chalk_pastel",
+    totalChapters: 4,
+    fileSlug: "hoi-5-tru-thu-du-diep-giac-ma.md",
+  },
+  {
+    id: "quyen-6",
+    number: 6,
+    slug: "hoi-6-khai-hoan-dong-chi",
+    title: {
+      vi: "Hồi VI: Khải Hoàn Về Đồng Chì Tam Quan Kẻ Chợ",
+      en: "Act VI: Triumphal Return to Dong Chi Tam Quan Ke Cho",
+      zh: "第六幕：凯旋归来 Đồng Chì Tam Quan Kẻ Chợ",
+    },
+    subtitle: {
+      vi: "Lo áo xống, kiệu ngai và rước vua về đất mường",
+      en: "Preparing royal robes, palanquin, and escorting the king home",
+      zh: "缝制王衣、打造龙轿并护送君主返回芒地",
+    },
+    isEpilogue: false,
+    illustrationStyle: "charcoal_indigo_terracotta_chalk_pastel",
+    totalChapters: 1,
+    fileSlug: "hoi-6-khai-hoan-dong-chi.md",
+  },
+];
+
+const EARTH_ANCIENT_BOOKS: Array<{
+  id: string;
+  category: "van-ban-co" | "tu-lieu";
+  fileName: string;
+  title: Record<Language, string>;
+}> = [
+  { id: "de-dat-de-nuoc", category: "van-ban-co", fileName: "Đẻ đất đẻ nước.md", title: { vi: "Đẻ đất đẻ nước", en: "The Birth of Earth and Water", zh: "《生土生水》（芒族史诗原典）" } },
+  { id: "loi-gioi-thieu-1988", category: "tu-lieu", fileName: "loi-gioi-thieu-1988.md", title: { vi: "Lời giới thiệu 1988: Mo vải và Mo lêu", en: "Introduction 1988: Mo Vai and Mo Leu", zh: "1988年版导言：Mo Vải 与 Mo Lêu" } },
+  { id: "nghi-thuc-dien-xuong", category: "tu-lieu", fileName: "nghi-thuc-dien-xuong.md", title: { vi: "Nghi thức diễn xướng tang lễ Mường", en: "Muong funeral performance ritual", zh: "芒族丧礼吟诵仪式" } },
+  { id: "khao-di-de-ruou-can", category: "tu-lieu", fileName: "khao-di-de-ruou-can.md", title: { vi: "Khảo dị: Tích Đẻ rượu cần", en: "Variant: Origin of Rice Wine", zh: "异文考：《酿酒竹管起源》" } },
+  { id: "khao-di-con-ba-ran", category: "tu-lieu", fileName: "khao-di-con-ba-ran.md", title: { vi: "Khảo dị: Con bà Rằn và Mụ Dạ Dần", en: "Variant: Lady Da Dan and Son of Mrs. Ran", zh: "异文考：Rằn 婆之子与 Dạ Dần 祖母" } },
+  { id: "bang-chu-giai-tu-muong", category: "tu-lieu", fileName: "bang-chu-giai-tu-muong.md", title: { vi: "Bảng chú giải từ Mường", en: "Glossary of Muong terms", zh: "芒语词汇注释表" } },
+  { id: "nhan-vat-va-than-linh", category: "tu-lieu", fileName: "nhan-vat-va-than-linh.md", title: { vi: "Nhân vật, thần linh và sự vật tiêu biểu", en: "Key Characters, Deities and Motifs", zh: "主要人物、神灵与意象名录" } },
+  { id: "dia-danh-xu-muong", category: "tu-lieu", fileName: "dia-danh-xu-muong.md", title: { vi: "Địa danh xứ Mường", en: "Places of Muong Land", zh: "芒族古地名录" } },
+  { id: "ghi-chu-bien-soan", category: "tu-lieu", fileName: "ghi-chu-bien-soan.md", title: { vi: "Ghi chú biên soạn và ba nguồn hợp nhất", en: "Editorial notes and three consolidated sources", zh: "编纂说明与三源合编考" } },
+];
+
+const EARTH_BOOK_SOULS: Record<string, StorySoulContext> = {
+  "quyen-1": {
+    culturalSpirit:
+      "Hồi I là thần thoại khởi nguyên của người Mường: thế giới được sinh ra từng lớp từ nước, đất, cây xanh chín mươi cành, cây si khổng lồ ngã thành 1.919 mường, đến mụ Dạ Dần và trứng Chiếng nở ra các dòng họ.",
+    storytellingRhythm:
+      "Giọng mời chậm vang như người già trong nhà; nhịp nước lên xuống khi hạn khi mưa; đếm đều danh sách mường; tách bốn nhịp rõ trong Chương 6.",
+    ageMetaphor:
+      "Thế giới không phải đồ vật có sẵn mà là một quá trình sinh sôi: nước rút mới thành đất, cây si đổ mới mở ra trăm mường.",
+    pronunciations: [
+      { term: "Thu Tha – Thu Thiên", pronunciation: "Thu Tha – Thu Thiên", meaning: "Hai vị tổ hóa sinh từ cây xanh chín mươi cành (Chương 2, 7)" },
+      { term: "Pồng Pêu", pronunciation: "Pồng Pêu", meaning: "Thần nước ngồi đan chài cầu mưa (Chương 3)" },
+      { term: "Dạ Dần", pronunciation: "Dạ Dần", meaning: "Nữ thần sinh từ thân si mục, dạy dệt lụa và ấp trứng Chiếng (Chương 6)" },
+    ],
+  },
+  "quyen-2": {
+    culturalSpirit:
+      "Hồi II là chín chặng học nghề của cộng đồng mới thành hình: ba lần rước lang (chỉ Lang Cun Cần khiêm nhường dám đứng ra), dựng nhà sàn theo lời rùa vàng, tìm lửa nước, tìm lúa, tìm rượu, lợn gà và trâu.",
+    storytellingRhythm:
+      "Ba lần rước lặp lại nhịp đều với cái hài kín đáo; phân biệt giọng rùa thâm – rùa vàng; nhịp mùa vụ tháng tư đến tháng mười ở Chương 13.",
+    ageMetaphor:
+      "Của quý giữ được không phải thứ cầm sẵn trong tay mà là cách làm ra nó; người đứng đầu mường là người dám đứng ra gánh vác.",
+    pronunciations: [
+      { term: "Dịt Dàng – Lang Tà Cái", pronunciation: "Dịt Dàng – Lang Tà Cái", meaning: "Hai vị lang đầu tiên lùi bước trước ma ếm (Chương 8–9)" },
+      { term: "Lang Cun Cần", pronunciation: "Lang Cun Cần", meaning: "Vị lang khiêm nhường giữ mường, dựng nhà sàn (Chương 10–16)" },
+      { term: "Dặt Cái Dành", pronunciation: "Dặt Cái Dành", meaning: "Người phụ nữ khéo léo đi xin giống lúa, lợn gà, nghề tằm (Chương 13, 15, 28)" },
+    ],
+  },
+  "quyen-3": {
+    culturalSpirit:
+      "Hồi III đặt nền luật lệ cộng đồng qua ba việc lớn: lập gia (phản đối hôn phối trái lẽ và cưới bốn bà vợ), đúc trống đồng khâu lạc, và chia đất gây oan khuất cho Lang Cun Khương.",
+    storytellingRhythm:
+      "Dứt khoát ở lời mường phản đối, hào hứng khi đúc trống đồng ba lần, chậm lại và lắng sâu khi chia mảnh đất bằng tai khỉ.",
+    ageMetaphor:
+      "Có những luật lệ không ai được phép vượt qua; chia phần bất công sẽ gieo mầm cho bất hòa về sau.",
+    pronunciations: [
+      { term: "Vạ Hai Kịp", pronunciation: "Vạ Hai Kịp", meaning: "Em gái ruột của Lang Cun Cần (Chương 17)" },
+      { term: "Lang Cun Khương", pronunciation: "Lang Cun Khương", meaning: "Người con tài giỏi nhận phần đất xấu (Chương 19)" },
+      { term: "Toóng Ín", pronunciation: "Toóng Ín", meaning: "Người con út gây họa và cái chết đầu tiên trong nhà (Chương 19)" },
+    ],
+  },
+  "quyen-4": {
+    culturalSpirit:
+      "Hồi IV là trái tim của sử thi với chu kỳ Tìm – Chặt – Dựng – Đốt cây chu đá lá chu đồng, xoay quanh người giữ nương hiền lành Tặm Tạch và cái giá của lời hứa bị phản bội.",
+    storytellingRhythm:
+      "Phiêu lưu từng chặng ở Chương 20 (đọc thật chậm lời dặn của chim Vàng Anh); chặt kéo nhịp dồn; kể gọn cảnh nặng và lắng lại ở ngọn lửa cháy 17 ngày.",
+    ageMetaphor:
+      "Đúng cách quan trọng hơn to lớn (lưỡi rìu nhỏ bằng bàn tay hạ được cây chu); của quý lấy bằng lừa dối sẽ phải trả giá.",
+    pronunciations: [
+      { term: "Tặm Tạch", pronunciation: "Tặm Tạch", meaning: "Người giữ nương hiền lành tìm ra cây chu (Chương 20–23)" },
+      { term: "Cặp Noọng", pronunciation: "Cặp Noọng", meaning: "Thần đười ươi đấu vật rồi dẫn đường cho Tặm Tạch (Chương 20)" },
+      { term: "Moong Lồ", pronunciation: "Moong Lồ", meaning: "Quái thú sinh từ máu oan dưới gốc si (Chương 23–24)" },
+    ],
+  },
+  "quyen-5": {
+    culturalSpirit:
+      "Hồi V là bốn lớp dẹp loạn nối tiếp nhau: săn Moong Lồ và chia da cho các dân tộc nên nghề dệt, dẹp chó điên – cá điên – quạ điên, và hai trận đánh oan hồn Toóng Ín.",
+    storytellingRhythm:
+      "Đếm đều các bước lớn lên của Moong, chuyển giọng vui bình đẳng khi chia da cho các tộc; giữ sự đồng cảm với nỗi tủi của Toóng Ín trước trận đánh.",
+    ageMetaphor:
+      "Cái dữ thường bắt nguồn từ vết thương chưa được giải tỏa; mọi dân tộc đều là anh em chia chung một cội nguồn.",
+    pronunciations: [
+      { term: "Cá ngào", pronunciation: "Cá ngào", meaning: "Tướng cá điên chín vây (Chương 25, 27)" },
+      { term: "Vua Bạc Đầu Long Vương", pronunciation: "Bạc Đầu Long Vương", meaning: "Vua Thủy phủ thu nhận Toóng Ín (Chương 27)" },
+      { term: "Hang Trống – Hang Hao", pronunciation: "Hang Trống – Hang Hao", meaning: "Hang thiêng nơi quạ tha xương rồng về (Chương 27)" },
+    ],
+  },
+  "quyen-6": {
+    culturalSpirit:
+      "Hồi VI khép lại toàn bộ sử thi bằng cuộc chuẩn bị áo lụa, kiệu rồng ngai công và đoàn rước khải hoàn đưa vua về Đồng Chì Tam Quan Kẻ Chợ — kết bằng hòa bình và lời dặn nhớ gốc.",
+    storytellingRhythm:
+      "Nhẹ nhàng khi học nghề tằm tơ, dí dỏm với ông thợ đòi ăn, rồi trang trọng khoan thai suốt đoàn rước và lời gà trống nhắc lại cả 28 chương.",
+    ageMetaphor:
+      "Mường trưởng thành khi biết làm ra cái đẹp và giữ gìn sự tử tế; đi xa tới Kẻ Chợ vẫn nhớ nơi đẻ đất đẻ nước.",
+    pronunciations: [
+      { term: "Đồng Chì – Tam Quan – Kẻ Chợ", pronunciation: "Đồng Chì – Tam Quan – Kẻ Chợ", meaning: "Kinh đô đích của đoàn rước khải hoàn (Chương 28)" },
+      { term: "Lang Bảng", pronunciation: "Lang Bảng", meaning: "Nhà nuôi tằm dệt lụa ở Khanh Hao Tang Hạm (Chương 28)" },
+      { term: "Phường sắc bùa", pronunciation: "Phường sắc bùa", meaning: "Đội hát chúc mừng đi sau trống chiêng (Chương 28)" },
+    ],
+  },
+};
+
+const EARTH_CHAPTERS_SEED: Array<
+  [number, string, number, string, Record<Language, string>, string, string]
+> = [
+  [1, "quyen-1", 1, "Hồi I: Khai Thiên Lập Địa Và Khởi Nguồn Giống Nòi", { vi: "Mở đầu — Nói một chuyện đời xưa", en: "Prologue — Telling an old story", zh: "开篇——讲述一段古老的故事" }, "tranh-01", "assets/images/tranh-01-mo-dau.png"],
+  [2, "quyen-1", 2, "Hồi I: Khai Thiên Lập Địa Và Khởi Nguồn Giống Nòi", { vi: "Đẻ đất", en: "Laying ground", zh: "生土" }, "tranh-02", "assets/images/tranh-02-de-dat.png"],
+  [3, "quyen-1", 3, "Hồi I: Khai Thiên Lập Địa Và Khởi Nguồn Giống Nòi", { vi: "Đẻ nước", en: "Giving birth to water", zh: "生水" }, "tranh-03", "assets/images/tranh-03-de-nuoc.png"],
+  [4, "quyen-1", 4, "Hồi I: Khai Thiên Lập Địa Và Khởi Nguồn Giống Nòi", { vi: "Đẻ cây si", en: "Giving birth to a sycamore tree", zh: "生榕树" }, "tranh-04", "assets/images/tranh-04-de-cay-si.png"],
+  [5, "quyen-1", 5, "Hồi I: Khai Thiên Lập Địa Và Khởi Nguồn Giống Nòi", { vi: "Đẻ mường", en: "Giving birth", zh: "生芒地" }, "tranh-05", "assets/images/tranh-05-de-muong.png"],
+  [6, "quyen-1", 6, "Hồi I: Khai Thiên Lập Địa Và Khởi Nguồn Giống Nòi", { vi: "Đẻ người", en: "Giving birth", zh: "生人" }, "tranh-06", "assets/images/tranh-06-de-nguoi.png"],
+  [7, "quyen-1", 7, "Hồi I: Khai Thiên Lập Địa Và Khởi Nguồn Giống Nòi", { vi: "Chia năm chia tháng", en: "Divide the year into the month", zh: "分年分月" }, "tranh-07", "assets/images/tranh-07-chia-nam-chia-thang.png"],
+  [8, "quyen-2", 8, "Hồi II: Lập Lang Dựng Mường Và Sáng Tạo Văn Hóa", { vi: "Dịt Dàng", en: "Ease", zh: "Dịt Dàng" }, "tranh-08", "assets/images/tranh-08-dit-dang.png"],
+  [9, "quyen-2", 9, "Hồi II: Lập Lang Dựng Mường Và Sáng Tạo Văn Hóa", { vi: "Lang Tà Cái", en: "Lang Ta Cai", zh: "Lang Tà Cái" }, "tranh-09", "assets/images/tranh-09-lang-ta-cai.png"],
+  [10, "quyen-2", 10, "Hồi II: Lập Lang Dựng Mường Và Sáng Tạo Văn Hóa", { vi: "Lang Cun Cần", en: "Lang Cun Can", zh: "Lang Cun Cần" }, "tranh-10", "assets/images/tranh-10-lang-cun-can.png"],
+  [11, "quyen-2", 11, "Hồi II: Lập Lang Dựng Mường Và Sáng Tạo Văn Hóa", { vi: "Làm nhà Lang Cun Cần", en: "Building Lang Cun Can's house", zh: "为 Lang Cun Cần 建屋" }, "tranh-11", "assets/images/tranh-11-lam-nha-lang-cun-can.png"],
+  [12, "quyen-2", 12, "Hồi II: Lập Lang Dựng Mường Và Sáng Tạo Văn Hóa", { vi: "Tìm lửa, tìm nước", en: "Find fire, find water", zh: "寻火、寻水" }, "tranh-12", "assets/images/tranh-12-tim-lua-tim-nuoc.png"],
+  [13, "quyen-2", 13, "Hồi II: Lập Lang Dựng Mường Và Sáng Tạo Văn Hóa", { vi: "Tìm cơm, tìm lúa", en: "Looking for rice, looking for rice", zh: "寻饭、寻稻" }, "tranh-13", "assets/images/tranh-13-tim-com-tim-lua.png"],
+  [14, "quyen-2", 14, "Hồi II: Lập Lang Dựng Mường Và Sáng Tạo Văn Hóa", { vi: "Tìm rượu", en: "Looking for wine", zh: "寻酒" }, "tranh-14", "assets/images/tranh-14-tim-ruou.png"],
+  [15, "quyen-2", 15, "Hồi II: Lập Lang Dựng Mường Và Sáng Tạo Văn Hóa", { vi: "Tìm lợn, tìm gà", en: "Looking for pigs, looking for chickens", zh: "寻猪、寻鸡" }, "tranh-15", "assets/images/tranh-15-tim-lon-tim-ga.png"],
+  [16, "quyen-2", 16, "Hồi II: Lập Lang Dựng Mường Và Sáng Tạo Văn Hóa", { vi: "Tìm trâu", en: "Finding the buffalo", zh: "寻水牛" }, "tranh-16", "assets/images/tranh-16-tim-trau.png"],
+  [17, "quyen-3", 17, "Hồi III: Lập Gia, Đúc Trống Đồng Và Chia Đất", { vi: "Lang Cun Cần lấy vợ", en: "Lang Cun Can gets married", zh: "Lang Cun Cần 娶妻" }, "tranh-17", "assets/images/tranh-17-lang-cun-can-lay-vo.png"],
+  [18, "quyen-3", 18, "Hồi III: Lập Gia, Đúc Trống Đồng Và Chia Đất", { vi: "Lấy vợ khác cho Lang Cun Cần", en: "Get another wife for Lang Cun Can", zh: "为 Lang Cun Cần 再娶" }, "tranh-18", "assets/images/tranh-18-lay-vo-khac-cho-lang-cun-can.png"],
+  [19, "quyen-3", 19, "Hồi III: Lập Gia, Đúc Trống Đồng Và Chia Đất", { vi: "Đẻ trống đồng và Lang Cun Cần chia đất", en: "Giving birth to the bronze drum and Lang Cun Need to divide the land", zh: "铸铜鼓与 Lang Cun Cần 分地" }, "tranh-19", "assets/images/tranh-19-de-trong-dong-va-chia-dat.png"],
+  [20, "quyen-4", 20, "Hồi IV: Chu Kỳ Cây Chu — Tìm, Chặt, Dựng Và Đốt", { vi: "Tìm chu", en: "Finding the Chu", zh: "寻 Chu 树" }, "tranh-20", "assets/images/tranh-20-tim-chu.png"],
+  [21, "quyen-4", 21, "Hồi IV: Chu Kỳ Cây Chu — Tìm, Chặt, Dựng Và Đốt", { vi: "Chặt chu", en: "Chop chu", zh: "砍 Chu 树" }, "tranh-21", "assets/images/tranh-21-chat-chu.png"],
+  [22, "quyen-4", 22, "Hồi IV: Chu Kỳ Cây Chu — Tìm, Chặt, Dựng Và Đốt", { vi: "Làm nhà chu", en: "Making a house", zh: "建 Chu 屋" }, "tranh-22", "assets/images/tranh-22-lam-nha-chu.png"],
+  [23, "quyen-4", 23, "Hồi IV: Chu Kỳ Cây Chu — Tìm, Chặt, Dựng Và Đốt", { vi: "Đốt nhà chu", en: "Burning down the house", zh: "焚烧 Chu 屋" }, "tranh-23", "assets/images/tranh-23-dot-nha-chu.png"],
+  [24, "quyen-5", 24, "Hồi V: Trừ Thú Dữ Và Dẹp Loạn Giặc Ma", { vi: "Săn Moong Lồ", en: "Hunting the Giant Moon", zh: "围猎 Moong Lồ" }, "tranh-24", "assets/images/tranh-24-san-moong-lo.png"],
+  [25, "quyen-5", 25, "Hồi V: Trừ Thú Dữ Và Dẹp Loạn Giặc Ma", { vi: "Săn cá điên, săn quạ điên", en: "Hunting crazy fish, hunting crazy crows", zh: "猎疯鱼、猎疯鸦" }, "tranh-25", "assets/images/tranh-25-san-ca-dien-san-qua-dien.png"],
+  [26, "quyen-5", 26, "Hồi V: Trừ Thú Dữ Và Dẹp Loạn Giặc Ma", { vi: "Giặc ma ruộng", en: "Invading the ghost field", zh: "田中鬼敌" }, "tranh-26", "assets/images/tranh-26-giac-ma-ruong.png"],
+  [27, "quyen-5", 27, "Hồi V: Trừ Thú Dữ Và Dẹp Loạn Giặc Ma", { vi: "Giặc ma may, giặc ma lạng", en: "The enemy is lucky, the enemy is evil", zh: "风暴鬼敌与乡里鬼敌" }, "tranh-27", "assets/images/tranh-27-giac-ma-may-giac-ma-lang.png"],
+  [28, "quyen-6", 28, "Hồi VI: Khải Hoàn Về Đồng Chì Tam Quan Kẻ Chợ", { vi: "Đưa vua về Đồng Chì Tam Quan Kẻ Chợ", en: "Bringing the king back to Dong Chi, Tam Quan Ke Cho", zh: "迎君主回归 Đồng Chì Tam Quan Kẻ Chợ" }, "tranh-28", "assets/images/tranh-28-dua-vua-ve-dong-chi.png"],
+];
+
+function buildEarthSeedStory(lang: Language): WaldorfStory {
+  const books: StoryBookMeta[] = EARTH_BOOK_CONFIGS.map((cfg) => ({
+    id: cfg.id,
+    number: cfg.number,
+    slug: cfg.slug,
+    title: cfg.title[lang],
+    subtitle: cfg.subtitle[lang],
+    isEpilogue: cfg.isEpilogue,
+    illustrationStyle: cfg.illustrationStyle,
+    totalChapters: cfg.totalChapters,
+    level0File: `locales/${lang}/level-0-context/${cfg.fileSlug}`,
+    level1File: `locales/${lang}/level-1-full-text/${cfg.fileSlug}`,
+    level2File: `locales/${lang}/level-2-detailed-outline/${cfg.fileSlug}`,
+  }));
+  const bookMap = new Map(books.map((b) => [b.id, b]));
+
+  const illustrations: StoryIllustration[] = EARTH_CHAPTERS_SEED.map(
+    ([ord, bookId, chNum, , titlesByLang, illId, image]) => ({
+      id: illId,
+      ord,
+      bookId,
+      chaptersRef:
+        lang === "en" ? `Chapter ${chNum}` : lang === "zh" ? `第${chNum}章` : `Chương ${chNum}`,
+      title: titlesByLang[lang],
+      artStyle: "chalkboard",
+      repoImage: image,
+      imageGenerated: false,
+    })
+  );
+  const illMap = new Map(illustrations.map((il) => [il.id, il]));
+
+  const scenes: StoryScene[] = EARTH_CHAPTERS_SEED.map(
+    ([globalNumber, bookId, chapterNumber, , titlesByLang, illId, image]) => {
+      const book = bookMap.get(bookId) || books[0];
+      const ill = illMap.get(illId) || illustrations[0];
+      const rawTitle = titlesByLang[lang];
+      const formattedTitle =
+        lang === "en"
+          ? `Chapter ${chapterNumber}: ${rawTitle}`
+          : lang === "zh"
+          ? `第${chapterNumber}章：${rawTitle}`
+          : `Chương ${chapterNumber}: ${rawTitle}`;
+
+      const summaryPoints = [
+        `${book.title}.`,
+        `${formattedTitle}.`,
+        `Nội dung toàn văn và dàn ý đầy đủ được đồng bộ tự động từ ${book.level1File}.`,
+      ];
+
+      return {
+        id: `${bookId}-chuong-${String(chapterNumber).padStart(2, "0")}`,
+        ord: globalNumber,
+        chapterNumber,
+        bookId,
+        section: book.title,
+        illustrationId: illId,
+        slug: image.split("/").pop()?.replace(/\.png$/, "") || illId,
+        isEpilogue: false,
+        title: formattedTitle,
+        passage: `${rawTitle} (${book.title}). Nội dung toàn văn đang được đồng bộ từ kho GitHub (xuvivn/de-dat-de-nuoc)...`,
+        voiceNote:
+          lang === "en"
+            ? `Keep an unhurried, respectful cadence matching ${book.title}.`
+            : lang === "zh"
+            ? `保持与《${book.title}》相契合的沉稳讲述节奏。`
+            : `Giữ giọng mo khoan thai, rõ nhịp theo tinh thần ${book.title}.`,
+        detailedOutline: {
+          characters: extractLikelyNames(rawTitle),
+          localizedDetails: [],
+          emotionalRhythm:
+            EARTH_BOOK_SOULS[book.id]?.storytellingRhythm ||
+            "Nhịp kể khoan thai, giàu hình ảnh.",
+          beats: summaryPoints,
+        },
+        summaryPoints,
+        artStyle: "chalkboard",
+        repoImage: image,
+        imageGenerated: false,
+        levelPaths: {
+          level0Overview: `locales/${lang}/level-0-context/00-epic-soul-overview.md`,
+          level0Book: book.level0File,
+          level1: book.level1File,
+          level2: book.level2File,
+          level3: `locales/${lang}/level-3-summary-outline/chapter-summaries.md`,
+          level4Gallery: `locales/${lang}/level-4-visual-prompts/illustration-gallery.md`,
+          level4Image: image,
+          level4PromptSpec: `locales/${lang}/level-4-visual-prompts/prompts-28-scenes.md`,
+        },
+      };
+    }
+  );
+
+  const ancientBooks: AncientBookItem[] = EARTH_ANCIENT_BOOKS.map((ab) => ({
+    id: ab.id,
+    title: ab.title[lang],
+    category: ab.category,
+    file: `locales/${lang}/level-0-context/ancient-texts/${ab.fileName}`,
+  }));
+
+  const title =
+    lang === "en"
+      ? "The Birth of Earth and Water — Five-Level Epic Storytelling Collection"
+      : lang === "zh"
+      ? "天地水生——五级史诗故事讲述练习集"
+      : "Đẻ Đất Đẻ Nước — Bộ Sử Thi Luyện Kể Chuyện 5 Cấp Độ";
+
+  return {
+    id: EARTH_STORY_ID,
+    language: lang,
+    title,
+    titleEn: "The Birth of Earth and Water — Five-Level Epic Storytelling Collection",
+    sourceInfo:
+      lang === "en"
+        ? "Source: xuvivn/de-dat-de-nuoc · 6 Acts · 28 Chapters · 28 Illustrations"
+        : lang === "zh"
+        ? "语料来源：xuvivn/de-dat-de-nuoc · 6幕 · 28章 · 28幅画作"
+        : "Nguồn từ repo xuvivn/de-dat-de-nuoc · 6 Hồi · 28 Chương · 28 Tranh",
+    targetAge: lang === "en" ? "9–10 years" : lang === "zh" ? "9–10岁" : "9–10 tuổi",
+    styleReference:
+      lang === "en"
+        ? "Muong epic — mo chant"
+        : lang === "zh"
+        ? "芒族史诗——莫礼吟诵"
+        : "Sử thi Mường — lời mo",
+    goal:
+      lang === "en"
+        ? "Explore the Mường epic background and practice all 28 chapters across 4 levels."
+        : lang === "zh"
+        ? "理解芒族史诗背景与精神，并循序练习讲述全28章。"
+        : "Đọc hiểu bối cảnh sử thi Mường & luyện kể trọn vẹn 28 Chương theo 4 cấp độ.",
+    defaultArtStyle: "chalkboard",
+    repoUrl: EARTH_REPO_URL,
+    rawBaseUrl: EARTH_JSDELIVR_BASE_URL,
+    books,
+    soul: {
+      ...EARTH_BOOK_SOULS["quyen-1"],
+      overviewPath: `locales/${lang}/level-0-context/00-epic-soul-overview.md`,
+      bookSouls: EARTH_BOOK_SOULS,
+      ancientBooks,
+    },
+    illustrations,
+    scenes,
   };
 }
 

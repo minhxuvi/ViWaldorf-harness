@@ -20,6 +20,15 @@ export const GENESIS_JSDELIVR_BASE_URL = `https://cdn.jsdelivr.net/gh/${GENESIS_
 export const LOCAL_REPO_API_BASE_URL = "/api/local-repo";
 export const GENESIS_STORY_ID = "story-from-genesis-to-nativity";
 
+export const EARTH_REPO_OWNER = "xuvivn";
+export const EARTH_REPO_NAME = "de-dat-de-nuoc";
+export const EARTH_REPO_BRANCH = "main";
+export const EARTH_REPO_URL = `https://github.com/${EARTH_REPO_OWNER}/${EARTH_REPO_NAME}`;
+export const EARTH_RAW_BASE_URL = `https://raw.githubusercontent.com/${EARTH_REPO_OWNER}/${EARTH_REPO_NAME}/${EARTH_REPO_BRANCH}`;
+export const EARTH_JSDELIVR_BASE_URL = `https://cdn.jsdelivr.net/gh/${EARTH_REPO_OWNER}/${EARTH_REPO_NAME}@${EARTH_REPO_BRANCH}`;
+export const EARTH_LOCAL_REPO_API_BASE_URL = "/api/local-repo?repo=earth";
+export const EARTH_STORY_ID = "story-de-dat-de-nuoc";
+
 export type RepoLanguage = "vi" | "en" | "zh";
 
 export const REPO_SYNC_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -71,27 +80,47 @@ export async function mapWithConcurrency<T, R>(
   return results;
 }
 
+export function getRepoKeyByStoryId(storyId?: string | null): "earth" | "genesis" {
+  return storyId === EARTH_STORY_ID ? "earth" : "genesis";
+}
+
 export function getCandidateRepoBaseUrls(
   preferredBaseUrl?: string,
-  options?: { includeLocalApi?: boolean }
+  options?: { includeLocalApi?: boolean; repo?: "genesis" | "earth" }
 ): string[] {
-  const defaults = [GENESIS_JSDELIVR_BASE_URL, GENESIS_RAW_BASE_URL];
+  const resolvedRepo: "genesis" | "earth" =
+    options?.repo ||
+    (preferredBaseUrl &&
+    (preferredBaseUrl.includes("de-dat-de-nuoc") || preferredBaseUrl.includes("repo=earth"))
+      ? "earth"
+      : "genesis");
+  const defaults =
+    resolvedRepo === "earth"
+      ? [EARTH_JSDELIVR_BASE_URL, EARTH_RAW_BASE_URL]
+      : [GENESIS_JSDELIVR_BASE_URL, GENESIS_RAW_BASE_URL];
   const isBrowserLocalhost =
     typeof window !== "undefined" &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
   const shouldUseLocalApi =
     options?.includeLocalApi === true ||
     preferredBaseUrl === LOCAL_REPO_API_BASE_URL ||
+    preferredBaseUrl === EARTH_LOCAL_REPO_API_BASE_URL ||
     (options?.includeLocalApi !== false && isBrowserLocalhost);
 
   const candidates: string[] = [];
   if (shouldUseLocalApi) {
-    candidates.push(LOCAL_REPO_API_BASE_URL);
+    candidates.push(
+      resolvedRepo === "earth"
+        ? EARTH_LOCAL_REPO_API_BASE_URL
+        : LOCAL_REPO_API_BASE_URL
+    );
   }
   if (
     preferredBaseUrl &&
     preferredBaseUrl !== GENESIS_RAW_BASE_URL &&
-    preferredBaseUrl !== LOCAL_REPO_API_BASE_URL
+    preferredBaseUrl !== EARTH_RAW_BASE_URL &&
+    preferredBaseUrl !== LOCAL_REPO_API_BASE_URL &&
+    preferredBaseUrl !== EARTH_LOCAL_REPO_API_BASE_URL
   ) {
     candidates.push(preferredBaseUrl);
   }
@@ -322,7 +351,8 @@ export function parseLevel0BookMarkdown(
           cells.length >= 3 &&
           !headerLower.includes("tên trong văn bản") &&
           !headerLower.includes("name in text") &&
-          !headerLower.includes("标准中文译名")
+          !headerLower.includes("标准中文译名") &&
+          !headerLower.includes("文本中的名称")
         ) {
           pronunciations.push({
             term: cells[0],
@@ -376,7 +406,7 @@ export function parseLevel1Markdown(
 
   for (const block of blocks) {
     const voiceSplit = block.body.split(
-      /^#{3,4}\s+(?:Lưu ý giọng kể|Storytelling Notes|讲演提示)[^\n]*$/m
+      /^#{3,4}\s+(?:Lưu ý giọng kể|Storytelling Notes|Note the narrator's voice|Narration note|讲演提示|讲述语气提示)[^\n]*$/m
     );
     const rawPassage = stripTrailingRule(voiceSplit[0] || "");
     const rawVoiceNote = stripTrailingRule(voiceSplit[1] || "");
@@ -458,6 +488,8 @@ export function parseLevel2Markdown(
         key.includes("mạch kể") ||
         key.includes("plot beat") ||
         key.includes("detailed plot") ||
+        key.includes("detailed development") ||
+        key.includes("详细发展") ||
         key.includes("情节")
       ) {
         for (const l of valueLines) {
@@ -474,8 +506,12 @@ export function parseLevel2Markdown(
         key.includes("chiều sâu") ||
         key.includes("meaning") ||
         key.includes("storytelling focus") ||
+        key.includes("storytelling highlight") ||
+        key.includes("significance") ||
         key.includes("寓意") ||
-        key.includes("重点")
+        key.includes("重点") ||
+        key.includes("意义") ||
+        key.includes("叙事要点")
       ) {
         emotionalRhythm = joinedClean;
       }
@@ -522,21 +558,24 @@ const BOOK_NUMERAL_MAP: Record<string, string> = {
   III: "quyen-3",
   IV: "quyen-4",
   V: "quyen-5",
+  VI: "quyen-6",
   一: "quyen-1",
   二: "quyen-2",
   三: "quyen-3",
   四: "quyen-4",
   五: "quyen-5",
+  六: "quyen-6",
   "1": "quyen-1",
   "2": "quyen-2",
   "3": "quyen-3",
   "4": "quyen-4",
   "5": "quyen-5",
+  "6": "quyen-6",
 };
 
 /**
  * Phân tích tệp Level 3 (`chapter-summaries.md` / `dan-y-tom-tat-cac-chuong.md`).
- * Trả về map theo `chapterId` dạng `quyen-1-chuong-01` để không bị trùng số chương giữa các Quyển.
+ * Trả về map theo `chapterId` dạng `quyen-1-chuong-01` để không bị trùng số chương giữa các Quyển/Hồi.
  */
 export function parseLevel3Markdown(markdown: string): Record<string, string[]> {
   const normalized = markdown.replace(/\r\n/g, "\n");
@@ -550,10 +589,10 @@ export function parseLevel3Markdown(markdown: string): Record<string, string[]> 
     const trimmed = rawLine.trim();
 
     const bookMatch = trimmed.match(
-      /^##\s+(?:Quyển\s+([IVX]+)|Book\s+([IVX]+)|第([一二三四五1-5])卷)(?=[\s:：（(]|$)/
+      /^##\s+(?:(?:Quyển|Hồi|Book|Act|Chapter)\s+([IVX]+)|第\s*([IVX一二三四五六1-6]+)\s*[卷幕回])(?=[\s:：（(]|$)/
     );
     if (bookMatch) {
-      const token = bookMatch[1] || bookMatch[2] || bookMatch[3];
+      const token = bookMatch[1] || bookMatch[2];
       const mapped = token ? BOOK_NUMERAL_MAP[token] : undefined;
       if (mapped) {
         currentBookId = mapped;
@@ -619,6 +658,11 @@ export function buildRepoFileUrl(
   rawBaseUrl = GENESIS_JSDELIVR_BASE_URL
 ): string {
   const cleanPath = relativePath.replace(/^\/+/, "");
+  if (rawBaseUrl.startsWith("/api/local-repo")) {
+    const baseWithoutQuery = rawBaseUrl.split("?")[0];
+    const query = rawBaseUrl.split("?")[1];
+    return `${baseWithoutQuery}/${cleanPath}${query ? `?${query}` : ""}`;
+  }
   return `${rawBaseUrl}/${cleanPath}`;
 }
 
@@ -634,10 +678,10 @@ export function buildGitHubBlobUrl(
 export async function fetchAncientBookMarkdown(
   relativePath: string,
   rawBaseUrl = GENESIS_JSDELIVR_BASE_URL,
-  options?: { preferFresh?: boolean }
+  options?: { preferFresh?: boolean; repo?: "genesis" | "earth" }
 ): Promise<string> {
   const cacheMode: RequestCache = options?.preferFresh ? "no-cache" : "default";
-  const candidateBases = getCandidateRepoBaseUrls(rawBaseUrl);
+  const candidateBases = getCandidateRepoBaseUrls(rawBaseUrl, { repo: options?.repo });
   let lastStatus = 0;
 
   for (const base of candidateBases) {
@@ -673,11 +717,16 @@ function formatChapterTitle(
 
 export async function fetchGenesisStoryFromRepo(
   rawBaseUrl = GENESIS_JSDELIVR_BASE_URL,
-  options?: { preferFresh?: boolean; lang?: RepoLanguage }
+  options?: {
+    preferFresh?: boolean;
+    lang?: RepoLanguage;
+    repo?: "genesis" | "earth";
+  }
 ): Promise<WaldorfStory> {
   const lang: RepoLanguage = options?.lang || "vi";
+  const repo = options?.repo || "genesis";
   const cacheMode: RequestCache = options?.preferFresh ? "no-cache" : "default";
-  const candidateBases = getCandidateRepoBaseUrls(rawBaseUrl);
+  const candidateBases = getCandidateRepoBaseUrls(rawBaseUrl, { repo });
   let indexData: RepoStoryIndex | null = null;
   let activeBaseUrl = candidateBases[0];
   let loadedFromLegacyRoot = false;
@@ -914,43 +963,66 @@ export async function fetchGenesisStoryFromRepo(
 
   const primarySoul = bookSouls["quyen-1"] || Object.values(bookSouls)[0] || {
     culturalSpirit:
-      "Đại sử thi 5 Quyển (180 Chương · 28 Tranh minh họa) kết nối từ Khởi Nguyên Sáng Thế đến Đêm Giáng Sinh và Ngoại truyện Ông già Noel.",
+      repo === "earth"
+        ? "Sử thi Mường Đẻ đất đẻ nước bám theo lời mo, tiếng Mường, nhịp điệu lễ tang và đời sống cộng đồng."
+        : "Đại sử thi 5 Quyển (180 Chương · 28 Tranh minh họa) kết nối từ Khởi Nguyên Sáng Thế đến Đêm Giáng Sinh.",
     storytellingRhythm:
-      "Giọng kể tự nhiên, ấm áp và giàu hình ảnh trực quan cho trẻ 9–10 tuổi theo tinh thần Jakob Streit.",
+      repo === "earth"
+        ? "Giọng kể trang trọng, khoan thai và giàu hình ảnh cho trẻ 9–10 tuổi."
+        : "Giọng kể tự nhiên, ấm áp và giàu hình ảnh trực quan cho trẻ 9–10 tuổi theo tinh thần Jakob Streit.",
     ageMetaphor:
-      "Hành trình tìm ánh sáng nội tâm, lòng kiên trung và tình thương trao đi không vụ lợi.",
-    pronunciations: [
-      { term: "Michael", pronunciation: "Mi-kha-en", meaning: "Tổng lãnh thiên thần cầm gươm ánh sáng" },
-      { term: "Adam – Eve", pronunciation: "A-đam – Ê-va", meaning: "Hai con người đầu tiên trong Vườn Địa Đàng" },
-      { term: "Noah", pronunciation: "Nô-a", meaning: "Người đóng Con Tàu gỗ tuyết tùng" },
-    ],
+      repo === "earth"
+        ? "Hành trình về nguồn cội đất, nước, nòi giống, mùa vụ và nếp sống cộng đồng Mường."
+        : "Hành trình tìm ánh sáng nội tâm, lòng kiên trung và tình thương trao đi không vụ lợi.",
+    pronunciations: [],
   };
 
   const localizedSourceInfo =
-    lang === "en"
+    repo === "earth"
+      ? lang === "en"
+        ? `Source: xuvivn/de-dat-de-nuoc · ${indexData.total_books} Acts · ${indexData.total_chapters} Chapters · ${illustrations.length} Illustrations`
+        : lang === "zh"
+        ? `语料来源：xuvivn/de-dat-de-nuoc · ${indexData.total_books}幕 · ${indexData.total_chapters}章 · ${illustrations.length}幅画作`
+        : `Nguồn từ repo xuvivn/de-dat-de-nuoc · ${indexData.total_books} Hồi · ${indexData.total_chapters} Chương · ${illustrations.length} Tranh`
+      : lang === "en"
       ? `Source: xuvivn/from-genesis-to-nativity · ${indexData.total_books} Books · ${indexData.total_chapters} Chapters · ${illustrations.length} Illustrations`
       : lang === "zh"
       ? `语料来源：xuvivn/from-genesis-to-nativity · ${indexData.total_books}卷 · ${indexData.total_chapters}章 · ${illustrations.length}幅插画`
       : `Nguồn từ repo xuvivn/from-genesis-to-nativity · ${indexData.total_books} Quyển · ${indexData.total_chapters} Chương · ${illustrations.length} Tranh`;
 
   const localizedGoal =
-    lang === "en"
+    repo === "earth"
+      ? lang === "en"
+        ? "Explore the Mường epic background and practice all 28 chapters across 4 levels—from full text to wordless visual recall."
+        : lang === "zh"
+        ? "理解芒族史诗背景与精神，并循序练习讲述全28章。"
+        : "Đọc hiểu bối cảnh sử thi Mường & luyện kể trọn vẹn 28 Chương theo 4 cấp độ từ toàn văn đến tranh gợi nhớ."
+      : lang === "en"
       ? "Explore background context and practice telling all 180 chapters across 4 levels—from full text to 28 wordless illustrations."
       : lang === "zh"
       ? "理解故事背景与精神，并循序练习讲述全180章——从完整全文到28幅纯视觉记忆插画。"
       : "Đọc hiểu bối cảnh & luyện kể trọn vẹn 180 Chương theo 4 cấp độ từ toàn văn đến 28 tranh thuần hình ảnh.";
 
   return {
-    id: GENESIS_STORY_ID,
+    id: repo === "earth" ? EARTH_STORY_ID : GENESIS_STORY_ID,
     language: lang,
-    title: indexData.title || "Từ Sáng Thế Đến Giáng Sinh — Bộ Sử Thi Luyện Kể Chuyện",
-    titleEn: lang === "en" ? indexData.title : "From Genesis to Nativity — Epic Storytelling Practice",
+    title:
+      indexData.title ||
+      (repo === "earth"
+        ? "Đẻ Đất Đẻ Nước — Bộ Sử Thi Luyện Kể Chuyện"
+        : "Từ Sáng Thế Đến Giáng Sinh — Bộ Sử Thi Luyện Kể Chuyện"),
+    titleEn:
+      lang === "en"
+        ? indexData.title
+        : repo === "earth"
+        ? "The Birth of Earth and Water — Epic Storytelling Practice"
+        : "From Genesis to Nativity — Epic Storytelling Practice",
     sourceInfo: localizedSourceInfo,
     targetAge: indexData.target_age || (lang === "en" ? "9–10 years" : lang === "zh" ? "9–10岁" : "9–10 tuổi"),
-    styleReference: indexData.style_reference || "Jakob Streit",
+    styleReference: indexData.style_reference || (repo === "earth" ? "Sử thi Mường — lời mo" : "Jakob Streit"),
     goal: localizedGoal,
     defaultArtStyle: "chalkboard",
-    repoUrl: GENESIS_REPO_URL,
+    repoUrl: repo === "earth" ? EARTH_REPO_URL : GENESIS_REPO_URL,
     rawBaseUrl: activeBaseUrl,
     lastSyncedAt: new Date().toISOString(),
     books: booksMeta,
@@ -964,4 +1036,15 @@ export async function fetchGenesisStoryFromRepo(
     illustrations,
     scenes,
   };
+}
+
+export async function fetchEarthStoryFromRepo(
+  rawBaseUrl = EARTH_JSDELIVR_BASE_URL,
+  options?: { preferFresh?: boolean; lang?: RepoLanguage }
+): Promise<WaldorfStory> {
+  return fetchGenesisStoryFromRepo(rawBaseUrl, {
+    preferFresh: options?.preferFresh,
+    lang: options?.lang,
+    repo: "earth",
+  });
 }

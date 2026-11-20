@@ -1,5 +1,10 @@
 import { ProceduralIllustrator } from "./art/proceduralIllustrator";
-import { buildRepoFileUrl, getCandidateRepoBaseUrls } from "./repoStoryLoader";
+import {
+  buildRepoFileUrl,
+  EARTH_STORY_ID,
+  getCandidateRepoBaseUrls,
+  getRepoKeyByStoryId,
+} from "./repoStoryLoader";
 import { StoryBookMeta, StoryIllustration, StoryScene, WaldorfStory } from "./types";
 
 export const PRINT_ROOT_ID = "viwaldorf-print-root";
@@ -18,7 +23,14 @@ export interface PdfExportOptions {
 export function hasFullStoryPassages(
   story: WaldorfStory | undefined | null
 ): boolean {
-  if (!story || !Array.isArray(story.scenes) || story.scenes.length < 180) {
+  if (!story || !Array.isArray(story.scenes) || story.scenes.length === 0) {
+    return false;
+  }
+  const expectedTotal =
+    Array.isArray(story.books) && story.books.length > 0
+      ? story.books.reduce((sum, bk) => sum + bk.totalChapters, 0)
+      : story.scenes.length;
+  if (story.scenes.length < expectedTotal) {
     return false;
   }
   if (!story.lastSyncedAt) {
@@ -53,7 +65,8 @@ export function resolveIllustrationSrcForPdf(
   }
 
   if (!options?.preferProceduralArt && illustration.imageGenerated && illustration.repoImage) {
-    const bases = getCandidateRepoBaseUrls(story.rawBaseUrl);
+    const repo = getRepoKeyByStoryId(story.id);
+    const bases = getCandidateRepoBaseUrls(story.rawBaseUrl, { repo });
     const orderedBases = story.rawBaseUrl
       ? [story.rawBaseUrl, ...bases.filter((b) => b !== story.rawBaseUrl)]
       : bases;
@@ -413,9 +426,12 @@ function buildPrintableBodyContent(
     (sum, arr) => sum + arr.length,
     0
   );
-  const totalExportIllustrations = selectedBookId
-    ? (story.illustrations || []).filter((il) => il.bookId === selectedBookId).length
-    : (story.illustrations || []).length;
+  const renderableIllustrations = (story.illustrations || []).filter(
+    (il) =>
+      (!selectedBookId || il.bookId === selectedBookId) &&
+      (Boolean(il.imagePath) || il.imageGenerated)
+  );
+  const totalExportIllustrations = renderableIllustrations.length;
 
   const chaptersWord = isEn ? "chapters" : isZh ? "章" : "chương";
   const tocItemsHtml = targetBooks
@@ -456,7 +472,7 @@ function buildPrintableBodyContent(
 
           if (includeImages && ch.illustrationId && !renderedIllustrationIds.has(ch.illustrationId)) {
             const ill = illustrationMap.get(ch.illustrationId);
-            if (ill) {
+            if (ill && (ill.imagePath || ill.imageGenerated)) {
               renderedIllustrationIds.add(ch.illustrationId);
               parts.push(renderIllustrationFigureHtml(ill, story, options));
             }
@@ -477,7 +493,14 @@ function buildPrintableBodyContent(
         })
         .join("\n");
 
-      const bookBadge = isEn
+      const isEarth = story.id === EARTH_STORY_ID;
+      const bookBadge = isEarth
+        ? isEn
+          ? `Act ${bk.number}`
+          : isZh
+          ? `第${bk.number}幕`
+          : `Hồi ${bk.number}`
+        : isEn
         ? `Book ${bk.number}`
         : isZh
         ? `第${bk.number}卷`
@@ -505,23 +528,35 @@ function buildPrintableBodyContent(
     ? `${story.title} — ${targetBooks[0].title}`
     : story.title;
 
-  const booksLabel = isEn ? "Books" : isZh ? "卷" : "Quyển";
-  const chaptersLabel = isEn ? "Chapters" : isZh ? "章" : "Chương";
-  const editionMeta = includeImages
-    ? `${totalExportIllustrations} ${
-        isEn ? "Level 4 Illustrations" : isZh ? "幅 Level 4 插画" : "Tranh minh họa Level 4"
-      }`
+  const isEarth = story.id === EARTH_STORY_ID;
+  const booksLabel = isEarth
+    ? isEn
+      ? "Acts"
+      : isZh
+      ? "幕"
+      : "Hồi"
     : isEn
-    ? "Text-Only Edition (No Images)"
+    ? "Books"
     : isZh
-    ? "纯文本版（无插画）"
-    : "Bản thuần chữ (Không kèm ảnh)";
+    ? "卷"
+    : "Quyển";
+  const chaptersLabel = isEn ? "Chapters" : isZh ? "章" : "Chương";
+  const editionMeta =
+    includeImages && totalExportIllustrations > 0
+      ? `${totalExportIllustrations} ${
+          isEn ? "Level 4 Illustrations" : isZh ? "幅 Level 4 插画" : "Tranh minh họa Level 4"
+        }`
+      : isEn
+      ? "Text-Only Edition (No Images)"
+      : isZh
+      ? "纯文本版（无插画）"
+      : "Bản thuần chữ (Không kèm ảnh)";
   const tocHeading = isEn ? "Table of Contents" : isZh ? "全文目录" : "Mục Lục Toàn Văn";
 
   const bodyHtml = `<section class="pdf-cover">
     <div class="pdf-cover-eyebrow">ViWaldorf · ${escapeHtml(story.styleReference || "Jakob Streit")} · ${escapeHtml(story.targetAge)}</div>
     <h1>${escapeHtml(docTitle)}</h1>
-    ${story.titleEn && exportLang === "vi" ? `<p class="pdf-cover-sub">${escapeHtml(story.titleEn)}</p>` : ""}
+    ${story.titleEn && exportLang === "vi" && !isEarth ? `<p class="pdf-cover-sub">${escapeHtml(story.titleEn)}</p>` : ""}
     <div class="pdf-cover-meta">
       ${targetBooks.length} ${booksLabel} · ${totalExportChapters} ${chaptersLabel} · ${editionMeta}
     </div>

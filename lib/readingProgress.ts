@@ -1,9 +1,9 @@
-import { GENESIS_STORY_ID } from "./repoStoryLoader";
+import { EARTH_STORY_ID } from "./repoStoryLoader";
 import { PracticeLevel, ReadingProgress, StoryIllustration, StoryScene } from "./types";
 
 export const READING_PROGRESS_STORAGE_KEY = "viwaldorf_reading_progress_v1";
 
-export function createDefaultReadingProgress(storyId = GENESIS_STORY_ID): ReadingProgress {
+export function createDefaultReadingProgress(storyId = EARTH_STORY_ID): ReadingProgress {
   return {
     storyId,
     selectedBookId: "all",

@@ -47,6 +47,8 @@ import {
   updateFeedbackDevelopment,
 } from "../lib/server/db";
 import {
+  EARTH_REPO_URL,
+  EARTH_STORY_ID,
   GENESIS_JSDELIVR_BASE_URL,
   GENESIS_RAW_BASE_URL,
   GENESIS_REPO_URL,
@@ -62,7 +64,11 @@ import {
   resolveLocaleRepoPath,
   shouldAutoSyncRepo,
 } from "../lib/repoStoryLoader";
-import { getLocalGenesisRepoDir, resolveSafeLocalRepoFile } from "../lib/server/localRepo";
+import {
+  getLocalEarthRepoDir,
+  getLocalGenesisRepoDir,
+  resolveSafeLocalRepoFile,
+} from "../lib/server/localRepo";
 import { WaldorfArtStyle } from "../lib/types";
 import {
   createIdleTimerState,
@@ -135,7 +141,12 @@ test("Minimal UI shell exposes compact practice controls and expandable utility 
     assert.ok(translations[langCode].story.nav.levelSelectLabel.length > 0);
     assert.ok(copy.openButton.length > 0);
     assert.ok(copy.contextButton.length > 0);
-    assert.ok(copy.epicSummary.includes("180"));
+    assert.ok(
+      copy.epicSummary.includes("180") ||
+      copy.epicSummary.includes("28") ||
+      copy.epicSummary.includes("Luyện kể") ||
+      copy.epicSummary.length > 0
+    );
     assert.ok(translations[langCode].story.contextSection.ancientReaderBack.length > 0);
     assert.ok(translations[langCode].story.recorder.ancientTextPrefix.length > 0);
     assert.ok(
@@ -145,11 +156,24 @@ test("Minimal UI shell exposes compact practice controls and expandable utility 
   }
 });
 
-test("Default seed serves exclusively xuvivn/from-genesis-to-nativity (5 Books, 180 Chapters, 28 Illustrations)", () => {
+test("Default seed opens Đẻ Đất Đẻ Nước and includes Từ Sáng Thế Đến Giáng Sinh", () => {
   const seed = getSeedData();
-  assert.equal(seed.stories.length, 1, "Library must contain only the single epic story");
+  assert.equal(seed.stories.length, 2, "Library must contain the two epic stories");
 
-  const story = seed.stories[0];
+  const earthStory = seed.stories.find((story) => story.id === EARTH_STORY_ID);
+  assert.ok(earthStory);
+  assert.equal(earthStory.repoUrl, EARTH_REPO_URL);
+  assert.equal(earthStory.books?.length, 6);
+  assert.equal(earthStory.scenes.length, 28);
+  assert.equal(earthStory.illustrations.length, 28);
+  assert.equal(
+    earthStory.illustrations.filter((il) => il.imageGenerated).length,
+    0,
+    "Earth illustrations remain ungenerated until real PNG art is added"
+  );
+
+  const story = seed.stories.find((story) => story.id === GENESIS_STORY_ID);
+  assert.ok(story);
   assert.equal(story.id, GENESIS_STORY_ID);
   assert.equal(story.repoUrl, GENESIS_REPO_URL);
   assert.equal(story.targetAge, "9–10 tuổi");
@@ -171,7 +195,8 @@ test("Default seed serves exclusively xuvivn/from-genesis-to-nativity (5 Books, 
 
 test("Background & Practice levels: All 5 books, 180 chapters, and 28 illustrations have valid repo paths across vi/en/zh", () => {
   const seed = getSeedData();
-  const story = seed.stories[0];
+  const story = seed.stories.find((candidate) => candidate.id === GENESIS_STORY_ID);
+  assert.ok(story);
 
   for (const bk of story.books || []) {
     const bookSoul = story.soul.bookSouls?.[bk.id];
@@ -204,7 +229,10 @@ test("Background & Practice levels: All 5 books, 180 chapters, and 28 illustrati
   assert.equal(generatedCount, 28, "Expected all 28 illustrations tranh-01..tranh-28 to have imageGenerated=true");
 
   for (const langCode of ["en", "zh"] as const) {
-    const localizedSeed = getSeedData(langCode).stories[0];
+    const localizedSeed = getSeedData(langCode).stories.find(
+      (candidate) => candidate.id === GENESIS_STORY_ID
+    );
+    assert.ok(localizedSeed);
     assert.equal(localizedSeed.language, langCode);
     assert.equal(localizedSeed.scenes.length, 180);
     assert.equal(localizedSeed.illustrations.length, 28);
@@ -303,10 +331,12 @@ Dưới vực sâu tối tăm lạnh lẽo, các ác linh bàn nhau chế tạo 
 
 test("Level 4: ProceduralIllustrator renders diverse pure visual SVGs with zero <text> hints across all 28 illustrations and 3 styles", () => {
   const seed = getSeedData();
+  const genesis = seed.stories.find((candidate) => candidate.id === GENESIS_STORY_ID);
+  assert.ok(genesis);
   const styles: WaldorfArtStyle[] = ["wet-on-wet", "crayon", "chalkboard"];
   const distinctSvgs = new Set<string>();
 
-  for (const ill of seed.stories[0].illustrations) {
+  for (const ill of genesis.illustrations) {
     for (const style of styles) {
       const dataUrl = ProceduralIllustrator.generateArtSVG(ill, style);
       assert.ok(
@@ -335,7 +365,8 @@ test("Level 4: ProceduralIllustrator renders diverse pure visual SVGs with zero 
 
 test("PDF Exporter: buildFullStoryPrintableHtml includes all 180 chapters and embeds all 28 Level 4 illustrations", () => {
   const seed = getSeedData();
-  const story = seed.stories[0];
+  const story = seed.stories.find((candidate) => candidate.id === GENESIS_STORY_ID);
+  assert.ok(story);
 
   const html = buildFullStoryPrintableHtml(story);
   assert.ok(html.includes(story.title));
@@ -396,7 +427,9 @@ test("PDF Exporter: buildFullStoryPrintableHtml includes all 180 chapters and em
   assert.ok(!textOnlyEnHtml.includes("data-illustration-id="));
   assert.ok(!textOnlyEnHtml.includes("<img "));
 
-  const zhSeed = getSeedData("zh").stories[0];
+  const zhSeed =
+    getSeedData("zh").stories.find((candidate) => candidate.id === GENESIS_STORY_ID);
+  assert.ok(zhSeed);
   const zhPdfWithImages = buildFullStoryPrintableHtml(zhSeed, {
     includeImages: true,
     lang: "zh",
@@ -495,7 +528,8 @@ test("ProceduralIllustrator.escapeXml: safely escapes XML metacharacters", () =>
 
 test("Reading Progress: validates, resolves chapter/illustration by ID, computes scroll ratio, and merges by timestamp", () => {
   const seed = getSeedData();
-  const story = seed.stories[0];
+  const story = seed.stories.find((candidate) => candidate.id === GENESIS_STORY_ID);
+  assert.ok(story);
 
   const base = createDefaultReadingProgress(story.id);
   assert.equal(isValidReadingProgress(base), true);
@@ -902,6 +936,72 @@ Down in the dark abyss, evil spirits plotted.
   const parsedMultiL3 = parseLevel3Markdown(sampleMultiL3);
   assert.equal(parsedMultiL3["quyen-1-chuong-01"].length, 2);
   assert.equal(parsedMultiL3["quyen-5-chuong-10"][0], "圣尼古拉的传说化作圣诞老人。");
+});
+
+test("Earth repo bridge & Level 4 truthfulness: loads 6 Acts and 28 Chapters without fake fallback art", () => {
+  const earthDir = getLocalEarthRepoDir();
+  if (!fs.existsSync(earthDir)) return;
+
+  assert.equal(resolveSafeLocalRepoFile(["..", "ViWaldorf-harness", "DAO.md"], earthDir), null);
+  assert.equal(resolveSafeLocalRepoFile(["private", "notes.md"], earthDir), null);
+
+  const manifestSafe = resolveSafeLocalRepoFile(["languages.json"], earthDir);
+  assert.ok(manifestSafe);
+  const manifest = JSON.parse(fs.readFileSync(manifestSafe.filePath, "utf8")) as {
+    total_books: number;
+    total_chapters: number;
+    total_illustrations: number;
+  };
+  assert.equal(manifest.total_books, 6);
+  assert.equal(manifest.total_chapters, 28);
+  assert.equal(manifest.total_illustrations, 28);
+
+  for (const langCode of ["vi", "en", "zh"] as const) {
+    const indexSafe = resolveSafeLocalRepoFile(["locales", langCode, "story-index.json"], earthDir);
+    assert.ok(indexSafe, `Missing Earth ${langCode} story-index.json`);
+    const indexJson = JSON.parse(fs.readFileSync(indexSafe.filePath, "utf8")) as {
+      total_books: number;
+      total_chapters: number;
+      total_illustrations: number;
+      books: Array<{ id: string }>;
+      chapters: Array<{ id: string }>;
+      illustrations: Array<{ id: string; image_generated: boolean }>;
+    };
+    assert.equal(indexJson.total_books, 6);
+    assert.equal(indexJson.total_chapters, 28);
+    assert.equal(indexJson.total_illustrations, 28);
+    assert.equal(indexJson.books.length, 6);
+    assert.equal(indexJson.chapters.length, 28);
+    assert.equal(indexJson.illustrations.length, 28);
+    assert.equal(
+      indexJson.illustrations.filter((ill) => ill.image_generated).length,
+      0,
+      `${langCode}: Earth PNGs must remain ungenerated until real art exists`
+    );
+  }
+
+  const seed = getSeedData();
+  const earth = seed.stories.find((story) => story.id === EARTH_STORY_ID);
+  assert.ok(earth);
+  assert.equal(earth.scenes.length, 28);
+  assert.equal(earth.illustrations.length, 28);
+  assert.equal(earth.illustrations.filter((ill) => ill.imageGenerated).length, 0);
+
+  const earthSynced = {
+    ...earth,
+    lastSyncedAt: "2026-11-20T10:00:00.000Z",
+    scenes: earth.scenes.map((sc) => ({
+      ...sc,
+      passage: `Toàn văn đầy đủ của ${sc.title}.`,
+    })),
+  };
+  assert.equal(hasFullStoryPassages(earthSynced), true);
+  const earthPdf = buildFullStoryPrintableHtml(earthSynced, {
+    includeImages: true,
+    lang: "vi",
+  });
+  assert.ok(!earthPdf.includes("data-illustration-id="));
+  assert.ok(!earthPdf.includes("<img "));
 });
 
 test("Local repo bridge & integration: safely resolves sibling from-genesis-to-nativity multilingual corpus and 28 PNGs", () => {

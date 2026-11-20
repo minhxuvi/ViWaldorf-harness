@@ -21,6 +21,12 @@ export function getLocalGenesisRepoDir(customDir?: string): string {
   return path.resolve(process.cwd(), configured);
 }
 
+export function getLocalEarthRepoDir(customDir?: string): string {
+  const configured =
+    customDir || process.env.EARTH_LOCAL_REPO_DIR || "../de-dat-de-nuoc";
+  return path.resolve(process.cwd(), configured);
+}
+
 /**
  * Validates and resolves a safe file path inside the local story repository.
  * Blocks path traversal, hidden files, and private directories.

@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import { NextRequest, NextResponse } from "next/server";
-import { resolveSafeLocalRepoFile } from "@/lib/server/localRepo";
+import {
+  getLocalEarthRepoDir,
+  getLocalGenesisRepoDir,
+  resolveSafeLocalRepoFile,
+} from "@/lib/server/localRepo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +14,10 @@ export async function GET(
   context: { params: Promise<{ path: string[] }> }
 ) {
   const { path: pathSegments } = await context.params;
-  const resolved = resolveSafeLocalRepoFile(pathSegments);
+  const repo = _request.nextUrl.searchParams.get("repo");
+  const customRoot =
+    repo === "earth" ? getLocalEarthRepoDir() : getLocalGenesisRepoDir();
+  const resolved = resolveSafeLocalRepoFile(pathSegments, customRoot);
 
   if (!resolved) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

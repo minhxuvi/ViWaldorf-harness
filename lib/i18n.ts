@@ -3,7 +3,7 @@ export type Language = "vi" | "en" | "zh";
 export const translations = {
   vi: {
     brand: "ViWaldorf",
-    tagline: "Luyện Kể Chuyện Sư Phạm · Từ Sáng Thế Đến Giáng Sinh",
+    tagline: "Luyện Kể Chuyện Sư Phạm · Đẻ Đất Đẻ Nước & Từ Sáng Thế Đến Giáng Sinh",
     header: {
       languageLabel: "Ngôn ngữ",
       feedbackBtn: "Góp ý",
@@ -99,21 +99,23 @@ export const translations = {
       loadError: "Không thể tải danh sách góp ý lúc này.",
     },
     story: {
-      pageTitle: "Từ Sáng Thế Đến Giáng Sinh",
+      storySelectLabel: "Chọn truyện",
+      pageTitle: "Thư viện Luyện Kể Chuyện",
       pageSubtitle:
-        "Không gian luyện kể chuyện chuyên biệt cho bộ sử thi 5 Quyển · 180 Chương · 28 Tranh minh họa (phong cách Jakob Streit, độ tuổi 9–10). Luyện tập theo 4 cấp độ từ toàn văn đến tranh thuần hình ảnh, đọc thêm bối cảnh, xuất bản PDF toàn văn kèm tranh, cùng thu âm và nghe lại giọng kể ngay trên thiết bị của bạn.",
+        "Không gian luyện kể chuyện sư phạm cho trẻ 9–10 tuổi với sử thi Đẻ Đất Đẻ Nước và Từ Sáng Thế Đến Giáng Sinh. Luyện tập theo 4 cấp độ, đọc thêm bối cảnh & cổ thư, xuất bản PDF toàn văn, cùng thu âm và nghe lại giọng kể ngay trên thiết bị của bạn.",
       booksCountSuffix: "Quyển",
+      actsCountSuffix: "Hồi",
       chaptersCountSuffix: "Chương",
       illustrationsCountSuffix: "Tranh gợi nhớ",
       pdf: {
         downloadBtn: "Tải PDF Toàn văn",
         downloadingBtn: "Đang tạo bản PDF...",
-        withImagesOption: "Kèm ảnh (28 tranh Level 4)",
-        withImagesDesc: "Trọn bộ 5 Quyển · 180 chương và 28 tranh minh họa cụm chương",
+        withImagesOption: "Kèm ảnh minh họa (nếu có)",
+        withImagesDesc: "Trọn bộ toàn văn sử thi và tranh minh họa Level 4 đã phát hành",
         withoutImagesOption: "Không kèm ảnh (Bản thuần chữ)",
-        withoutImagesDesc: "Trọn bộ 5 Quyển · 180 chương và lưu ý giọng kể, nhẹ & in nhanh",
+        withoutImagesDesc: "Trọn bộ toàn văn và lưu ý giọng kể, nhẹ & in nhanh",
         syncRequiredNotice:
-          "Đang tải toàn văn 180 chương từ kho lưu trữ. Vui lòng thử lại sau vài giây khi kết nối mạng ổn định.",
+          "Đang tải toàn văn các chương từ kho lưu trữ. Vui lòng thử lại sau vài giây khi kết nối mạng ổn định.",
         errorNotice: "Không thể khởi tạo bản PDF lúc này. Vui lòng thử lại.",
       },
       utilities: {
@@ -121,8 +123,8 @@ export const translations = {
         closeButton: "Thu gọn Hướng dẫn & Tiện ích",
         contextButton: "Bối cảnh & Cổ thư",
         introTitle: "Giới thiệu & Hướng dẫn sử dụng",
-        epicSummary: "5 Quyển · 180 Chương · 28 Tranh gợi nhớ · 9–10 tuổi",
-        levelGuide: "Luyện theo 4 cấp độ: đọc toàn văn → dàn ý chi tiết → dàn ý tóm tắt → nhìn tranh không chữ.",
+        epicSummary: "Luyện kể chuyện 5 cấp độ · 9–10 tuổi",
+        levelGuide: "Luyện theo 4 cấp độ: đọc toàn văn → dàn ý chi tiết → dàn ý tóm tắt → tranh gợi nhớ thuần hình ảnh.",
         tapGuide: "Chạm nửa trái/phải để cuộn trang; vuốt ngang hoặc dùng ← / → để chuyển chương; thu âm và nghe lại ở góc phải dưới.",
         toolsTitle: "Tiện ích & Tính năng nâng cao",
         level1ModeLabel: "Chế độ đọc Level 1",
@@ -136,15 +138,17 @@ export const translations = {
         lastSyncedPrefix: "Đồng bộ gần nhất",
         folderPathLabel: "Thư mục / Tệp nguồn",
         openOnGitHub: "Xem trên GitHub",
-        bookFilterLabel: "Chọn Quyển",
+        bookFilterLabel: "Chọn Phần",
         allBooksOption: "Tất cả",
-        ancientBooksTitle: "Thư viện Văn bản cổ đọc thêm",
+        ancientBooksTitle: "Thư viện Văn bản cổ & Tư liệu đọc thêm",
         ancientBooksSubtitle:
-          "Đọc trực tiếp từ thư mục locales/vi/level-0-context/ancient-texts/",
+          "Đọc trực tiếp từ thư mục level-0-context/ancient-texts/",
         ancientBookLoading: "Đang tải văn bản cổ từ CDN...",
         closeAncientBook: "Đóng văn bản",
         allCategoriesOption: "Tất cả",
         categories: {
+          "van-ban-co": "Văn bản gốc",
+          "tu-lieu": "Tư liệu & Khảo dị",
           "cuu-uoc": "Kinh Cựu Ước",
           "tan-uoc": "Kinh Tân Ước",
           "co-thu": "Cổ Thư & Sử Truyền",
@@ -155,7 +159,7 @@ export const translations = {
         closeBtn: "Thu gọn Bối cảnh & Linh hồn",
         title: "Đọc thêm · Bối cảnh & Linh hồn câu chuyện",
         subtitle:
-          "Tư liệu nền từ thư mục locales/vi/level-0-context/: tinh thần văn hóa, nhịp điệu kể (9–10 tuổi · Jakob Streit), điểm chạm ẩn dụ, cách phát âm tên cổ và 25 văn bản cổ đọc thêm.",
+          "Tư liệu nền từ thư mục level-0-context/: tinh thần văn hóa, nhịp điệu kể (9–10 tuổi), điểm chạm ẩn dụ, cách phát âm tên cổ và thư viện tư liệu đọc thêm.",
         culturalSpiritTitle: "Tinh thần văn hóa & Không gian bối cảnh",
         rhythmTitle: "Nhịp điệu kể chuyện & Hơi thở",
         metaphorTitle: "Điểm chạm & Ẩn dụ (9–10 tuổi)",
@@ -169,30 +173,30 @@ export const translations = {
         1: {
           badge: "Level 1",
           shortTitle: "Toàn văn câu chuyện",
-          title: "Level 1 · Toàn văn câu chuyện (180 Chương)",
+          title: "Level 1 · Toàn văn câu chuyện",
           description:
-            "Văn phong kể chuyện đọc thành tiếng hoàn chỉnh cho cả 180 Chương, đi kèm Lưu ý giọng kể riêng cho từng chương.",
+            "Văn phong kể chuyện đọc thành tiếng hoàn chỉnh cho các chương, đi kèm Lưu ý giọng kể riêng cho từng chương.",
         },
         2: {
           badge: "Level 2",
           shortTitle: "Dàn ý chi tiết",
-          title: "Level 2 · Dàn ý chi tiết (180 Chương)",
+          title: "Level 2 · Dàn ý chi tiết",
           description:
             "Luyện kể không nhìn toàn văn nhưng giữ trọn nhân vật, hình tượng trung tâm, diễn biến chi tiết và ý nghĩa từng chương.",
         },
         3: {
           badge: "Level 3",
           shortTitle: "Dàn ý tóm tắt",
-          title: "Level 3 · Dàn ý tóm tắt (Khung xương 180 Chương)",
+          title: "Level 3 · Dàn ý tóm tắt",
           description:
-            "1 bản khung xương duy nhất bám sát mạch cốt truyện gốc xuyên suốt 180 Chương.",
+            "1 bản khung xương duy nhất bám sát mạch cốt truyện gốc xuyên suốt bộ sử thi.",
         },
         4: {
           badge: "Level 4",
           shortTitle: "Tranh thuần hình ảnh",
-          title: "Level 4 · Tranh gợi nhớ thuần hình ảnh (28 Tranh)",
+          title: "Level 4 · Tranh gợi nhớ thuần hình ảnh",
           description:
-            "28 bức tranh vẽ tay truyền thống gắn theo các Cụm Chương, hoàn toàn không chữ gợi ý, giúp người kể tự tuôn chảy bằng ngôn ngữ sống của mình.",
+            "Tranh minh họa gắn theo các chương, không chữ gợi ý, giúp người kể tự tuôn chảy bằng ngôn ngữ sống của mình.",
         },
       },
       level1: {
@@ -273,7 +277,7 @@ export const translations = {
   },
   en: {
     brand: "ViWaldorf",
-    tagline: "Pedagogical Storytelling · From Genesis to Nativity",
+    tagline: "Pedagogical Storytelling · Earth & Water & From Genesis to Nativity",
     header: {
       languageLabel: "Language",
       feedbackBtn: "Feedback",
@@ -369,21 +373,23 @@ export const translations = {
       loadError: "Could not load feedback right now.",
     },
     story: {
-      pageTitle: "From Genesis to Nativity",
+      storySelectLabel: "Select Story",
+      pageTitle: "Storytelling Practice Library",
       pageSubtitle:
-        "Dedicated storytelling practice studio for the 5-Book · 180-Chapter · 28-Illustration epic (Jakob Streit style, ages 9–10). Practice across 4 levels from full text to wordless visual art, read optional background context, download the full story as PDF with Level 4 illustrations, and record and play back your telling right on your own device.",
+        "Dedicated storytelling practice studio for The Birth of Earth and Water and From Genesis to Nativity (ages 9–10). Practice across 4 levels, read optional background context, download the full story as PDF, and record and play back your telling right on your own device.",
       booksCountSuffix: "Books",
+      actsCountSuffix: "Acts",
       chaptersCountSuffix: "Chapters",
       illustrationsCountSuffix: "Illustrations",
       pdf: {
         downloadBtn: "Download Full Story PDF",
         downloadingBtn: "Preparing PDF...",
-        withImagesOption: "With Images (28 Level 4 Artworks)",
-        withImagesDesc: "All 5 Books · 180 chapters with 28 cluster illustrations",
+        withImagesOption: "With Images (if available)",
+        withImagesDesc: "Full story text and any generated Level 4 illustrations",
         withoutImagesOption: "Without Images (Text Only)",
-        withoutImagesDesc: "All 5 Books · 180 chapters & vocal notes, lightweight & fast",
+        withoutImagesDesc: "Full story text & vocal notes, lightweight & fast",
         syncRequiredNotice:
-          "Full 180-chapter text is still syncing from the repository. Please try again in a moment.",
+          "Full chapter text is still syncing from the repository. Please try again in a moment.",
         errorNotice: "Could not prepare the PDF right now. Please try again.",
       },
       utilities: {
@@ -391,7 +397,7 @@ export const translations = {
         closeButton: "Collapse Guide & Tools",
         contextButton: "Context & Ancient Texts",
         introTitle: "Introduction & How to Practice",
-        epicSummary: "5 Books · 180 Chapters · 28 Visual Prompts · Ages 9–10",
+        epicSummary: "5-Level Storytelling Practice · Ages 9–10",
         levelGuide: "Practice in 4 stages: full text → detailed outline → summary outline → wordless visual recall.",
         tapGuide: "Tap the left/right half to scroll; swipe or use ← / → to change chapters; record and replay from the lower-right dock.",
         toolsTitle: "Tools & Advanced Features",
@@ -406,15 +412,17 @@ export const translations = {
         lastSyncedPrefix: "Last synced",
         folderPathLabel: "Source Path",
         openOnGitHub: "View on GitHub",
-        bookFilterLabel: "Select Book",
-        allBooksOption: "All Books",
-        ancientBooksTitle: "Ancient Reference Texts",
+        bookFilterLabel: "Select Book / Act",
+        allBooksOption: "All",
+        ancientBooksTitle: "Ancient Texts & Reference Library",
         ancientBooksSubtitle:
-          "Loaded from locales/en/level-0-context/ancient-texts/",
+          "Loaded from level-0-context/ancient-texts/",
         ancientBookLoading: "Loading ancient text via CDN...",
         closeAncientBook: "Close Text",
         allCategoriesOption: "All",
         categories: {
+          "van-ban-co": "Primary Text",
+          "tu-lieu": "Notes & Variants",
           "cuu-uoc": "Old Testament",
           "tan-uoc": "New Testament",
           "co-thu": "Ancient & Traditional Texts",
@@ -425,7 +433,7 @@ export const translations = {
         closeBtn: "Hide Background & Story Soul",
         title: "Further Reading · Background & Story Soul",
         subtitle:
-          "Reference material from locales/en/level-0-context/: cultural spirit, storytelling rhythm (Ages 9–10 · Jakob Streit), metaphors, ancient name pronunciations, and 25 ancient texts.",
+          "Reference material from level-0-context/: cultural spirit, storytelling rhythm (Ages 9–10), metaphors, ancient name pronunciations, and reference texts.",
         culturalSpiritTitle: "Cultural Spirit & Context Space",
         rhythmTitle: "Storytelling Rhythm & Breath",
         metaphorTitle: "Touchpoints & Metaphor (Ages 9–10)",
@@ -439,30 +447,30 @@ export const translations = {
         1: {
           badge: "Level 1",
           shortTitle: "Full Story Text",
-          title: "Level 1 · Full Story Text (180 Chapters)",
+          title: "Level 1 · Full Story Text",
           description:
-            "Complete read-aloud storytelling prose across all 180 chapters paired with vocal delivery notes per chapter.",
+            "Complete read-aloud storytelling prose paired with vocal delivery notes per chapter.",
         },
         2: {
           badge: "Level 2",
           shortTitle: "Detailed Outline",
-          title: "Level 2 · Detailed Outline (180 Chapters)",
+          title: "Level 2 · Detailed Outline",
           description:
             "Retell without the full text while preserving every character, symbolic motif, detailed beat, and core takeaway.",
         },
         3: {
           badge: "Level 3",
           shortTitle: "Summary Skeleton",
-          title: "Level 3 · Summary Skeleton Outline (180 Chapters)",
+          title: "Level 3 · Summary Skeleton Outline",
           description:
-            "One single unified skeleton outline closely following all 180 chapters of the original plot.",
+            "One single unified skeleton outline closely following the original plot.",
         },
         4: {
           badge: "Level 4",
           shortTitle: "Pure Visual Art",
-          title: "Level 4 · Pure Visual Memory Illustrations (28 Paintings)",
+          title: "Level 4 · Pure Visual Memory Illustrations",
           description:
-            "28 traditional hand-drawn cluster illustrations with zero text hints so your living spoken language flows naturally.",
+            "Wordless illustrations with zero text hints so your living spoken language flows naturally.",
         },
       },
       level1: {
@@ -543,7 +551,7 @@ export const translations = {
   },
   zh: {
     brand: "ViWaldorf",
-    tagline: "华德福故事讲述练习 · 从创世到圣诞",
+    tagline: "华德福故事讲述练习 · 天地水生与从创世到圣诞",
     header: {
       languageLabel: "语言",
       feedbackBtn: "意见反馈",
@@ -637,21 +645,23 @@ export const translations = {
       loadError: "暂时无法加载反馈列表。",
     },
     story: {
-      pageTitle: "从创世到圣诞",
+      storySelectLabel: "选择故事",
+      pageTitle: "故事讲述练习库",
       pageSubtitle:
-        "专为《从创世到圣诞》5卷 · 180章 · 28幅插画史诗打造的纯口述练习空间（Jakob Streit 风格，适合9–10岁）。支持从完整全文到纯视觉插画的4阶练习、背景灵魂导读、全文PDF导出（含插画或纯文本），以及本机直接录音与回放。",
+        "面向9–10岁儿童的纯口述故事练习空间，收录《天地水生》与《从创世到圣诞》。支持4阶练习、背景灵魂导读、全文PDF导出，以及本机直接录音与回放。",
       booksCountSuffix: "卷",
+      actsCountSuffix: "幕",
       chaptersCountSuffix: "章",
       illustrationsCountSuffix: "幅记忆插画",
       pdf: {
         downloadBtn: "下载全文 PDF",
         downloadingBtn: "正在生成 PDF...",
-        withImagesOption: "含插画（28幅 Level 4 手绘插画）",
-        withImagesDesc: "完整收录5卷 · 180章及28幅单元插画",
+        withImagesOption: "含插画（如有已绘插画）",
+        withImagesDesc: "完整收录全文及已发布的 Level 4 插画",
         withoutImagesOption: "不含插画（纯文本版）",
-        withoutImagesDesc: "完整5卷 · 180章与讲演提示，轻量快速打印",
+        withoutImagesDesc: "完整正文与讲演提示，轻量快速打印",
         syncRequiredNotice:
-          "正在从资料库同步180章完整全文，请稍候几秒再试。",
+          "正在从资料库同步完整正文，请稍候几秒再试。",
         errorNotice: "暂时无法生成 PDF，请稍后重试。",
       },
       utilities: {
@@ -659,8 +669,8 @@ export const translations = {
         closeButton: "收起说明与工具",
         contextButton: "背景与古籍",
         introTitle: "介绍与使用说明",
-        epicSummary: "5卷 · 180章 · 28幅记忆插画 · 适合9–10岁",
-        levelGuide: "按4级练习：全文朗读 → 详细大纲 → 精简脉络 → 无文字看图复述。",
+        epicSummary: "五级讲述练习体系 · 适合9–10岁",
+        levelGuide: "按4级练习：全文朗读 → 详细大纲 → 精简脉络 → 纯视觉记忆复述。",
         tapGuide: "点击左右半屏可翻页；左右滑动或使用← / →切换章节；右下角可录音与回放。",
         toolsTitle: "工具与高级功能",
         level1ModeLabel: "Level 1阅读模式",
@@ -674,15 +684,17 @@ export const translations = {
         lastSyncedPrefix: "最近同步",
         folderPathLabel: "源文件路径",
         openOnGitHub: "在 GitHub 查看",
-        bookFilterLabel: "选择分卷",
+        bookFilterLabel: "选择分卷 / 分幕",
         allBooksOption: "全部",
         ancientBooksTitle: "延伸阅读古代文献库",
         ancientBooksSubtitle:
-          "加载自 locales/zh/level-0-context/ancient-texts/",
+          "加载自 level-0-context/ancient-texts/",
         ancientBookLoading: "正在加载古代文献...",
         closeAncientBook: "关闭文献",
         allCategoriesOption: "全部",
         categories: {
+          "van-ban-co": "原典正文",
+          "tu-lieu": "参考与异文",
           "cuu-uoc": "旧约文献",
           "tan-uoc": "新约福音",
           "co-thu": "古籍与圣徒传记",
@@ -693,7 +705,7 @@ export const translations = {
         closeBtn: "收起背景与灵魂",
         title: "延伸阅读 · 故事背景与史诗灵魂",
         subtitle:
-          "取自 locales/zh/level-0-context/ 的背景资料：文化精神、讲述节奏（9–10岁 · Jakob Streit）、共鸣触点、专有名词读音指南与25篇延伸古代文献。",
+          "取自 level-0-context/ 的背景资料：文化精神、讲述节奏（9–10岁）、共鸣触点、专有名词读音指南与延伸文献。",
         culturalSpiritTitle: "文化背景与核心精神",
         rhythmTitle: "讲述节奏与呼吸",
         metaphorTitle: "共鸣触点与隐喻（9–10岁）",
@@ -707,30 +719,30 @@ export const translations = {
         1: {
           badge: "Level 1",
           shortTitle: "完整故事全文",
-          title: "Level 1 · 完整故事全文（180章）",
+          title: "Level 1 · 完整故事全文",
           description:
-            "全180章适合大声朗读与讲述的完整叙事文本，每章均附有实用的讲演提示。",
+            "适合大声朗读与讲述的完整叙事文本，每章均附有实用的讲演提示。",
         },
         2: {
           badge: "Level 2",
           shortTitle: "详细故事大纲",
-          title: "Level 2 · 详细故事大纲（180章）",
+          title: "Level 2 · 详细故事大纲",
           description:
             "脱离原文进行复述练习，同时完整保留每章的核心人物、象征意象、详细情节与讲述重点。",
         },
         3: {
           badge: "Level 3",
           shortTitle: "精简脉络总纲",
-          title: "Level 3 · 精简章节脉络总纲（180章）",
+          title: "Level 3 · 精简章节脉络总纲",
           description:
-            "紧扣原著情节主线的统一精简大纲，轻松核对全180章的叙事脉络。",
+            "紧扣原著情节主线的统一精简大纲，轻松核对全书的叙事脉络。",
         },
         4: {
           badge: "Level 4",
           shortTitle: "纯视觉插画",
-          title: "Level 4 · 纯视觉记忆插画（28幅画作）",
+          title: "Level 4 · 纯视觉记忆插画",
           description:
-            "28幅传统手绘风格的单元记忆插画，不含任何文字提示，让讲述者完全凭借鲜活的口头语言自然流淌。",
+            "不含文字提示的视觉记忆插画，让讲述者凭借鲜活的口头语言自然流淌。",
         },
       },
       level1: {

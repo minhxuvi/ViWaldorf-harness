@@ -142,6 +142,7 @@ export interface VoiceRecording {
 export interface WaldorfData {
   stories: WaldorfStory[];
   storiesByLang?: Partial<Record<"vi" | "en" | "zh", WaldorfStory>>;
+  storiesByStoryAndLang?: Record<string, Partial<Record<"vi" | "en" | "zh", WaldorfStory>>>;
   updatedAt?: string;
   version?: string;
 }

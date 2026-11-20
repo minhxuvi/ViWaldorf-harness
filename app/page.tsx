@@ -39,6 +39,8 @@ import {
   buildRepoFileUrl,
   cleanInlineMarkdown,
   fetchAncientBookMarkdown,
+  EARTH_STORY_ID,
+  EARTH_JSDELIVR_BASE_URL,
   GENESIS_JSDELIVR_BASE_URL,
   GENESIS_REPO_URL,
   getCandidateRepoBaseUrls,
@@ -81,7 +83,14 @@ import {
 } from "lucide-react";
 
 const PRACTICE_LEVELS: PracticeLevel[] = [1, 2, 3, 4];
-const ANCIENT_CATEGORIES = ["all", "cuu-uoc", "tan-uoc", "co-thu"] as const;
+const ANCIENT_CATEGORIES = [
+  "all",
+  "van-ban-co",
+  "tu-lieu",
+  "cuu-uoc",
+  "tan-uoc",
+  "co-thu",
+] as const;
 type AncientCategoryFilter = (typeof ANCIENT_CATEGORIES)[number];
 type Level1TextSize = "sm" | "md" | "lg";
 
@@ -147,7 +156,10 @@ function getActiveRepoPath(params: {
 export default function StorytellingPracticePage() {
   const {
     updateData,
+    data,
     selectedStory,
+    activeStoryId,
+    setActiveStoryId,
     t,
     lang,
     isSyncingRepo,
@@ -311,6 +323,11 @@ export default function StorytellingPracticePage() {
   }, [selectedStory?.lastSyncedAt, selectedStory?.language]);
 
   const allScenes: StoryScene[] = useMemo(() => selectedStory?.scenes || [], [selectedStory]);
+  useEffect(() => {
+    setActiveSceneIndex(0);
+    setActiveIllustrationIndex(0);
+    setSelectedBookId("all");
+  }, [selectedStory?.id]);
   const allIllustrations: StoryIllustration[] = useMemo(
     () => selectedStory?.illustrations || [],
     [selectedStory]
@@ -718,7 +735,7 @@ export default function StorytellingPracticePage() {
   const handleSyncRepoClick = async () => {
     setFailedRepoImages({});
     ancientCacheRef.current = {};
-    await syncFromRepo({ force: true });
+    await syncFromRepo({ force: true, storyId: selectedStory?.id });
   };
 
   const handleExportPdf = async (includeImages: boolean = true) => {
@@ -729,7 +746,10 @@ export default function StorytellingPracticePage() {
     try {
       let targetStory = selectedStory;
       if (!hasFullStoryPassages(targetStory)) {
-        const synced = await syncFromRepo({ force: true });
+        const synced = await syncFromRepo({
+          force: true,
+          storyId: selectedStory.id,
+        });
         if (synced) {
           targetStory = synced;
         }
@@ -760,7 +780,7 @@ export default function StorytellingPracticePage() {
     setActiveAncientBook(book);
     setAncientBookError("");
 
-    const cacheKey = `${lang}:${book.file}`;
+    const cacheKey = `${selectedStory?.id || "story"}:${lang}:${book.file}`;
     const cached = ancientCacheRef.current[cacheKey];
     if (cached) {
       setAncientBookContent(cached);
@@ -772,7 +792,13 @@ export default function StorytellingPracticePage() {
     try {
       const md = await fetchAncientBookMarkdown(
         book.file,
-        selectedStory?.rawBaseUrl || GENESIS_JSDELIVR_BASE_URL
+        selectedStory?.rawBaseUrl ||
+          (selectedStory?.id === EARTH_STORY_ID
+            ? EARTH_JSDELIVR_BASE_URL
+            : GENESIS_JSDELIVR_BASE_URL),
+        {
+          repo: selectedStory?.id === EARTH_STORY_ID ? "earth" : "genesis",
+        }
       );
       ancientCacheRef.current[cacheKey] = md;
       setAncientBookContent(md);
@@ -1078,20 +1104,33 @@ export default function StorytellingPracticePage() {
     ) {
       return [];
     }
-    return getCandidateRepoBaseUrls(selectedStory?.rawBaseUrl).map((base) =>
-      buildRepoFileUrl(currentIllustration.repoImage, base)
+    const repo = selectedStory?.id === EARTH_STORY_ID ? "earth" : "genesis";
+    return getCandidateRepoBaseUrls(selectedStory?.rawBaseUrl, { repo }).map(
+      (base) => buildRepoFileUrl(currentIllustration.repoImage, base)
     );
   }, [currentIllustration, preferProceduralArt, selectedStory?.rawBaseUrl]);
 
   const repoImgUrl = repoImageCandidates.find((u) => !failedRepoImages[u]) || "";
   const shouldShowRepoImg = Boolean(!currentIllustration?.imagePath && repoImgUrl);
-  const level4ImgSrc = currentIllustration
-    ? currentIllustration.imagePath
+  const hasVisibleLevel4Image =
+    Boolean(currentIllustration?.imagePath) ||
+    shouldShowRepoImg ||
+    Boolean(
+      currentIllustration?.imageGenerated &&
+      !preferProceduralArt &&
+      selectedStory?.id !== EARTH_STORY_ID
+    );
+  const level4ImgSrc =
+    currentIllustration && hasVisibleLevel4Image
       ? currentIllustration.imagePath
-      : shouldShowRepoImg
-      ? repoImgUrl
-      : ProceduralIllustrator.generateArtSVG(currentIllustration, currentIllustration.artStyle)
-    : "";
+        ? currentIllustration.imagePath
+        : shouldShowRepoImg
+        ? repoImgUrl
+        : ProceduralIllustrator.generateArtSVG(
+            currentIllustration,
+            currentIllustration.artStyle
+          )
+      : "";
 
   const activeRepoPath = getActiveRepoPath({
     level: activeLevel,
@@ -1127,6 +1166,23 @@ export default function StorytellingPracticePage() {
     <div className="space-y-4 pb-20 sm:pb-24">
       {selectedStory && (
         <section className="flex flex-wrap items-center gap-2">
+          {data.stories.length > 1 && (
+            <label className="btn-ghost text-xs py-2 px-2 flex items-center gap-2">
+              <BookOpen className="w-3.5 h-3.5" />
+              <select
+                value={activeStoryId}
+                onChange={(event) => setActiveStoryId(event.target.value)}
+                className="bg-transparent text-ink outline-none max-w-[13rem]"
+                aria-label={lang === "vi" ? "Chọn truyện" : "Choose story"}
+              >
+                {data.stories.map((story) => (
+                  <option key={story.id} value={story.id}>
+                    {lang === "en" && story.titleEn ? story.titleEn : story.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <LevelSelectDropdown
             activeLevel={activeLevel}
             levels={t.story.levels}
@@ -1285,11 +1341,13 @@ export default function StorytellingPracticePage() {
                   <p className="text-xs font-semibold text-forestDark">
                     {t.story.utilities.artTitle}
                   </p>
-                  <span className="badge-sand text-[10px]">
-                    {shouldShowRepoImg || currentIllustration?.imagePath
-                      ? t.story.level4.artModeRepoBadge
-                      : t.story.level4.artModeProceduralBadge}
-                  </span>
+                  {selectedStory?.id !== EARTH_STORY_ID || shouldShowRepoImg || currentIllustration?.imagePath ? (
+                    <span className="badge-sand text-[10px]">
+                      {shouldShowRepoImg || currentIllustration?.imagePath
+                        ? t.story.level4.artModeRepoBadge
+                        : t.story.level4.artModeProceduralBadge}
+                    </span>
+                  ) : null}
                 </div>
                 <select
                   aria-label={t.story.level4.artStyleLabel}
@@ -1682,6 +1740,7 @@ export default function StorytellingPracticePage() {
                     selectedBookId={selectedBookId}
                     onSelect={handleBookSelect}
                     lang={lang}
+                    storyId={selectedStory.id}
                     ariaLabel={t.story.repo.bookFilterLabel}
                     allBooksLabel={t.story.repo.allBooksOption}
                   />
@@ -1889,6 +1948,7 @@ export default function StorytellingPracticePage() {
                     selectedBookId={selectedBookId}
                     onSelect={handleBookSelect}
                     lang={lang}
+                    storyId={selectedStory.id}
                     ariaLabel={t.story.repo.bookFilterLabel}
                     allBooksLabel={t.story.repo.allBooksOption}
                   />
@@ -2021,6 +2081,7 @@ export default function StorytellingPracticePage() {
                     selectedBookId={selectedBookId}
                     onSelect={handleBookSelect}
                     lang={lang}
+                    storyId={selectedStory.id}
                     ariaLabel={t.story.repo.bookFilterLabel}
                     allBooksLabel={t.story.repo.allBooksOption}
                   />
@@ -2168,6 +2229,7 @@ export default function StorytellingPracticePage() {
                     selectedBookId={selectedBookId}
                     onSelect={handleBookSelect}
                     lang={lang}
+                    storyId={selectedStory.id}
                     ariaLabel={t.story.repo.bookFilterLabel}
                     allBooksLabel={t.story.repo.allBooksOption}
                   />
@@ -2185,7 +2247,9 @@ export default function StorytellingPracticePage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  {!shouldShowRepoImg && !currentIllustration.imagePath && (
+                  {!shouldShowRepoImg &&
+                    !currentIllustration.imagePath &&
+                    selectedStory?.id !== EARTH_STORY_ID && (
                     <span className="badge-sand text-[11px]">
                       {t.story.level4.artModeProceduralBadge}
                     </span>
@@ -2224,21 +2288,28 @@ export default function StorytellingPracticePage() {
                   isLevel4StageMode ? "max-w-5xl" : "max-w-3xl"
                 }`}
               >
-                <img
-                  src={level4ImgSrc}
-                  alt=""
-                  aria-label={`${t.story.level4.illustrationLabel} ${currentIllustration.ord}`}
-                  onError={() => {
-                    if (repoImgUrl && !failedRepoImages[repoImgUrl]) {
-                      setFailedRepoImages((prev) => ({ ...prev, [repoImgUrl]: true }));
-                    }
-                  }}
-                  className={`w-full h-full select-none ${
-                    shouldShowRepoImg || currentIllustration.imagePath
-                      ? "object-contain"
-                      : "object-cover"
-                  }`}
-                />
+                {level4ImgSrc ? (
+                  <img
+                    src={level4ImgSrc}
+                    alt=""
+                    aria-label={`${t.story.level4.illustrationLabel} ${currentIllustration.ord}`}
+                    onError={() => {
+                      if (repoImgUrl && !failedRepoImages[repoImgUrl]) {
+                        setFailedRepoImages((prev) => ({ ...prev, [repoImgUrl]: true }));
+                      }
+                    }}
+                    className={`w-full h-full select-none ${
+                      shouldShowRepoImg || currentIllustration.imagePath
+                        ? "object-contain"
+                        : "object-cover"
+                    }`}
+                  />
+                ) : (
+                  <div
+                    aria-label={`${t.story.level4.illustrationLabel} ${currentIllustration.ord}`}
+                    className="absolute inset-0"
+                  />
+                )}
 
                 {safeIllustrationIndex > 0 && (
                   <button
@@ -2597,6 +2668,7 @@ function BookSelectDropdown({
   selectedBookId,
   onSelect,
   lang,
+  storyId,
   ariaLabel,
   allBooksLabel,
 }: {
@@ -2605,12 +2677,18 @@ function BookSelectDropdown({
   selectedBookId: string;
   onSelect: (bookId: string) => void;
   lang: string;
+  storyId: string;
   ariaLabel: string;
   allBooksLabel: string;
 }) {
   if (books.length === 0) return null;
 
   const formatBookLabel = (bk: StoryBookMeta): string => {
+    if (storyId === EARTH_STORY_ID) {
+      if (lang === "en") return `Act ${bk.number} (${bk.totalChapters})`;
+      if (lang === "zh") return `第${bk.number}幕 (${bk.totalChapters})`;
+      return `Hồi ${bk.number} (${bk.totalChapters})`;
+    }
     if (bk.isEpilogue) {
       if (lang === "en") return `Book V · Epilogue (${bk.totalChapters})`;
       if (lang === "zh") return `第五卷 · 外传 (${bk.totalChapters})`;
