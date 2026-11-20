@@ -22,6 +22,16 @@
 
 ---
 
+### URL SEO
+
+Mỗi bộ truyện, Quyển/Hồi và chương có deep-link ổn định, không lặp tiền tố ngôn ngữ:
+
+- `/truyen/{story-slug}`
+- `/truyen/{story-slug}/{book-slug}`
+- `/truyen/{story-slug}/chuong-{so}-{chapter-slug}`
+
+Các URL này mở cùng không gian đọc, đặt canonical metadata và được liệt kê trong sitemap.
+
 ## 2. Ghi Nhớ Tiến Độ Đọc, Đăng Nhập (Google SSO) & Góp Ý Cộng Đồng
 
 - **Tự động mở lại đúng truyện, chương & vị trí đọc dở**: Khi mở lại trang web trên trình duyệt cũ, ứng dụng khôi phục ngay bộ truyện, Quyển/Hồi, Cấp độ (`Level 1–4`), Chương hoặc Tranh, cỡ chữ và đúng đoạn đang cuộn dở (`localStorage`).

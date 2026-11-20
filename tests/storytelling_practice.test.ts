@@ -82,6 +82,15 @@ import {
   startRecordingTimer,
   supportsMediaRecorderPause,
 } from "../lib/voiceRecorder";
+import {
+  getBookRoute,
+  getChapterRoute,
+  getChapterSlug,
+  getSeedStories,
+  getStoryRoute,
+  resolveChapterRoute,
+  resolveStoryRoute,
+} from "../lib/seoRoutes";
 
 test("Minimal UI shell exposes compact practice controls and expandable utility panels in vi/en/zh", () => {
   const pageSource = fs.readFileSync(path.join(process.cwd(), "app/page.tsx"), "utf8");
@@ -191,6 +200,28 @@ test("Default seed opens Đẻ Đất Đẻ Nước and includes Từ Sáng Th�
   assert.equal(chapterCountByBook.get("quyen-3"), 32);
   assert.equal(chapterCountByBook.get("quyen-4"), 15);
   assert.equal(chapterCountByBook.get("quyen-5"), 10);
+});
+
+test("SEO routes resolve stable story, book, and chapter slugs", () => {
+  const stories = getSeedStories();
+  const story = stories.find((candidate) => candidate.id === GENESIS_STORY_ID);
+  assert.ok(story);
+  const book = story.books?.[0];
+  const scene = story.scenes[0];
+  assert.ok(book);
+
+  assert.equal(getStoryRoute(story), "/truyen/tu-sang-the-den-giang-sinh");
+  assert.equal(getBookRoute(story, book), `/truyen/tu-sang-the-den-giang-sinh/${book.slug}`);
+  assert.equal(
+    getChapterRoute(story, scene),
+    `/truyen/tu-sang-the-den-giang-sinh/chuong-${scene.ord}-${getChapterSlug(scene)}`
+  );
+  assert.equal(resolveStoryRoute("tu-sang-the-den-giang-sinh")?.id, story.id);
+  assert.equal(
+    resolveChapterRoute(story, `${scene.ord}-${getChapterSlug(scene)}`)?.id,
+    scene.id
+  );
+  assert.equal(resolveChapterRoute(story, "not-a-chapter"), undefined);
 });
 
 test("Background & Practice levels: All 5 books, 180 chapters, and 28 illustrations have valid repo paths across vi/en/zh", () => {

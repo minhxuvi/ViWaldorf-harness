@@ -81,6 +81,7 @@ import {
   ChevronUp,
   BookOpen,
 } from "lucide-react";
+import type { StoryRouteTarget } from "@/lib/seoRoutes";
 
 const PRACTICE_LEVELS: PracticeLevel[] = [1, 2, 3, 4];
 const ANCIENT_CATEGORIES = [
@@ -153,7 +154,11 @@ function getActiveRepoPath(params: {
   }
 }
 
-export default function StorytellingPracticePage() {
+export function StorytellingPracticePage({
+  initialRoute,
+}: {
+  initialRoute?: StoryRouteTarget;
+}) {
   const {
     updateData,
     data,
@@ -234,6 +239,12 @@ export default function StorytellingPracticePage() {
   const isStartingRecordingRef = useRef<boolean>(false);
   const isUnmountedRef = useRef<boolean>(false);
   const recordingsRef = useRef<VoiceRecording[]>([]);
+
+  useEffect(() => {
+    if (initialRoute?.storyId && initialRoute.storyId !== activeStoryId) {
+      setActiveStoryId(initialRoute.storyId);
+    }
+  }, [activeStoryId, initialRoute?.storyId, setActiveStoryId]);
 
   useEffect(() => {
     recordingsRef.current = recordings;
@@ -440,6 +451,31 @@ export default function StorytellingPracticePage() {
     selectedStory,
     allScenes,
     allIllustrations,
+  ]);
+
+  useEffect(() => {
+    if (!isProgressLoaded || !selectedStory || initialRoute?.storyId !== selectedStory.id) return;
+    const targetBookId = initialRoute.bookId || "all";
+    const targetScenes = targetBookId === "all"
+      ? allScenes
+      : allScenes.filter((scene) => scene.bookId === targetBookId);
+    const targetSceneIndex = initialRoute.sceneId
+      ? targetScenes.findIndex((scene) => scene.id === initialRoute.sceneId)
+      : -1;
+
+    setSelectedBookId(targetBookId);
+    if (targetSceneIndex >= 0) {
+      setActiveSceneIndex(targetSceneIndex);
+      setActiveLevel(1);
+      setShowContextSection(false);
+    }
+  }, [
+    allScenes,
+    initialRoute?.bookId,
+    initialRoute?.sceneId,
+    initialRoute?.storyId,
+    isProgressLoaded,
+    selectedStory,
   ]);
 
   // Chuyển giữa trang đọc truyện và trang Góp ý
@@ -2612,6 +2648,10 @@ export default function StorytellingPracticePage() {
       )}
     </div>
   );
+}
+
+export default function Page() {
+  return <StorytellingPracticePage />;
 }
 
 function LevelStepFooter({
