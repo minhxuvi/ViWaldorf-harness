@@ -24,3 +24,4 @@
 | 2026-11-20 | Cycle 20 — Dedicated Ancient Text Reader & Text-Scoped Recording | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 20 Report](2026-11-20-cycle-20-ancient-text-reader.md) |
 | 2026-11-20 | Cycle 21 — Two-Epic Library with Đẻ Đất Đẻ Nước as Default | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 21 Report](2026-11-20-cycle-21-two-epic-library-earth-default.md) |
 | 2026-11-20 | Cycle 22 — Live Browser URL Sync & SEO Chapter Route Fixes | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 22 Report](2026-11-20-cycle-22-seo-url-sync-and-chapter-routes.md) |
+| 2026-11-20 | Cycle 23 — One-Click Tap-to-Scroll 10% Overlap | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 23 Report](2026-11-20-cycle-23-tap-scroll-overlap.md) |

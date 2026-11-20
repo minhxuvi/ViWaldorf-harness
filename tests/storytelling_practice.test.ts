@@ -12,6 +12,8 @@ import {
 } from "../lib/pdfExporter";
 import { translations } from "../lib/i18n";
 import {
+  PAGE_SCROLL_OVERLAP_RATIO,
+  computePageScrollStep,
   computeScrollRatio,
   computeTargetScrollY,
   createDefaultReadingProgress,
@@ -1333,4 +1335,102 @@ test("Voice Recorder Pause/Resume: excludes paused intervals, handles MIME/exten
       `${langCode} recorder copy must not mention AI`
     );
   }
+});
+
+test("One-click page scroll preserves 10% overlap across viewport, header, and recorder states", () => {
+  assert.equal(PAGE_SCROLL_OVERLAP_RATIO, 0.1);
+
+  // Standard desktop and mobile downward page scrolls leave 10% of the visible page
+  assert.equal(
+    computePageScrollStep({ viewportHeight: 900, direction: "down" }),
+    810
+  );
+  assert.equal(
+    computePageScrollStep({ viewportHeight: 667, direction: "down" }),
+    600
+  );
+
+  // Downward scroll past the 64px auto-hide threshold accounts for the header hiding
+  assert.equal(
+    computePageScrollStep({
+      viewportHeight: 667,
+      direction: "down",
+      currentScrollY: 0,
+      topObstruction: 108,
+    }),
+    600
+  );
+
+  // Tiny viewport where downward scroll stays <= 64px keeps the sticky header subtracted
+  assert.equal(
+    computePageScrollStep({
+      viewportHeight: 60,
+      direction: "down",
+      currentScrollY: 0,
+      topObstruction: 20,
+    }),
+    36
+  );
+
+  // Expanded voice recorder dock reduces unobstructed reading area so lines aren't skipped
+  assert.equal(
+    computePageScrollStep({
+      viewportHeight: 740,
+      direction: "down",
+      bottomObstruction: 180,
+    }),
+    504
+  );
+
+  // Upward scroll with hidden header vs visible sticky header preserves 10% overlap
+  assert.equal(
+    computePageScrollStep({
+      viewportHeight: 667,
+      direction: "up",
+      topObstruction: 0,
+    }),
+    600
+  );
+  assert.equal(
+    computePageScrollStep({
+      viewportHeight: 667,
+      direction: "up",
+      topObstruction: 108,
+    }),
+    503
+  );
+
+  // Short landscape viewport keeps true 10% overlap instead of a fixed 240px floor
+  assert.equal(
+    computePageScrollStep({ viewportHeight: 260, direction: "down" }),
+    234
+  );
+
+  // Edge cases: invalid viewports return 0, and custom overlapRatio clamps to [0, 0.5]
+  assert.equal(computePageScrollStep({ viewportHeight: 0, direction: "down" }), 0);
+  assert.equal(computePageScrollStep({ viewportHeight: -50, direction: "up" }), 0);
+  assert.equal(computePageScrollStep({ viewportHeight: Number.NaN, direction: "down" }), 0);
+  assert.equal(
+    computePageScrollStep({ viewportHeight: 500, direction: "down", overlapRatio: -0.2 }),
+    500
+  );
+  assert.equal(
+    computePageScrollStep({ viewportHeight: 500, direction: "down", overlapRatio: 0.9 }),
+    250
+  );
+
+  // Source wiring assertions on app/page.tsx
+  const pageSource = fs.readFileSync(path.join(process.cwd(), "app/page.tsx"), "utf8");
+  assert.ok(pageSource.includes("computePageScrollStep"));
+  assert.ok(pageSource.includes("PAGE_SCROLL_OVERLAP_RATIO"));
+  assert.ok(pageSource.includes("recorderDockRef"));
+  assert.ok(pageSource.includes("visualViewport"));
+  assert.ok(
+    !pageSource.includes("window.innerHeight * 0.85"),
+    "Legacy raw 0.85 innerHeight scroll step must be replaced"
+  );
+  assert.ok(
+    /<article\s+onClick=\{handleReadingSurfaceClick\}/.test(pageSource),
+    "Ancient text reader <article> must wire handleReadingSurfaceClick"
+  );
 });

@@ -199,3 +199,63 @@ export function computeTargetScrollY(
   }
   return Math.max(0, Math.round(fallbackScrollY));
 }
+
+export const PAGE_SCROLL_OVERLAP_RATIO = 0.1;
+const STICKY_HEADER_AUTOHIDE_SCROLL_Y = 64;
+
+export interface PageScrollStepInput {
+  viewportHeight: number;
+  direction: "down" | "up";
+  currentScrollY?: number;
+  topObstruction?: number;
+  bottomObstruction?: number;
+  overlapRatio?: number;
+}
+
+/**
+ * Compute vertical scroll step for one-click page navigation while preserving
+ * a 10% overlap of the previously visible reading surface.
+ */
+export function computePageScrollStep(input: PageScrollStepInput): number {
+  if (!Number.isFinite(input.viewportHeight) || input.viewportHeight <= 0) {
+    return 0;
+  }
+
+  const rawOverlap = input.overlapRatio ?? PAGE_SCROLL_OVERLAP_RATIO;
+  const overlapRatio = Number.isFinite(rawOverlap)
+    ? Math.min(0.5, Math.max(0, rawOverlap))
+    : PAGE_SCROLL_OVERLAP_RATIO;
+  const scrollFraction = 1 - overlapRatio;
+
+  const currentScrollY =
+    typeof input.currentScrollY === "number" && Number.isFinite(input.currentScrollY)
+      ? Math.max(0, input.currentScrollY)
+      : 0;
+  const topBefore =
+    typeof input.topObstruction === "number" && Number.isFinite(input.topObstruction)
+      ? Math.min(input.viewportHeight, Math.max(0, input.topObstruction))
+      : 0;
+  const bottom =
+    typeof input.bottomObstruction === "number" && Number.isFinite(input.bottomObstruction)
+      ? Math.min(input.viewportHeight, Math.max(0, input.bottomObstruction))
+      : 0;
+
+  const unobstructedBottom = Math.max(0, input.viewportHeight - bottom);
+
+  if (input.direction === "up") {
+    const visiblePageHeight = Math.max(0, unobstructedBottom - topBefore);
+    if (visiblePageHeight <= 0) return 0;
+    return Math.max(1, Math.round(visiblePageHeight * scrollFraction));
+  }
+
+  // Shell sticky header auto-hides once window.scrollY passes 64px on downward scroll.
+  const tentativeDownStep = Math.round(unobstructedBottom * scrollFraction);
+  const headerStaysVisible =
+    topBefore > 0 && currentScrollY + tentativeDownStep <= STICKY_HEADER_AUTOHIDE_SCROLL_Y;
+  const effectivePageHeight = headerStaysVisible
+    ? Math.max(0, unobstructedBottom - topBefore)
+    : unobstructedBottom;
+
+  if (effectivePageHeight <= 0) return 0;
+  return Math.max(1, Math.round(effectivePageHeight * scrollFraction));
+}

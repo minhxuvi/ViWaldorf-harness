@@ -4,8 +4,10 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { useApp } from "@/lib/store";
 import { FeedbackSection } from "@/components/FeedbackSection";
 import {
+  computePageScrollStep,
   computeScrollRatio,
   computeTargetScrollY,
+  PAGE_SCROLL_OVERLAP_RATIO,
   resolveIllustrationIndexFromProgress,
   resolveSceneIndexFromProgress,
 } from "@/lib/readingProgress";
@@ -246,6 +248,7 @@ export function StorytellingPracticePage({
   const [micError, setMicError] = useState<string>("");
 
   const customImageInputRef = useRef<HTMLInputElement | null>(null);
+  const recorderDockRef = useRef<HTMLElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -940,7 +943,7 @@ export function StorytellingPracticePage({
     return Boolean(selection && selection.trim().length > 0);
   };
 
-  // Chạm nửa phải màn hình: cuộn xuống 1 trang màn hình; chạm nửa trái: cuộn lên 1 trang màn hình
+  // Chạm nửa phải màn hình: cuộn xuống 1 trang (giữ lại 10% trang cũ để đọc liền mạch); nửa trái: cuộn lên 1 trang
   const handleReadingSurfaceClick = (e: React.MouseEvent<HTMLElement>) => {
     if (isInteractiveTap(e) || typeof window === "undefined") return;
     const rect = e.currentTarget.getBoundingClientRect();
@@ -948,10 +951,45 @@ export function StorytellingPracticePage({
       rect.width > 0
         ? (e.clientX - rect.left) / rect.width
         : e.clientX / Math.max(1, window.innerWidth);
-    const scrollStep = Math.max(240, Math.round(window.innerHeight * 0.85));
+    const direction: "down" | "up" = relX < 0.5 ? "up" : "down";
+
+    const visualHeight = window.visualViewport?.height;
+    const viewportHeight =
+      typeof visualHeight === "number" && Number.isFinite(visualHeight) && visualHeight > 0
+        ? Math.min(window.innerHeight, visualHeight)
+        : window.innerHeight;
+
+    const headerRect = document.querySelector("header")?.getBoundingClientRect();
+    const topObstruction =
+      headerRect && headerRect.bottom > 0 && headerRect.top <= 1
+        ? Math.max(0, headerRect.bottom)
+        : 0;
+
+    let bottomObstruction = 0;
+    if (isRecorderExpanded && recorderDockRef.current) {
+      const dockRect = recorderDockRef.current.getBoundingClientRect();
+      const overlapsHorizontally =
+        dockRect.width > 0 && dockRect.left < rect.right && dockRect.right > rect.left;
+      if (overlapsHorizontally && dockRect.top < viewportHeight) {
+        bottomObstruction = Math.max(0, viewportHeight - dockRect.top);
+      }
+    }
+
+    const scrollStep = computePageScrollStep({
+      viewportHeight,
+      direction,
+      currentScrollY: window.scrollY,
+      topObstruction,
+      bottomObstruction,
+      overlapRatio: PAGE_SCROLL_OVERLAP_RATIO,
+    });
+    if (scrollStep <= 0) return;
+
+    const prefersReducedMotion =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
     window.scrollBy({
-      top: relX < 0.5 ? -scrollStep : scrollStep,
-      behavior: "smooth",
+      top: direction === "up" ? -scrollStep : scrollStep,
+      behavior: prefersReducedMotion ? "auto" : "smooth",
     });
   };
 
@@ -1813,7 +1851,10 @@ export function StorytellingPracticePage({
                   {ancientBookError}
                 </p>
               ) : ancientBookContent ? (
-                <article className="max-w-[68ch] mx-auto font-serif text-base sm:text-lg leading-[1.85] text-ink whitespace-pre-line select-text">
+                <article
+                  onClick={handleReadingSurfaceClick}
+                  className="max-w-[68ch] mx-auto font-serif text-base sm:text-lg leading-[1.85] text-ink whitespace-pre-line cursor-pointer select-text"
+                >
                   {formatMarkdownForReading(ancientBookContent)}
                 </article>
               ) : null}
@@ -2590,6 +2631,7 @@ export function StorytellingPracticePage({
       {/* ================================================================== */}
       {selectedStory && (
         <aside
+          ref={recorderDockRef}
           aria-label="Thanh thu âm và nghe lại giọng kể"
           className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2"
         >
