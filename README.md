@@ -10,6 +10,7 @@
 
 - **Đọc thêm — Bối cảnh & Linh hồn câu chuyện (`locales/{lang}/level-0-context/`)**:
   Nắm tinh thần văn hóa, nhịp điệu kể (9–10 tuổi theo phong cách Jakob Streit), điểm chạm ẩn dụ, hướng dẫn phát âm tên cổ theo từng Quyển, tổng quan sử thi và thư viện 25 văn bản cổ đọc thêm (`ancient-texts/`).
+  Chọn một văn bản cổ mở một trình đọc tràn viền, cuộn tự nhiên trên mobile/desktop và không phân chia văn bản đó thành Level 1–4. Dock thu âm chung ghi nhãn theo tên văn bản cổ; ghi âm và nghe lại hoàn toàn trong trình duyệt.
 1. **Level 1 — Toàn văn câu chuyện**:
    Văn phong kể chuyện đọc thành tiếng hoàn chỉnh cho toàn bộ **180 Chương**, đi kèm *Lưu ý giọng kể* riêng từng chương và chức năng **Tải bản PDF Toàn văn (tùy chọn kèm 28 tranh Level 4 hoặc không kèm ảnh)**.
 2. **Level 2 — Dàn ý chi tiết**:

@@ -113,6 +113,22 @@ test("Minimal UI shell exposes compact practice controls and expandable utility 
   assert.ok(!pageSource.includes("tapOrSwipeHint"), "Legacy fixed tap/swipe hints must not remain visible");
   assert.ok(!pageSource.includes("jumpToSceneHint"), "Legacy fixed level-3 hint must not remain visible");
   assert.ok(!pageSource.includes("swipeHint"), "Legacy fixed level-4 hint must not remain visible");
+  assert.ok(
+    pageSource.includes("ancient-text-reading-surface"),
+    "Ancient texts must use a dedicated edge-to-edge reading surface"
+  );
+  assert.ok(
+    pageSource.includes("ancientBookId: capturedAncientBook?.id"),
+    "Ancient-text recordings must retain independent text context"
+  );
+  assert.ok(
+    pageSource.includes("level: capturedAncientBook ? undefined : capturedLevel"),
+    "Ancient-text recordings must not create or expose a Practice Level"
+  );
+  assert.ok(
+    !pageSource.includes("activeAncientBook && (\\n                <div className=\"p-4 rounded-xl"),
+    "Ancient text content must not stay in the legacy nested fixed-height card"
+  );
 
   for (const langCode of ["vi", "en", "zh"] as const) {
     const copy = translations[langCode].story.utilities;
@@ -120,6 +136,8 @@ test("Minimal UI shell exposes compact practice controls and expandable utility 
     assert.ok(copy.openButton.length > 0);
     assert.ok(copy.contextButton.length > 0);
     assert.ok(copy.epicSummary.includes("180"));
+    assert.ok(translations[langCode].story.contextSection.ancientReaderBack.length > 0);
+    assert.ok(translations[langCode].story.recorder.ancientTextPrefix.length > 0);
     assert.ok(
       !/\bai\b|trợ lý ai|人工智能/i.test(JSON.stringify(copy)),
       `${langCode} utilities copy must not mention AI`

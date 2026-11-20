@@ -162,6 +162,8 @@ export const translations = {
         pronunciationTitle: "Hướng dẫn phát âm tên riêng & địa danh cổ",
         epicOverviewToggleOpen: "Đọc Tổng quan Linh hồn Sử thi",
         epicOverviewToggleClose: "Ẩn Tổng quan Sử thi",
+        ancientReaderBack: "Quay lại thư viện cổ thư",
+        ancientReaderSource: "Nguồn văn bản",
       },
       levels: {
         1: {
@@ -265,6 +267,7 @@ export const translations = {
           "Trình duyệt này chưa hỗ trợ tạm dừng khi đang thu âm.",
         recordingErrorNotice:
           "Đã xảy ra sự cố khi thu âm. Vui lòng thử thu lại.",
+        ancientTextPrefix: "Cổ thư",
       },
     },
   },
@@ -429,6 +432,8 @@ export const translations = {
         pronunciationTitle: "Ancient & Cultural Name Pronunciation Guide",
         epicOverviewToggleOpen: "Read Epic Soul Overview",
         epicOverviewToggleClose: "Hide Epic Overview",
+        ancientReaderBack: "Back to Ancient Text Library",
+        ancientReaderSource: "Text Source",
       },
       levels: {
         1: {
@@ -532,6 +537,7 @@ export const translations = {
           "This browser does not support pausing an active recording.",
         recordingErrorNotice:
           "A recording error occurred. Please try recording again.",
+        ancientTextPrefix: "Ancient Text",
       },
     },
   },
@@ -694,6 +700,8 @@ export const translations = {
         pronunciationTitle: "专有名词与古地名读音指南",
         epicOverviewToggleOpen: "阅读史诗灵魂总览",
         epicOverviewToggleClose: "隐藏史诗总览",
+        ancientReaderBack: "返回古籍文献库",
+        ancientReaderSource: "文献来源",
       },
       levels: {
         1: {
@@ -793,6 +801,7 @@ export const translations = {
         unsupportedNotice: "当前浏览器不支持直接网页录音（MediaRecorder）。",
         pauseUnsupportedNotice: "当前浏览器不支持在录音过程中暂停。",
         recordingErrorNotice: "录音过程中发生错误，请重新尝试。",
+        ancientTextPrefix: "古籍文献",
       },
     },
   },

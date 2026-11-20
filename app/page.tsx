@@ -919,6 +919,7 @@ export default function StorytellingPracticePage() {
       };
 
       const capturedLevel = activeLevel;
+      const capturedAncientBook = showContextSection ? activeAncientBook : null;
       const capturedOrd =
         capturedLevel === 4
           ? currentIllustration?.ord || safeIllustrationIndex + 1
@@ -951,13 +952,17 @@ export default function StorytellingPracticePage() {
         const audioUrl = URL.createObjectURL(blob);
 
         const recId = `rec-${Date.now()}`;
-        const label = `Level ${capturedLevel} · ${capturedUnitLabel} ${capturedOrd}`;
+        const label = capturedAncientBook
+          ? `${t.story.recorder.ancientTextPrefix} · ${capturedAncientBook.title}`
+          : `Level ${capturedLevel} · ${capturedUnitLabel} ${capturedOrd}`;
         const newRec: VoiceRecording = {
           id: recId,
           storyId: capturedStoryId,
-          level: capturedLevel,
-          sceneOrd: capturedOrd,
+          level: capturedAncientBook ? undefined : capturedLevel,
+          sceneOrd: capturedAncientBook ? 0 : capturedOrd,
           label,
+          ancientBookId: capturedAncientBook?.id,
+          ancientBookTitle: capturedAncientBook?.title,
           audioUrl,
           mimeType: blobType,
           durationSeconds,
@@ -1477,6 +1482,53 @@ export default function StorytellingPracticePage() {
             </div>
           )}
 
+          {activeAncientBook ? (
+            <div className="reading-surface ancient-text-reading-surface space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3">
+                <div className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveAncientBook(null)}
+                    className="btn-ghost text-xs py-1 px-2.5 mb-3"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>{t.story.contextSection.ancientReaderBack}</span>
+                  </button>
+                  <h3 className="font-serif text-xl sm:text-2xl font-bold text-forestDark">
+                    {activeAncientBook.title}
+                  </h3>
+                  <code className="text-[11px] text-terra break-all">{activeAncientBook.file}</code>
+                </div>
+                <a
+                  href={buildGitHubBlobUrl(
+                    activeAncientBook.file,
+                    selectedStory.repoUrl || GENESIS_REPO_URL
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-forest font-semibold inline-flex items-center gap-1 hover:underline"
+                >
+                  <span>{t.story.contextSection.ancientReaderSource}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              {ancientBookLoading ? (
+                <p className="text-sm text-inkSoft italic">
+                  {t.story.repo.ancientBookLoading}
+                </p>
+              ) : ancientBookError ? (
+                <p className="text-sm text-terra" role="alert">
+                  {ancientBookError}
+                </p>
+              ) : ancientBookContent ? (
+                <article className="max-w-[68ch] mx-auto font-serif text-base sm:text-lg leading-[1.85] text-ink whitespace-pre-line select-text">
+                  {formatMarkdownForReading(ancientBookContent)}
+                </article>
+              ) : null}
+            </div>
+          ) : (
+            <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="garden-card space-y-2.5 bg-[#FFFDF8]">
               <div className="flex items-center gap-2 text-forestDark font-serif font-bold text-base">
@@ -1553,16 +1605,6 @@ export default function StorytellingPracticePage() {
                     </p>
                   </div>
                 </div>
-                {activeAncientBook && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAncientBook(null)}
-                    className="btn-ghost text-xs py-1 px-2.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>{t.story.repo.closeAncientBook}</span>
-                  </button>
-                )}
               </div>
 
               <div
@@ -1601,18 +1643,13 @@ export default function StorytellingPracticePage() {
 
               <div className="flex flex-wrap gap-2">
                 {filteredAncientBooks.map((ab) => {
-                  const isOpen = activeAncientBook?.id === ab.id;
                   return (
                     <button
                       key={ab.id}
                       type="button"
-                      aria-pressed={isOpen}
+                      aria-pressed={false}
                       onClick={() => handleOpenAncientBook(ab)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs border transition text-left ${
-                        isOpen
-                          ? "bg-forest text-white border-forest"
-                          : "bg-[#FDFBF5] text-ink border-line hover:border-forest/50 hover:bg-[#FAF3E3]"
-                      }`}
+                      className="px-2.5 py-1.5 rounded-lg text-xs border transition text-left bg-[#FDFBF5] text-ink border-line hover:border-forest/50 hover:bg-[#FAF3E3]"
                     >
                       {ab.title}
                     </button>
@@ -1620,45 +1657,9 @@ export default function StorytellingPracticePage() {
                 })}
               </div>
 
-              {activeAncientBook && (
-                <div className="p-4 rounded-xl bg-[#FFFDF9] border border-forest/30 space-y-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
-                    <div>
-                      <h4 className="font-serif font-bold text-base text-forestDark">
-                        {activeAncientBook.title}
-                      </h4>
-                      <code className="text-[11px] text-terra">{activeAncientBook.file}</code>
-                    </div>
-                    <a
-                      href={buildGitHubBlobUrl(
-                        activeAncientBook.file,
-                        selectedStory.repoUrl || GENESIS_REPO_URL
-                      )}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-forest font-semibold inline-flex items-center gap-1 hover:underline"
-                    >
-                      <span>{t.story.repo.openOnGitHub}</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-
-                  {ancientBookLoading && (
-                    <p className="text-xs text-inkSoft italic">
-                      {t.story.repo.ancientBookLoading}
-                    </p>
-                  )}
-                  {ancientBookError && (
-                    <p className="text-xs text-terra">{ancientBookError}</p>
-                  )}
-                  {ancientBookContent && (
-                    <div className="max-h-96 overflow-y-auto text-sm text-ink leading-relaxed whitespace-pre-line pr-2 font-serif">
-                      {formatMarkdownForReading(ancientBookContent)}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
+          )}
+            </>
           )}
         </section>
       )}
@@ -1666,7 +1667,7 @@ export default function StorytellingPracticePage() {
       {/* ================================================================== */}
       {/* THANH CHỌN 4 LEVEL LUYỆN TẬP (LEVEL 1 → LEVEL 4)                  */}
       {/* ================================================================== */}
-      {selectedStory && (
+      {selectedStory && !activeAncientBook && (
         <section className="space-y-4">
           {/* ============================================================== */}
           {/* LEVEL 1: TOÀN VĂN CÂU CHUYỆN + LƯU Ý GIỌNG KỂ                  */}
@@ -2317,16 +2318,18 @@ export default function StorytellingPracticePage() {
               {showTakesPanel && recordings.length > 0 && (
                 <div className="bg-[#FFFDF7]/98 backdrop-blur-md border border-line rounded-2xl shadow-xl p-3 max-h-60 overflow-y-auto space-y-2">
                   {recordings.map((rec) => {
-                    const isCurrentTake =
-                      rec.storyId === selectedStory.id &&
-                      ((rec.level === 4 &&
-                        activeLevel === 4 &&
-                        currentIllustration &&
-                        rec.sceneOrd === currentIllustration.ord) ||
+                  const isCurrentTake =
+                    rec.storyId === selectedStory.id &&
+                    (rec.ancientBookId
+                      ? activeAncientBook?.id === rec.ancientBookId
+                      : ((rec.level === 4 &&
+                          activeLevel === 4 &&
+                          currentIllustration &&
+                          rec.sceneOrd === currentIllustration.ord) ||
                         (rec.level !== 4 &&
                           activeLevel !== 4 &&
                           currentScene &&
-                          rec.sceneOrd === currentScene.ord));
+                          rec.sceneOrd === currentScene.ord)));
                     return (
                       <div
                         key={rec.id}
@@ -2355,7 +2358,11 @@ export default function StorytellingPracticePage() {
                         <div className="flex items-center gap-1">
                           <a
                             href={rec.audioUrl}
-                            download={`ke-chuyen-L${rec.level}-${rec.sceneOrd}.${getAudioFileExtension(rec.mimeType)}`}
+                            download={
+                              rec.ancientBookId
+                                ? `co-thu-${rec.ancientBookId}.${getAudioFileExtension(rec.mimeType)}`
+                                : `ke-chuyen-L${rec.level}-${rec.sceneOrd}.${getAudioFileExtension(rec.mimeType)}`
+                            }
                             className="p-1.5 rounded-lg border border-line text-forest hover:bg-[#F7ECD8] transition"
                             title={t.story.recorder.downloadTake}
                             aria-label={t.story.recorder.downloadTake}
@@ -2390,21 +2397,27 @@ export default function StorytellingPracticePage() {
               <div className="bg-[#FFFDF7]/95 backdrop-blur-md border-2 border-forest/30 shadow-2xl rounded-2xl p-3 space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="badge-leaf font-bold text-xs">Level {activeLevel}</span>
-                    {activeLevel === 4 ? (
+                    {activeAncientBook ? (
+                      <span className="badge-leaf font-bold text-xs max-w-[220px] truncate">
+                        {t.story.recorder.ancientTextPrefix} · {activeAncientBook.title}
+                      </span>
+                    ) : (
+                      <span className="badge-leaf font-bold text-xs">Level {activeLevel}</span>
+                    )}
+                    {!activeAncientBook && activeLevel === 4 ? (
                       totalIllustrations > 0 && (
                         <span className="text-xs font-serif font-bold text-forestDark whitespace-nowrap">
                           {currentIllustration?.ord || safeIllustrationIndex + 1}/
                           {allIllustrations.length}
                         </span>
                       )
-                    ) : (
+                    ) : !activeAncientBook ? (
                       totalScenes > 0 && (
                         <span className="text-xs font-serif font-bold text-forestDark whitespace-nowrap">
                           {currentScene?.ord || safeSceneIndex + 1}/{allScenes.length}
                         </span>
                       )
-                    )}
+                    ) : null}
                   </div>
 
                   <button

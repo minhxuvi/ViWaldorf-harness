@@ -128,9 +128,11 @@ export interface WaldorfStory {
 export interface VoiceRecording {
   id: string;
   storyId: string;
-  level: PracticeLevel;
+  level?: PracticeLevel;
   sceneOrd: number;
   label: string;
+  ancientBookId?: string;
+  ancientBookTitle?: string;
   audioUrl: string;
   mimeType?: string;
   durationSeconds: number;

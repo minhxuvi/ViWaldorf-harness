@@ -21,3 +21,4 @@
 | 2026-11-19 | Cycle 17 — Minimalist Storytelling-First UI & Collapsible Guide/Tools Drawer | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 17 Report](2026-11-19-cycle-17-minimalist-storytelling-ui.md) |
 | 2026-11-19 | Cycle 18 — Practice Level Dropdown Selector | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 18 Report](2026-11-19-cycle-18-practice-level-dropdown.md) |
 | 2026-11-19 | Cycle 19 — Voice Recorder Pause & Resume | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 19 Report](2026-11-19-cycle-19-recorder-pause-resume.md) |
+| 2026-11-20 | Cycle 20 — Dedicated Ancient Text Reader & Text-Scoped Recording | 100.0 | PASS/PASS/PASS | KEEP | [Cycle 20 Report](2026-11-20-cycle-20-ancient-text-reader.md) |
